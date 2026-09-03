@@ -26,10 +26,22 @@ this separately, in its own `localStorage`).
 
 ## Structure
 
-- `app/page.tsx` — the whole dashboard (Overview, Clients, Activity Log,
-  Settings, detail panel, add-client modal).
+- `app/page.tsx` — thin: wires the hook below to the components below, plus
+  the shared backdrop overlay.
 - `app/layout.tsx` / `app/globals.css` — shell and styling, ported from the
   HTML file's `<style>` block.
+- `lib/hooks/useDashboard.ts` — all dashboard state and backend actions
+  (connection, clients, settings, add/pause/resume/mark-paid/etc.). Start
+  here for behavior changes.
 - `lib/backend.ts` — the one function (`apiCall`) that talks to the Apps
   Script backend; mirrors the HTML file's `apiCall`.
-- `lib/format.ts`, `lib/types.ts` — small helpers/types.
+- `lib/status.ts` — status computation, status-pill styling, activity-log
+  dot colors.
+- `lib/format.ts`, `lib/types.ts` — date/money helpers and shared types.
+- `components/` — presentational pieces: `Sidebar`, `Toast`,
+  `NoBackendBanner`, `Pill`, `ClientDetailPanel`, `AddClientModal`.
+- `components/views/` — one component per sidebar tab: `OverviewView`,
+  `ClientsView`, `ActivityView`, `SettingsView`.
+
+Start UI changes in `components/`, state/backend changes in
+`lib/hooks/useDashboard.ts`.
