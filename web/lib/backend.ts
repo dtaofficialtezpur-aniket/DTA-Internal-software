@@ -18,7 +18,7 @@ export function hasBackend(conn: BackendConn): boolean {
 export async function apiCall<T = unknown>(
   conn: BackendConn,
   action: string,
-  payload: Record<string, unknown> = {}
+  payload: object = {}
 ): Promise<T> {
   if (!hasBackend(conn)) throw new Error('Backend not configured');
   const res = await fetch(conn.backendUrl, {
