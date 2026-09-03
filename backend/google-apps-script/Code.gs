@@ -314,10 +314,18 @@ function jsonOut(obj) {
 
 /**
  * Run this once manually from the Apps Script editor (select "setup" in the
- * function dropdown, click Run) to create the sheets and print your admin
- * key before you deploy the Web App.
+ * function dropdown, click Run) to create the sheets and get your admin key
+ * before you deploy the Web App. The key is shown in a popup and also saved
+ * in the Settings sheet (row "adminKey") so you can find it again anytime.
  */
 function setup() {
   ensureSheets_();
-  Logger.log('Admin key: ' + getSettings_().adminKey);
+  var adminKey = getSettings_().adminKey;
+  SpreadsheetApp.getUi().alert(
+    'Setup complete',
+    'Your admin key is:\n\n' + adminKey +
+      '\n\nCopy it now — you\'ll paste it into the dashboard\'s Settings. ' +
+      'You can also find it later in the Settings sheet tab, row "adminKey".',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
 }
