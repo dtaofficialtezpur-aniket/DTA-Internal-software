@@ -19,9 +19,6 @@ listener needed on the customer's machine.
 - **`backend/google-apps-script/`** — the backend: a Google Apps Script Web
   App backed by a Google Sheet acting as the database. No local server or
   install needed. See `SETUP.md` in that folder to deploy it and get a URL.
-- **`test-client/index.html`** — a stand-in for a customer's desktop app.
-  Polls the backend's status endpoint and locks/unlocks itself live, so you
-  can test the full flow without building the real client software yet.
 
 ## Quick start
 
@@ -29,11 +26,11 @@ listener needed on the customer's machine.
    a Web App URL + admin key.
 2. Open `dashboard/index.html` → Settings → paste the URL + admin key →
    Save & connect.
-3. Add a test client from the dashboard, copy its Client ID + API key.
-4. Open `test-client/index.html`, paste the same backend URL + that Client ID
-   + API key, click Start.
-5. From the dashboard, pause that client → watch the test client lock itself
-   within one check interval. Resume it → watch it unlock.
+3. Add a client from the dashboard, copy its Client ID + API key.
+4. Send a status check yourself (from wherever you're testing) to:
+   `<backend URL>?action=status&client_id=<id>&api_key=<key>`
+5. From the dashboard, pause that client and re-check — the response should
+   flip from `active` to `paused`. Resume it and it flips back.
 
 ## Later
 
