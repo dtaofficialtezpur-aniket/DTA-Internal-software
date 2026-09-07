@@ -1,0 +1,52 @@
+name: Build desktop app
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch: {} # lets you trigger a build manually from the Actions tab, no tag needed
+
+permissions:
+  contents: write # needed so electron-builder can publish to GitHub Releases
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install dependencies
+        working-directory: desktop
+        run: npm ci
+
+      - name: Build and publish (on tag push)
+        if: startsWith(github.ref, 'refs/tags/')
+        working-directory: desktop
+        run: npx electron-builder --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build only (manual run, no tag)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        working-directory: desktop
+        run: npx electron-builder --publish never
+
+      - name: Upload build as a workflow artifact
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: |
+            desktop/release/*.exe
+            desktop/release/*.dmg
+            desktop/release/*.AppImage
+          if-no-files-found: warn
