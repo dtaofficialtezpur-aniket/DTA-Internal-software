@@ -1,3 +1,14 @@
+<meta charset="utf-8">
+<!--
+  This app is a single HTML file, so the inline <style> and <script> below
+  need 'unsafe-inline' in the CSP — that's a known tradeoff of keeping
+  everything in one file for easy editing/testing. The real protections
+  against script injection are: (1) every piece of client-controlled text
+  (client name, software name, activity notes) is HTML-escaped with esc()
+  before being inserted, and (2) network access is locked to the two
+  domains Google Apps Script actually uses.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://script.google.com https://script.googleusercontent.com; object-src 'none'; base-uri 'none'; form-action 'none';">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <title>DTA Subscription Control</title>
 <style>
@@ -444,6 +455,8 @@
   function fmtDate(d){ return d.toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'}); }
   function fmtDateTime(d){ return d.toLocaleDateString('en-IN', {day:'numeric', month:'short', year:'numeric'}) + ', ' + d.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'}); }
   function fmtMoney(n){ return '₹' + Number(n).toLocaleString('en-IN'); }
+  var ESC_MAP = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return ESC_MAP[c]; }); }
   function timeAgo(d){
     var mins = Math.round((Date.now() - d.getTime()) / 60000);
     if (mins < 1) return 'just now';
@@ -583,12 +596,12 @@
     tbody.innerHTML = rows.map(function(c){
       var s = computeStatus(c);
       var d = diffDays(c.nextDue, TODAY);
-      return '<tr data-id="' + c.id + '">' +
-        '<td class="cell-name">' + c.client + '</td>' +
-        '<td>' + c.software + '</td>' +
+      return '<tr data-id="' + esc(c.id) + '">' +
+        '<td class="cell-name">' + esc(c.client) + '</td>' +
+        '<td>' + esc(c.software) + '</td>' +
         '<td>' + pillHTML(s) + '</td>' +
         '<td class="tabular">' + fmtDate(c.nextDue) + '<div class="cell-sub">' + (d<0 ? Math.abs(d)+' days overdue' : d+' days left') + '</div></td>' +
-        '<td class="row-actions"><button class="btn btn-secondary btn-sm" data-view-client="' + c.id + '">View</button></td>' +
+        '<td class="row-actions"><button class="btn btn-secondary btn-sm" data-view-client="' + esc(c.id) + '">View</button></td>' +
         '</tr>';
     }).join('');
   }
@@ -609,12 +622,12 @@
     }
     tbody.innerHTML = rows.map(function(c){
       var s = computeStatus(c);
-      return '<tr data-id="' + c.id + '">' +
-        '<td><div class="cell-name">' + c.client + '</div><div class="cell-sub">' + c.software + '</div></td>' +
+      return '<tr data-id="' + esc(c.id) + '">' +
+        '<td><div class="cell-name">' + esc(c.client) + '</div><div class="cell-sub">' + esc(c.software) + '</div></td>' +
         '<td class="tabular">' + fmtMoney(c.amount) + ' <span style="color:var(--ink-faint);">/ ' + (c.cycle==='Monthly'?'mo':'yr') + '</span></td>' +
         '<td class="tabular">' + fmtDate(c.nextDue) + '</td>' +
         '<td>' + pillHTML(s) + '</td>' +
-        '<td class="row-actions"><button class="btn btn-secondary btn-sm" data-view-client="' + c.id + '">View</button></td>' +
+        '<td class="row-actions"><button class="btn btn-secondary btn-sm" data-view-client="' + esc(c.id) + '">View</button></td>' +
         '</tr>';
     }).join('');
   }
@@ -629,8 +642,8 @@
     if (!events.length){ list.innerHTML = '<div class="empty">' + (hasBackend() ? 'No activity yet.' : 'Connect a backend in Settings to load activity.') + '</div>'; return; }
     list.innerHTML = events.map(function(e){
       return '<div class="log-row"><div class="log-dot" style="background:' + actionColor(e.action) + '"></div>' +
-        '<div><div class="log-text"><b>' + e.client + '</b> — ' + e.note + '</div>' +
-        '<div class="log-time">' + e.software + ' · ' + timeAgo(e.t) + '</div></div></div>';
+        '<div><div class="log-text"><b>' + esc(e.client) + '</b> — ' + esc(e.note) + '</div>' +
+        '<div class="log-time">' + esc(e.software) + ' · ' + timeAgo(e.t) + '</div></div></div>';
     }).join('');
   }
 
@@ -688,7 +701,7 @@
     var hist = c.history.slice().sort(function(a,b){ return b.t - a.t; });
     document.getElementById('d-history').innerHTML = hist.map(function(h){
       return '<div class="log-row"><div class="log-dot" style="background:' + actionColor(h.action) + '"></div>' +
-        '<div><div class="log-text">' + h.note + '</div><div class="log-time">' + fmtDateTime(h.t) + '</div></div></div>';
+        '<div><div class="log-text">' + esc(h.note) + '</div><div class="log-time">' + fmtDateTime(h.t) + '</div></div></div>';
     }).join('');
   }
   function maskKey(k){ return k.slice(0,8) + '••••••••' + k.slice(-4); }

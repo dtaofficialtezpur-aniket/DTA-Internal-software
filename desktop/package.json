@@ -1,0 +1,50 @@
+{
+  "name": "dta-subscription-control",
+  "productName": "DTA Subscription Control",
+  "version": "1.0.0",
+  "description": "DTA-internal desktop app for managing client subscriptions and access.",
+  "private": true,
+  "author": "DTA",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "build": {
+    "appId": "in.dtaonline.subscriptioncontrol",
+    "productName": "DTA Subscription Control",
+    "files": [
+      "main.js",
+      "preload.js"
+    ],
+    "extraResources": [
+      {
+        "from": "../dashboard",
+        "to": "dashboard"
+      }
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "dtaofficialtezpur-aniket",
+        "repo": "DTA-Internal-software"
+      }
+    ],
+    "win": { "target": "nsis" },
+    "mac": { "target": "dmg", "category": "public.app-category.business" },
+    "linux": { "target": "AppImage" }
+  }
+}
