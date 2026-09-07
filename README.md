@@ -14,11 +14,12 @@ listener needed on the customer's machine.
 
 ## Parts of this repo
 
-- **`dashboard/index.html`** — a single-file **sandbox** copy of the admin
-  dashboard (add clients, pause/resume, mark paid, view activity). Open it
-  directly in a browser, no build step — use it to try changes fast.
-- **`web/`** — the same dashboard as a **Next.js App Router app**. This is
-  the real, ongoing version. See `web/README.md`.
+- **`dashboard/index.html`** — the admin dashboard itself (add clients,
+  pause/resume, mark paid, view activity), as a single HTML file. Open it
+  directly in a browser to try changes fast, no build step.
+- **`desktop/`** — an Electron wrapper that packages `dashboard/index.html`
+  as a real downloadable desktop app (Windows/Mac/Linux), with auto-update
+  checking and hardened security settings. See `desktop/README.md`.
 - **`backend/google-apps-script/`** — the backend both of the above talk to:
   a Google Apps Script Web App backed by a Google Sheet acting as the
   database. No local server or install needed. See `SETUP.md` in that
@@ -26,17 +27,17 @@ listener needed on the customer's machine.
 
 ### Workflow for changes
 
-Try a change in `dashboard/index.html` first (edit, refresh browser, done —
-no build). Once it's right, ask Claude to port the same change into `web/`.
-Keep both in sync going forward; don't let the HTML sandbox and the Next.js
-app drift apart.
+Edit `dashboard/index.html` directly, refresh a browser tab to try it — no
+build step. `desktop/` just packages that same file, so a change there is
+picked up the next time the desktop app is built.
 
 ## Quick start
 
 1. Follow `backend/google-apps-script/SETUP.md` to deploy the backend and get
    a Web App URL + admin key.
-2. Open `dashboard/index.html` (or run `web/` with `npm install && npm run dev`)
-   → Settings → paste the URL + admin key → Save & connect.
+2. Open `dashboard/index.html` in a browser (or run the desktop app —
+   `cd desktop && npm install && npm start`) → Settings → paste the URL +
+   admin key → Save & connect.
 3. Add a client from the dashboard, copy its Client ID + API key.
 4. Send a status check yourself (from wherever you're testing) to:
    `<backend URL>?action=status&client_id=<id>&api_key=<key>`
@@ -50,3 +51,5 @@ app drift apart.
   Backend URL changed.
 - Wire the same status-check logic into the real client software once it's
   built (desktop app via Electron/Tauri, or a web app).
+- Design pass on the desktop app's Update button and packaged installer
+  polish (icon, signing) — deferred for now to get a working build out.
