@@ -20,10 +20,15 @@ listener needed on the customer's machine.
 - **`desktop/`** — an Electron wrapper that packages `dashboard/index.html`
   as a real downloadable desktop app (Windows/Mac/Linux), with auto-update
   checking and hardened security settings. See `desktop/README.md`.
-- **`backend/google-apps-script/`** — the backend both of the above talk to:
-  a Google Apps Script Web App backed by a Google Sheet acting as the
-  database. No local server or install needed. See `SETUP.md` in that
-  folder to deploy it and get a URL.
+- **`backend/google-apps-script/`** — a backend option: a Google Apps
+  Script Web App backed by a Google Sheet acting as the database. No local
+  server or install needed. See `SETUP.md` in that folder to deploy it and
+  get a URL.
+- **`backend/hostinger-php/`** — a second backend option: a PHP + MySQL
+  backend for Hostinger (or any PHP/MySQL) hosting. Same request/response
+  contract as the Apps Script one, so the dashboard and desktop app work
+  unchanged either way — pick one, or run both and only use one at a time.
+  See `SETUP.md` in that folder.
 
 ### Workflow for changes
 
@@ -33,8 +38,9 @@ picked up the next time the desktop app is built.
 
 ## Quick start
 
-1. Follow `backend/google-apps-script/SETUP.md` to deploy the backend and get
-   a Web App URL + admin key.
+1. Follow `backend/google-apps-script/SETUP.md` (Google Sheets) or
+   `backend/hostinger-php/SETUP.md` (Hostinger) to deploy a backend and get
+   a Backend URL + admin key.
 2. Open `dashboard/index.html` in a browser (or run the desktop app —
    `cd desktop && npm install && npm start`) → Settings → paste the URL +
    admin key → Save & connect.
