@@ -5,10 +5,12 @@
   everything in one file for easy editing/testing. The real protections
   against script injection are: (1) every piece of client-controlled text
   (client name, software name, activity notes) is HTML-escaped with esc()
-  before being inserted, and (2) network access is locked to the two
-  domains Google Apps Script actually uses.
+  before being inserted, and (2) network access is limited to HTTPS only
+  (connect-src https:) — the Backend URL is admin-supplied in Settings and
+  can point at Google Apps Script, a self-hosted PHP backend, or anything
+  else, so it can't be pinned to a fixed list of domains here.
 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://script.google.com https://script.googleusercontent.com; object-src 'none'; base-uri 'none'; form-action 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https:; object-src 'none'; base-uri 'none'; form-action 'none';">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <title>DTA Subscription Control</title>
 <style>
