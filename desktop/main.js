@@ -2,8 +2,6 @@ const { app, BrowserWindow, Menu, Notification, ipcMain, session, shell } = requ
 const path = require('node:path');
 const { autoUpdater } = require('electron-updater');
 
-const ALLOWED_CONNECT_HOSTS = new Set(['script.google.com', 'script.googleusercontent.com']);
-
 let mainWindow = null;
 let updateReadyNotified = false;
 
@@ -60,16 +58,14 @@ function lockDownSession() {
   // from web content, etc.) — this app needs none of them.
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
 
-  // Only allow network requests to the two Google Apps Script hosts the
-  // dashboard actually talks to, plus Google Fonts for the stylesheet.
-  const allowedFontHosts = new Set(['fonts.googleapis.com', 'fonts.gstatic.com']);
+  // The Backend URL is admin-supplied in Settings (Google Apps Script, a
+  // self-hosted PHP backend, or anything else), so it can't be pinned to a
+  // fixed list of hosts. Allow any HTTPS request (plus local files); block
+  // everything else, including plain HTTP.
   session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
     try {
       const url = new URL(details.url);
-      if (url.protocol === 'file:') return callback({ cancel: false });
-      if (url.protocol === 'https:' && (ALLOWED_CONNECT_HOSTS.has(url.hostname) || allowedFontHosts.has(url.hostname))) {
-        return callback({ cancel: false });
-      }
+      if (url.protocol === 'file:' || url.protocol === 'https:') return callback({ cancel: false });
       callback({ cancel: true });
     } catch {
       callback({ cancel: true });
