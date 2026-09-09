@@ -31,19 +31,28 @@ account.
 3. You can delete `setup.php` afterward if you like; running it again is
    harmless either way (it only creates tables that don't already exist).
 
-## 4. Connect the dashboard / desktop app and register
+## 4. Point the app at this backend
+The Backend URL isn't typed into the app — it's a constant baked into
+`dashboard/index.html` (`BACKEND_URL`, near the top of the `<script>`
+block), since this whole team shares one backend. Before first use, open
+that file and set it to `https://yourdomain.com/subctl/api.php`, and
+update the `connect-src` value in the CSP `<meta>` tag near the top of the
+file to match your domain. The desktop app packages this same file, so
+one edit covers both.
+
+## 5. Register the admin account
 1. Open the dashboard (or the desktop app).
-2. On the **Connect** screen, paste the Backend URL:
-   `https://yourdomain.com/subctl/api.php`
-3. Click **Register**. The **first account ever created becomes the admin
-   automatically** — fill in your name, pick a username, and choose a
-   6-digit PIN.
-4. You're in. Every time the app is reopened, you log in again with that
+2. Click **Register**. This only ever works once — the **first account
+   ever created becomes the admin automatically**. Fill in your name, pick
+   a username, and choose a 6-digit PIN.
+3. You're in. Every time the app is reopened, you log in again with that
    username + PIN — no persistent session.
 
-## 5. Adding your team
-- Anyone else who registers becomes an **employee** and sits **pending**
-  until you approve them from the admin's **Team** page.
+## 6. Adding your team
+- Employees don't self-register. From the admin's **Team** page, click
+  **Add employee** and give their name + a username — no PIN needed from
+  you. They set their own PIN the first time they log in with that
+  username.
 - Removing someone from Team revokes their access immediately — their next
   action anywhere in the app sends them back to the login screen, and they
   can't log back in.

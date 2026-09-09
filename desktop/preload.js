@@ -15,11 +15,4 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Restarts the app and installs the already-downloaded update.
   installUpdate: () => ipcRenderer.send('install-update'),
-
-  // Backend URL, stored encrypted via the OS keychain instead of
-  // plain-text localStorage. Resolves to { backendUrl }. Login (username +
-  // PIN) is handled by the backend itself; the session token lives only
-  // in the renderer's memory, never persisted here.
-  getCredentials: () => ipcRenderer.invoke('get-credentials'),
-  setCredentials: (creds) => ipcRenderer.invoke('set-credentials', creds),
 });

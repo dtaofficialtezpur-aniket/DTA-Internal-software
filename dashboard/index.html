@@ -5,12 +5,12 @@
   everything in one file for easy editing/testing. The real protections
   against script injection are: (1) every piece of client-controlled text
   (client name, software name, activity notes, full names) is HTML-escaped
-  with esc() before being inserted, and (2) network access is limited to
-  HTTPS only (connect-src https:) — the Backend URL is admin-supplied and
-  can point at any server, so it can't be pinned to a fixed list of domains
-  here.
+  with esc() before being inserted, and (2) network access is locked to
+  the one backend this build is configured for (connect-src below) — see
+  BACKEND_URL near the top of the <script>. If you change that constant to
+  point at a different host, update connect-src here to match.
 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https:; object-src 'none'; base-uri 'none'; form-action 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://dtaonline.in; object-src 'none'; base-uri 'none'; form-action 'none';">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <title>DTA Subscription Control</title>
 <style>
@@ -136,7 +136,7 @@
   tbody tr:last-child td{border-bottom:none;}
   tbody tr{cursor:pointer;}
   tbody tr:hover td{background:var(--surface-sunken);}
-  #pending-table tbody tr, #reset-requests-table tbody tr, #team-table tbody tr{cursor:default;}
+  #reset-requests-table tbody tr, #team-table tbody tr{cursor:default;}
   .cell-name{font-weight:600;}
   .cell-sub{color:var(--ink-muted);font-size:.78rem;margin-top:1px;}
   .row-actions{display:flex;gap:6px;}
@@ -204,29 +204,6 @@
   [hidden]{display:none !important;}
 </style>
 
-<!-- CONNECT SCREEN: shown once, before any Backend URL is set -->
-<div class="auth-shell" id="connect-screen">
-  <div class="card auth-card">
-    <div class="auth-brand">
-      <div class="brand-mark" aria-hidden="true">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="3.4" height="12" rx="1.6" fill="var(--accent-ink)"/><rect x="9.6" y="2" width="3.4" height="12" rx="1.6" fill="var(--accent-ink)"/></svg>
-      </div>
-      <div>
-        <div class="brand-name">DTA</div>
-        <div class="brand-sub">Subscription Control</div>
-      </div>
-    </div>
-    <h2 style="font-size:1.1rem;margin-bottom:4px;">Connect to your backend</h2>
-    <div class="page-sub" style="margin-bottom:16px;">Paste the API URL from your Hostinger setup (see backend/hostinger-php/SETUP.md).</div>
-    <form class="settings-form" id="connect-form">
-      <label>Backend URL
-        <input type="url" id="connect-backend-url" placeholder="https://yourdomain.com/subctl/api.php" required>
-      </label>
-      <button type="submit" class="btn btn-primary btn-block">Continue</button>
-    </form>
-  </div>
-</div>
-
 <!-- AUTH SCREEN: login / register / forgot pin / set new pin -->
 <div class="auth-shell" id="auth-screen" hidden>
   <div class="card auth-card">
@@ -260,8 +237,8 @@
     </div>
 
     <div id="register-panel" hidden>
-      <h2 style="font-size:1.1rem;margin-bottom:4px;">Register</h2>
-      <div class="page-sub" style="margin-bottom:16px;">The first person to register becomes the admin. Everyone after needs the admin's approval before they can log in.</div>
+      <h2 style="font-size:1.1rem;margin-bottom:4px;">First-time setup</h2>
+      <div class="page-sub" style="margin-bottom:16px;">This creates the admin account and only works once — the very first account in the system. If you're an employee, ask your admin to create your account instead, and just log in below.</div>
       <form class="settings-form" id="register-form">
         <label>Full name
           <input type="text" id="register-fullname" required>
@@ -427,13 +404,24 @@
       <section data-page="team" hidden>
         <div class="page-head"><div>
           <h1>Team</h1>
-          <div class="page-sub">Approve new registrations, manage access, and PIN reset requests.</div>
+          <div class="page-sub">Create employee accounts, manage access, and PIN reset requests.</div>
         </div></div>
 
-        <div class="section-title"><h2>Pending registrations</h2></div>
-        <div class="table-wrap"><table id="pending-table"><thead><tr>
-          <th>Name</th><th>Username</th><th>Requested</th><th></th>
-        </tr></thead><tbody></tbody></table></div>
+        <div class="card" style="padding:20px 22px;margin-bottom:18px;">
+          <h2 style="font-size:1rem;margin-bottom:4px;">Add employee</h2>
+          <div class="page-sub" style="margin-bottom:14px;">Creates their account. They set their own PIN the first time they log in with this username — no password to hand them.</div>
+          <form class="settings-form" id="add-employee-form">
+            <label>Full name
+              <input type="text" id="ae-fullname" required>
+            </label>
+            <label>Username
+              <input type="text" id="ae-username" required pattern="[a-zA-Z0-9_.\-]+" title="Letters, numbers, . _ - only">
+            </label>
+            <div>
+              <button type="submit" class="btn btn-primary">Create employee</button>
+            </div>
+          </form>
+        </div>
 
         <div class="section-title"><h2>PIN reset requests</h2></div>
         <div class="table-wrap"><table id="reset-requests-table"><thead><tr>
@@ -452,19 +440,6 @@
           <h1>Settings</h1>
           <div class="page-sub">Defaults used across every client's subscription check.</div>
         </div></div>
-
-        <div class="card" style="padding:20px 22px;margin-bottom:18px;">
-          <h2 style="font-size:1rem;margin-bottom:4px;">Backend URL</h2>
-          <div class="page-sub" style="margin-bottom:14px;">Only change this if you're moving to a different server — saving it logs you out.</div>
-          <form class="settings-form" id="backend-form">
-            <label>Backend URL
-              <input type="url" id="set-backend-url" required>
-            </label>
-            <div>
-              <button type="submit" class="btn btn-secondary">Save &amp; reconnect</button>
-            </div>
-          </form>
-        </div>
 
         <div class="card" style="padding:20px 22px;">
           <h2 style="font-size:1rem;margin-bottom:4px;">Defaults</h2>
@@ -603,43 +578,30 @@
 
   var TODAY = new Date();
 
+  /* ---------- backend ----------
+     One fixed backend for this whole organization — baked in here rather
+     than typed into a Settings field. It isn't a secret (it's just a URL,
+     same as any API endpoint); what actually protects the data behind it
+     is the login system below. To point this build at a different backend,
+     change this constant and redeploy. */
+  var BACKEND_URL = 'https://dtaonline.in/DTA_Internal/api.php';
+
   /* ---------- state ---------- */
   var settings = { name:'DTA', lead:7, grace:5 };
   var clients = [];
   var selectedId = null;
-  var conn = { backendUrl: '' };
   // Never persisted to disk — every app launch requires the PIN again.
   var auth = { token: null, user: null };
   var pendingSetPinUsername = null;
 
-  /* ---------- credential storage (Backend URL only — no secrets here) ----------
-     In the desktop app, window.electronAPI stores this via the OS keychain.
-     Opened as a plain HTML file in a browser, it falls back to localStorage. */
-  function loadCredentials(){
-    if (window.electronAPI && window.electronAPI.getCredentials){
-      return window.electronAPI.getCredentials().catch(function(){ return { backendUrl:'' }; });
-    }
-    return Promise.resolve({ backendUrl: localStorage.getItem('dta-subctl-backend-url') || '' });
-  }
-  function saveCredentials(c){
-    if (window.electronAPI && window.electronAPI.setCredentials){
-      return window.electronAPI.setCredentials({ backendUrl: c.backendUrl });
-    }
-    localStorage.setItem('dta-subctl-backend-url', c.backendUrl);
-    return Promise.resolve();
-  }
-
-  /* ---------- backend calls ---------- */
-  function hasBackend(){ return !!conn.backendUrl; }
   function isLoggedIn(){ return !!(auth.token && auth.user); }
   function isAuthErrorMessage(msg){
     return /Session expired|Not logged in|access has been removed/i.test(msg || '');
   }
 
   function apiCall(action, payload){
-    if (!hasBackend()) return Promise.reject(new Error('Backend not configured'));
     var body = Object.assign({ action: action }, auth.token ? { token: auth.token } : {}, payload || {});
-    return fetch(conn.backendUrl, {
+    return fetch(BACKEND_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(body)
@@ -796,12 +758,11 @@
     document.getElementById('set-name').value = settings.name;
     document.getElementById('set-lead').value = settings.lead;
     document.getElementById('set-grace').value = settings.grace;
-    document.getElementById('set-backend-url').value = conn.backendUrl;
   }
 
   /* ---------- team page (admin only) ---------- */
   function statusPillHTML(status){
-    var labels = { pending:'Pending', active:'Active', removed:'Removed', rejected:'Rejected' };
+    var labels = { active:'Active', removed:'Removed' };
     return '<span class="pill pill-' + status + '">' + (labels[status] || status) + '</span>';
   }
 
@@ -809,25 +770,9 @@
     if (!isLoggedIn() || auth.user.role !== 'admin') return;
     apiCall('listTeam').then(function(data){
       var users = data.users;
-      renderPendingTable(users.filter(function(u){ return u.status === 'pending'; }));
       renderResetTable(users.filter(function(u){ return u.status === 'active' && u.pinResetRequested; }));
-      renderTeamTable(users.filter(function(u){ return u.status !== 'pending'; }));
+      renderTeamTable(users);
     }).catch(function(err){ showToast('Could not load team: ' + err.message); });
-  }
-
-  function renderPendingTable(list){
-    var tbody = document.querySelector('#pending-table tbody');
-    if (!list.length){ tbody.innerHTML = '<tr><td colspan="4" class="empty">No pending registrations.</td></tr>'; return; }
-    tbody.innerHTML = list.map(function(u){
-      return '<tr>' +
-        '<td class="cell-name">' + esc(u.fullName) + '</td>' +
-        '<td>' + esc(u.username) + '</td>' +
-        '<td class="tabular">' + fmtDate(new Date(u.createdAt)) + '</td>' +
-        '<td class="row-actions">' +
-          '<button class="btn btn-secondary btn-sm" data-approve-reg="' + u.id + '">Approve</button>' +
-          '<button class="btn btn-danger btn-sm" data-reject-reg="' + u.id + '">Reject</button>' +
-        '</td></tr>';
-    }).join('');
   }
 
   function renderResetTable(list){
@@ -967,9 +912,8 @@
     document.getElementById('add-form').reset();
   }
 
-  /* ---------- screen switching (connect / auth / app) ---------- */
+  /* ---------- screen switching (auth / app) ---------- */
   function showScreen(name){
-    document.getElementById('connect-screen').hidden = name !== 'connect';
     document.getElementById('auth-screen').hidden = name !== 'auth';
     document.getElementById('app-shell').hidden = name !== 'app';
   }
@@ -1001,7 +945,7 @@
   function doLogout(){
     var tok = auth.token;
     if (tok){
-      fetch(conn.backendUrl, {
+      fetch(BACKEND_URL, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ action: 'logout', token: tok })
       }).catch(function(){});
@@ -1016,17 +960,8 @@
 
   /* ---------- wire up ---------- */
   document.addEventListener('DOMContentLoaded', function(){
-    loadCredentials().then(function(c){
-      conn = c;
-      document.getElementById('connect-backend-url').value = conn.backendUrl;
-      document.getElementById('set-backend-url').value = conn.backendUrl;
-      if (hasBackend()){
-        showScreen('auth');
-        showAuthPanel('login');
-      } else {
-        showScreen('connect');
-      }
-    });
+    showScreen('auth');
+    showAuthPanel('login');
 
     document.querySelectorAll('.nav-btn').forEach(function(b){
       b.addEventListener('click', function(){ showView(b.dataset.view); });
@@ -1039,20 +974,6 @@
       if (row && !e.target.closest('button')){ openDetail(row.dataset.id); return; }
       if (e.target.closest('[data-open-add]')){ openAdd(); return; }
 
-      var approveReg = e.target.closest('[data-approve-reg]');
-      if (approveReg){
-        apiCall('approveRegistration', { userId: Number(approveReg.dataset.approveReg) })
-          .then(function(){ showToast('Registration approved'); renderTeam(); })
-          .catch(function(err){ showToast('Failed: ' + err.message); });
-        return;
-      }
-      var rejectReg = e.target.closest('[data-reject-reg]');
-      if (rejectReg){
-        apiCall('rejectRegistration', { userId: Number(rejectReg.dataset.rejectReg) })
-          .then(function(){ showToast('Registration rejected'); renderTeam(); })
-          .catch(function(err){ showToast('Failed: ' + err.message); });
-        return;
-      }
       var approveReset = e.target.closest('[data-approve-reset]');
       if (approveReset){
         apiCall('approvePinReset', { userId: Number(approveReset.dataset.approveReset) })
@@ -1130,26 +1051,19 @@
       }).catch(function(err){ showToast('Failed: ' + err.message); });
     });
 
-    document.getElementById('backend-form').addEventListener('submit', function(e){
-      e.preventDefault();
-      conn.backendUrl = document.getElementById('set-backend-url').value.trim();
-      saveCredentials(conn).then(function(){
-        showToast('Backend URL saved — please log in again');
-        document.getElementById('connect-backend-url').value = conn.backendUrl;
-        doLogout();
-      });
-    });
-
     document.getElementById('logout-btn').addEventListener('click', doLogout);
 
-    document.getElementById('connect-form').addEventListener('submit', function(e){
+    document.getElementById('add-employee-form').addEventListener('submit', function(e){
       e.preventDefault();
-      conn.backendUrl = document.getElementById('connect-backend-url').value.trim();
-      saveCredentials(conn).then(function(){
-        document.getElementById('set-backend-url').value = conn.backendUrl;
-        showScreen('auth');
-        showAuthPanel('login');
-      });
+      var payload = {
+        fullName: document.getElementById('ae-fullname').value.trim(),
+        username: document.getElementById('ae-username').value.trim()
+      };
+      apiCall('createEmployee', payload).then(function(){
+        showToast(payload.fullName + ' added — they set their own PIN on first login.');
+        document.getElementById('add-employee-form').reset();
+        renderTeam();
+      }).catch(function(err){ showToast('Failed: ' + err.message); });
     });
 
     document.querySelectorAll('[data-auth-switch]').forEach(function(b){

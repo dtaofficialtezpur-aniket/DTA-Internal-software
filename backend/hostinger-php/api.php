@@ -8,11 +8,13 @@
  *  - everything else (POST): the dashboard. Gated by a session token from
  *    login, except register/login/requestPinReset/setPin themselves.
  *
- * Accounts: the first person ever to complete registration becomes the
- * admin automatically; everyone after that registers as an 'employee' and
- * sits 'pending' until the admin approves them from the Team screen. Admin
- * can remove an employee at any time, which deletes their sessions too —
- * they lose access immediately, not just at their token's natural expiry.
+ * Accounts: 'register' only ever creates ONE account — the first person to
+ * call it becomes the admin. After that it's closed; employees don't
+ * self-register. Instead the admin creates their account (username + full
+ * name, no PIN yet) from the Team screen, and the employee sets their own
+ * PIN the first time they log in with that username. Admin can remove an
+ * employee at any time, which deletes their sessions too — they lose
+ * access immediately, not just at their token's natural expiry.
  */
 
 require __DIR__ . '/db.php';
@@ -272,13 +274,9 @@ if ($method === 'GET') {
             require_admin_session($pdo, $body['token'] ?? null);
             handle_list_team($pdo);
             break;
-        case 'approveRegistration':
+        case 'createEmployee':
             require_admin_session($pdo, $body['token'] ?? null);
-            handle_decide_registration($pdo, $body, 'active');
-            break;
-        case 'rejectRegistration':
-            require_admin_session($pdo, $body['token'] ?? null);
-            handle_decide_registration($pdo, $body, 'rejected');
+            handle_create_employee($pdo, $body);
             break;
         case 'removeEmployee':
             require_admin_session($pdo, $body['token'] ?? null);
@@ -333,6 +331,11 @@ function handle_status(PDO $pdo, array $params): void
 
 function handle_register(PDO $pdo, array $body): void
 {
+    $isFirstUser = (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn() === 0;
+    if (!$isFirstUser) {
+        json_out(['error' => 'Registration is closed. Ask your admin to create your account.']);
+    }
+
     $username = trim((string) ($body['username'] ?? ''));
     $fullName = trim((string) ($body['fullName'] ?? ''));
     $pin = (string) ($body['pin'] ?? '');
@@ -346,28 +349,44 @@ function handle_register(PDO $pdo, array $body): void
     if (!is_valid_pin($pin)) {
         json_out(['error' => 'PIN must be exactly 6 digits.']);
     }
+
+    $pinHash = password_hash($pin, PASSWORD_DEFAULT);
+    $stmt = $pdo->prepare('
+        INSERT INTO users (username, full_name, role, status, pin_hash, created_at)
+        VALUES (?, ?, \'admin\', \'active\', ?, NOW())
+    ');
+    $stmt->execute([$username, $fullName, $pinHash]);
+
+    $user = find_user_by_username($pdo, $username);
+    $token = create_session($pdo, (int) $user['id']);
+    json_out(['ok' => true, 'status' => 'active', 'token' => $token, 'user' => user_public($user)]);
+}
+
+function handle_create_employee(PDO $pdo, array $body): void
+{
+    $username = trim((string) ($body['username'] ?? ''));
+    $fullName = trim((string) ($body['fullName'] ?? ''));
+
+    if ($username === '' || strlen($username) > 64 || !preg_match('/^[a-zA-Z0-9_.-]+$/', $username)) {
+        json_out(['error' => 'Username must be letters/numbers/._- only.']);
+    }
+    if ($fullName === '') {
+        json_out(['error' => 'Full name is required.']);
+    }
     if (find_user_by_username($pdo, $username)) {
         json_out(['error' => 'That username is already taken.']);
     }
 
-    $isFirstUser = (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn() === 0;
-    $role = $isFirstUser ? 'admin' : 'employee';
-    $status = $isFirstUser ? 'active' : 'pending';
-    $pinHash = password_hash($pin, PASSWORD_DEFAULT);
-
-    $stmt = $pdo->prepare('
+    // No PIN yet — pin_hash stays NULL, same state as an approved reset.
+    // The employee sets their own PIN the first time they log in.
+    $stmt = $pdo->prepare("
         INSERT INTO users (username, full_name, role, status, pin_hash, created_at)
-        VALUES (?, ?, ?, ?, ?, NOW())
-    ');
-    $stmt->execute([$username, $fullName, $role, $status, $pinHash]);
+        VALUES (?, ?, 'employee', 'active', NULL, NOW())
+    ");
+    $stmt->execute([$username, $fullName]);
 
-    if ($status === 'active') {
-        $user = find_user_by_username($pdo, $username);
-        $token = create_session($pdo, (int) $user['id']);
-        json_out(['ok' => true, 'status' => 'active', 'token' => $token, 'user' => user_public($user)]);
-    } else {
-        json_out(['ok' => true, 'status' => 'pending', 'message' => 'Registered. Waiting for admin approval before you can log in.']);
-    }
+    $user = find_user_by_username($pdo, $username);
+    json_out(['ok' => true, 'user' => user_public($user)]);
 }
 
 function create_session(PDO $pdo, int $userId): string
@@ -386,9 +405,6 @@ function handle_login(PDO $pdo, array $body): void
     $user = find_user_by_username($pdo, $username);
     if (!$user) {
         json_out(['error' => 'No account with that username.']);
-    }
-    if ($user['status'] === 'pending') {
-        json_out(['error' => 'Your registration is awaiting admin approval.']);
     }
     if ($user['status'] !== 'active') {
         json_out(['error' => 'Your access has been removed. Contact your admin.']);
@@ -466,18 +482,6 @@ function handle_list_team(PDO $pdo): void
 {
     $rows = $pdo->query('SELECT * FROM users ORDER BY created_at ASC')->fetchAll();
     json_out(['ok' => true, 'users' => array_map('user_public', $rows)]);
-}
-
-function handle_decide_registration(PDO $pdo, array $body, string $newStatus): void
-{
-    $id = (int) ($body['userId'] ?? 0);
-    $user = find_user_by_id($pdo, $id);
-    if (!$user || $user['status'] !== 'pending') {
-        json_out(['error' => 'No pending registration with that id.']);
-    }
-    $stmt = $pdo->prepare('UPDATE users SET status = ?, decided_at = NOW() WHERE id = ?');
-    $stmt->execute([$newStatus, $id]);
-    json_out(['ok' => true]);
 }
 
 function handle_remove_employee(PDO $pdo, array $body): void
