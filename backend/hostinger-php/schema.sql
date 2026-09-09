@@ -31,3 +31,29 @@ CREATE TABLE IF NOT EXISTS settings (
     setting_key VARCHAR(64) PRIMARY KEY,
     setting_value VARCHAR(255) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- The first person ever to register becomes 'admin' automatically and
+-- starts 'active'. Everyone after that registers as 'employee' and
+-- starts 'pending' until the admin approves them.
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(64) NOT NULL UNIQUE,
+    full_name VARCHAR(255) NOT NULL,
+    role VARCHAR(16) NOT NULL DEFAULT 'employee',   -- 'admin' | 'employee'
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',  -- 'pending' | 'active' | 'rejected' | 'removed'
+    pin_hash VARCHAR(255) NULL,                     -- NULL means "awaiting a PIN to be set" (new account, or after an approved reset)
+    pin_reset_requested TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    decided_at DATETIME NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Login tokens, kept only in the app's memory on the client side (never
+-- written to disk there) — reopening the app always needs the PIN again.
+-- Stored here so removing a user invalidates their session immediately.
+CREATE TABLE IF NOT EXISTS sessions (
+    token CHAR(64) PRIMARY KEY,
+    user_id INT NOT NULL,
+    created_at DATETIME NOT NULL,
+    expires_at DATETIME NOT NULL,
+    INDEX (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

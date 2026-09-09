@@ -4,11 +4,11 @@
   need 'unsafe-inline' in the CSP — that's a known tradeoff of keeping
   everything in one file for easy editing/testing. The real protections
   against script injection are: (1) every piece of client-controlled text
-  (client name, software name, activity notes) is HTML-escaped with esc()
-  before being inserted, and (2) network access is limited to HTTPS only
-  (connect-src https:) — the Backend URL is admin-supplied in Settings and
-  can point at Google Apps Script, a self-hosted PHP backend, or anything
-  else, so it can't be pinned to a fixed list of domains here.
+  (client name, software name, activity notes, full names) is HTML-escaped
+  with esc() before being inserted, and (2) network access is limited to
+  HTTPS only (connect-src https:) — the Backend URL is admin-supplied and
+  can point at any server, so it can't be pinned to a fixed list of domains
+  here.
 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https:; object-src 'none'; base-uri 'none'; form-action 'none';">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -76,9 +76,6 @@
   .nav-group-label{font-size:.68rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-faint);padding:0 10px;margin-top:6px;}
 
   .sidebar-foot{margin-top:auto;padding:10px;border-top:1px solid var(--border);font-size:.78rem;color:var(--ink-faint);}
-  .conn-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;background:var(--ink-faint);}
-  .conn-dot.ok{background:var(--good);}
-  .conn-dot.bad{background:var(--crit);}
 
   .main{flex:1;min-width:0;padding:30px 40px 64px;}
   .main-inner{max-width:1080px;margin:0 auto;}
@@ -109,6 +106,7 @@
   .btn-danger{background:var(--crit-soft);color:var(--crit);}
   .btn-sm{padding:6px 10px;font-size:.76rem;}
   .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .btn-block{width:100%;justify-content:center;}
 
   .pill{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;padding:3px 9px 3px 7px;border-radius:99px;white-space:nowrap;}
   .pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;}
@@ -116,6 +114,8 @@
   .pill-due{background:var(--warn-soft);color:var(--warn);}
   .pill-overdue{background:var(--crit-soft);color:var(--crit);}
   .pill-paused{background:var(--surface-sunken);color:var(--ink-muted);}
+  .pill-pending{background:var(--warn-soft);color:var(--warn);}
+  .pill-removed, .pill-rejected{background:var(--surface-sunken);color:var(--ink-muted);}
 
   .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:26px;}
   .stat-tile{padding:16px 18px;}
@@ -136,6 +136,7 @@
   tbody tr:last-child td{border-bottom:none;}
   tbody tr{cursor:pointer;}
   tbody tr:hover td{background:var(--surface-sunken);}
+  #pending-table tbody tr, #reset-requests-table tbody tr, #team-table tbody tr{cursor:default;}
   .cell-name{font-weight:600;}
   .cell-sub{color:var(--ink-muted);font-size:.78rem;margin-top:1px;}
   .row-actions{display:flex;gap:6px;}
@@ -190,10 +191,120 @@
   .log-text{font-size:.85rem;}
   .log-time{font-size:.75rem;color:var(--ink-faint);margin-top:1px;}
   .banner{background:var(--warn-soft);color:var(--warn);border:1px solid var(--border);border-radius:var(--radius-m);padding:12px 16px;font-size:.84rem;margin-bottom:20px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;}
+
+  /* ---------- auth screens ---------- */
+  .auth-shell{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .auth-card{width:100%;max-width:380px;padding:28px 26px;}
+  .auth-brand{display:flex;align-items:center;gap:10px;margin-bottom:22px;}
+  .pin-input{letter-spacing:.4em;text-align:center;font-size:1.3rem;font-family:"IBM Plex Mono",ui-monospace,monospace;}
+  .auth-switch{font-size:.82rem;color:var(--ink-muted);margin-top:16px;text-align:center;}
+  .auth-switch button{background:none;border:none;color:var(--accent);font-weight:700;cursor:pointer;font-size:inherit;padding:0;}
+  .auth-error{background:var(--crit-soft);color:var(--crit);border-radius:var(--radius-s);padding:9px 12px;font-size:.82rem;}
+
   [hidden]{display:none !important;}
 </style>
 
-<div class="app">
+<!-- CONNECT SCREEN: shown once, before any Backend URL is set -->
+<div class="auth-shell" id="connect-screen">
+  <div class="card auth-card">
+    <div class="auth-brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="3.4" height="12" rx="1.6" fill="var(--accent-ink)"/><rect x="9.6" y="2" width="3.4" height="12" rx="1.6" fill="var(--accent-ink)"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">DTA</div>
+        <div class="brand-sub">Subscription Control</div>
+      </div>
+    </div>
+    <h2 style="font-size:1.1rem;margin-bottom:4px;">Connect to your backend</h2>
+    <div class="page-sub" style="margin-bottom:16px;">Paste the API URL from your Hostinger setup (see backend/hostinger-php/SETUP.md).</div>
+    <form class="settings-form" id="connect-form">
+      <label>Backend URL
+        <input type="url" id="connect-backend-url" placeholder="https://yourdomain.com/subctl/api.php" required>
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">Continue</button>
+    </form>
+  </div>
+</div>
+
+<!-- AUTH SCREEN: login / register / forgot pin / set new pin -->
+<div class="auth-shell" id="auth-screen" hidden>
+  <div class="card auth-card">
+    <div class="auth-brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="3.4" height="12" rx="1.6" fill="var(--accent-ink)"/><rect x="9.6" y="2" width="3.4" height="12" rx="1.6" fill="var(--accent-ink)"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">DTA</div>
+        <div class="brand-sub">Subscription Control</div>
+      </div>
+    </div>
+
+    <div id="login-panel">
+      <h2 style="font-size:1.1rem;margin-bottom:16px;">Log in</h2>
+      <form class="settings-form" id="login-form">
+        <label>Username
+          <input type="text" id="login-username" required autocomplete="username">
+        </label>
+        <label>6-digit PIN
+          <input type="password" inputmode="numeric" pattern="\d{6}" maxlength="6" class="pin-input" id="login-pin" required autocomplete="current-password">
+        </label>
+        <div class="auth-error" id="login-error" hidden></div>
+        <button type="submit" class="btn btn-primary btn-block">Log in</button>
+      </form>
+      <div class="auth-switch">
+        New here? <button type="button" data-auth-switch="register">Register</button>
+        &nbsp;·&nbsp;
+        <button type="button" data-auth-switch="forgot">Forgot PIN?</button>
+      </div>
+    </div>
+
+    <div id="register-panel" hidden>
+      <h2 style="font-size:1.1rem;margin-bottom:4px;">Register</h2>
+      <div class="page-sub" style="margin-bottom:16px;">The first person to register becomes the admin. Everyone after needs the admin's approval before they can log in.</div>
+      <form class="settings-form" id="register-form">
+        <label>Full name
+          <input type="text" id="register-fullname" required>
+        </label>
+        <label>Username
+          <input type="text" id="register-username" required pattern="[a-zA-Z0-9_.\-]+" title="Letters, numbers, . _ - only">
+        </label>
+        <label>Choose a 6-digit PIN
+          <input type="password" inputmode="numeric" pattern="\d{6}" maxlength="6" class="pin-input" id="register-pin" required autocomplete="new-password">
+        </label>
+        <div class="auth-error" id="register-error" hidden></div>
+        <button type="submit" class="btn btn-primary btn-block">Register</button>
+      </form>
+      <div class="auth-switch">Already have an account? <button type="button" data-auth-switch="login">Log in</button></div>
+    </div>
+
+    <div id="forgot-panel" hidden>
+      <h2 style="font-size:1.1rem;margin-bottom:4px;">Forgot PIN</h2>
+      <div class="page-sub" style="margin-bottom:16px;">Your admin needs to approve this before you can set a new PIN.</div>
+      <form class="settings-form" id="forgot-form">
+        <label>Username
+          <input type="text" id="forgot-username" required>
+        </label>
+        <button type="submit" class="btn btn-primary btn-block">Request reset</button>
+      </form>
+      <div class="auth-switch"><button type="button" data-auth-switch="login">Back to log in</button></div>
+    </div>
+
+    <div id="setpin-panel" hidden>
+      <h2 style="font-size:1.1rem;margin-bottom:4px;">Set a new PIN</h2>
+      <div class="page-sub" id="setpin-sub" style="margin-bottom:16px;"></div>
+      <form class="settings-form" id="setpin-form">
+        <label>New 6-digit PIN
+          <input type="password" inputmode="numeric" pattern="\d{6}" maxlength="6" class="pin-input" id="setpin-pin" required autocomplete="new-password">
+        </label>
+        <div class="auth-error" id="setpin-error" hidden></div>
+        <button type="submit" class="btn btn-primary btn-block">Set PIN &amp; log in</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="app" id="app-shell" hidden>
   <nav class="sidebar" aria-label="Primary">
     <div class="brand">
       <div class="brand-mark" aria-hidden="true">
@@ -228,21 +339,23 @@
           Settings
         </button>
       </div>
+      <div class="nav-group-label" id="team-nav-label" hidden>Admin</div>
+      <div class="nav" id="team-nav-group" hidden>
+        <button class="nav-btn" data-view="team">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="6.5" r="2.6"/><path d="M2.3 16c.7-3 2.4-4.6 4.7-4.6s4 1.6 4.7 4.6"/><circle cx="14.3" cy="7.3" r="2.1"/><path d="M12.7 11.7c1.9.2 3.3 1.6 3.9 4"/><path d="M17 6.5v4M15 8.5h4" stroke-linecap="round"/></svg>
+          Team
+        </button>
+      </div>
     </div>
 
     <div class="sidebar-foot">
-      <div><span class="conn-dot" id="conn-dot"></span><span id="conn-label">Not connected</span></div>
-      <div style="margin-top:6px;">Signed in as <b>DTA Admin</b><br>aniket@dtaonline.in</div>
+      <div>Signed in as <b id="me-name"></b><br><span id="me-role"></span></div>
+      <button class="btn btn-ghost btn-sm btn-block" id="logout-btn" style="margin-top:8px;">Log out</button>
     </div>
   </nav>
 
   <main class="main">
     <div class="main-inner">
-
-      <div class="banner" id="no-backend-banner" hidden>
-        <span>No backend connected yet — go to <b>Settings</b> and paste your Google Apps Script Web App URL + admin key to load real client data.</span>
-        <button class="btn btn-secondary btn-sm" data-view-btn="settings">Open Settings</button>
-      </div>
 
       <!-- OVERVIEW -->
       <section data-page="overview">
@@ -310,27 +423,45 @@
         </div>
       </section>
 
+      <!-- TEAM (admin only) -->
+      <section data-page="team" hidden>
+        <div class="page-head"><div>
+          <h1>Team</h1>
+          <div class="page-sub">Approve new registrations, manage access, and PIN reset requests.</div>
+        </div></div>
+
+        <div class="section-title"><h2>Pending registrations</h2></div>
+        <div class="table-wrap"><table id="pending-table"><thead><tr>
+          <th>Name</th><th>Username</th><th>Requested</th><th></th>
+        </tr></thead><tbody></tbody></table></div>
+
+        <div class="section-title"><h2>PIN reset requests</h2></div>
+        <div class="table-wrap"><table id="reset-requests-table"><thead><tr>
+          <th>Name</th><th>Username</th><th></th>
+        </tr></thead><tbody></tbody></table></div>
+
+        <div class="section-title"><h2>Team members</h2></div>
+        <div class="table-wrap"><table id="team-table"><thead><tr>
+          <th>Name</th><th>Username</th><th>Role</th><th>Status</th><th></th>
+        </tr></thead><tbody></tbody></table></div>
+      </section>
+
       <!-- SETTINGS -->
       <section data-page="settings" hidden>
         <div class="page-head"><div>
           <h1>Settings</h1>
-          <div class="page-sub">Connect the dashboard to your backend, and set defaults used across every client's subscription check.</div>
+          <div class="page-sub">Defaults used across every client's subscription check.</div>
         </div></div>
 
         <div class="card" style="padding:20px 22px;margin-bottom:18px;">
-          <h2 style="font-size:1rem;margin-bottom:4px;">Backend connection</h2>
-          <div class="page-sub" style="margin-bottom:14px;">The Google Apps Script Web App URL and admin key from SETUP.md.</div>
+          <h2 style="font-size:1rem;margin-bottom:4px;">Backend URL</h2>
+          <div class="page-sub" style="margin-bottom:14px;">Only change this if you're moving to a different server — saving it logs you out.</div>
           <form class="settings-form" id="backend-form">
             <label>Backend URL
-              <input type="url" id="set-backend-url" placeholder="https://script.google.com/macros/s/XXXX/exec">
+              <input type="url" id="set-backend-url" required>
             </label>
-            <div class="settings-hint">Ends in <code>/exec</code>. From Apps Script → Deploy → Web app.</div>
-            <label>Admin key
-              <input type="password" id="set-admin-key" placeholder="paste the key from the setup() run log">
-            </label>
-            <div style="display:flex;gap:8px;">
-              <button type="submit" class="btn btn-primary">Save &amp; connect</button>
-              <button type="button" class="btn btn-secondary" id="test-connection">Test connection</button>
+            <div>
+              <button type="submit" class="btn btn-secondary">Save &amp; reconnect</button>
             </div>
           </form>
         </div>
@@ -476,62 +607,56 @@
   var settings = { name:'DTA', lead:7, grace:5 };
   var clients = [];
   var selectedId = null;
-  var connected = false;
+  var conn = { backendUrl: '' };
+  // Never persisted to disk — every app launch requires the PIN again.
+  var auth = { token: null, user: null };
+  var pendingSetPinUsername = null;
 
-  var conn = { backendUrl: '', adminKey: '' };
-
-  /* ---------- credential storage ----------
-     In the desktop app, window.electronAPI is present and stores the
-     backend URL + admin key encrypted via the OS keychain. Opened as a
-     plain HTML file in a browser, there's no such API, so it falls back
-     to localStorage — same as before. */
+  /* ---------- credential storage (Backend URL only — no secrets here) ----------
+     In the desktop app, window.electronAPI stores this via the OS keychain.
+     Opened as a plain HTML file in a browser, it falls back to localStorage. */
   function loadCredentials(){
     if (window.electronAPI && window.electronAPI.getCredentials){
-      return window.electronAPI.getCredentials().catch(function(){ return { backendUrl:'', adminKey:'' }; });
+      return window.electronAPI.getCredentials().catch(function(){ return { backendUrl:'' }; });
     }
-    return Promise.resolve({
-      backendUrl: localStorage.getItem('dta-subctl-backend-url') || '',
-      adminKey: localStorage.getItem('dta-subctl-admin-key') || ''
-    });
+    return Promise.resolve({ backendUrl: localStorage.getItem('dta-subctl-backend-url') || '' });
   }
   function saveCredentials(c){
     if (window.electronAPI && window.electronAPI.setCredentials){
-      return window.electronAPI.setCredentials({ backendUrl: c.backendUrl, adminKey: c.adminKey });
+      return window.electronAPI.setCredentials({ backendUrl: c.backendUrl });
     }
     localStorage.setItem('dta-subctl-backend-url', c.backendUrl);
-    localStorage.setItem('dta-subctl-admin-key', c.adminKey);
     return Promise.resolve();
   }
 
   /* ---------- backend calls ---------- */
-  function hasBackend(){ return !!(conn.backendUrl && conn.adminKey); }
+  function hasBackend(){ return !!conn.backendUrl; }
+  function isLoggedIn(){ return !!(auth.token && auth.user); }
+  function isAuthErrorMessage(msg){
+    return /Session expired|Not logged in|access has been removed/i.test(msg || '');
+  }
 
   function apiCall(action, payload){
     if (!hasBackend()) return Promise.reject(new Error('Backend not configured'));
-    var body = Object.assign({ action: action, adminKey: conn.adminKey }, payload || {});
+    var body = Object.assign({ action: action }, auth.token ? { token: auth.token } : {}, payload || {});
     return fetch(conn.backendUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(body)
     }).then(function(res){ return res.json(); }).then(function(data){
-      if (data && data.error) throw new Error(data.error);
+      if (data && data.error){
+        if (isAuthErrorMessage(data.error) && isLoggedIn()){
+          doLogout();
+          showToast('Please log in again.');
+        }
+        throw new Error(data.error);
+      }
       return data;
     });
   }
 
-  function setConnected(ok){
-    connected = ok;
-    var dot = document.getElementById('conn-dot');
-    var label = document.getElementById('conn-label');
-    dot.className = 'conn-dot ' + (ok ? 'ok' : (hasBackend() ? 'bad' : ''));
-    label.textContent = ok ? 'Connected' : (hasBackend() ? 'Connection failed' : 'Not connected');
-    document.getElementById('no-backend-banner').hidden = hasBackend();
-  }
-
   function refreshFromBackend(){
-    if (!hasBackend()){ setConnected(false); renderAll(); return Promise.resolve(); }
     return apiCall('list').then(function(data){
-      setConnected(true);
       settings.name = data.settings.agencyName || 'DTA';
       settings.lead = Number(data.settings.leadDays) || 7;
       settings.grace = Number(data.settings.defaultGrace) || 5;
@@ -545,9 +670,7 @@
       });
       renderAll();
     }).catch(function(err){
-      setConnected(false);
-      showToast('Could not reach backend: ' + err.message);
-      renderAll();
+      showToast('Could not load data: ' + err.message);
     });
   }
 
@@ -612,7 +735,7 @@
       .sort(function(a,b){ return diffDays(a.nextDue, TODAY) - diffDays(b.nextDue, TODAY); });
     var tbody = document.querySelector('#attention-table tbody');
     if (!rows.length){
-      tbody.innerHTML = '<tr><td colspan="5" class="empty">' + (hasBackend() ? 'Nothing needs attention — every client is current.' : 'Connect a backend in Settings to load clients.') + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">Nothing needs attention — every client is current.</td></tr>';
       return;
     }
     tbody.innerHTML = rows.map(function(c){
@@ -639,7 +762,7 @@
     });
     var tbody = document.querySelector('#clients-table tbody');
     if (!rows.length){
-      tbody.innerHTML = '<tr><td colspan="5" class="empty">' + (hasBackend() ? 'No clients match this search.' : 'Connect a backend in Settings to load clients.') + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="empty">No clients match this search.</td></tr>';
       return;
     }
     tbody.innerHTML = rows.map(function(c){
@@ -661,7 +784,7 @@
     });
     events.sort(function(a,b){ return b.t - a.t; });
     var list = document.getElementById('activity-list');
-    if (!events.length){ list.innerHTML = '<div class="empty">' + (hasBackend() ? 'No activity yet.' : 'Connect a backend in Settings to load activity.') + '</div>'; return; }
+    if (!events.length){ list.innerHTML = '<div class="empty">No activity yet.</div>'; return; }
     list.innerHTML = events.map(function(e){
       return '<div class="log-row"><div class="log-dot" style="background:' + actionColor(e.action) + '"></div>' +
         '<div><div class="log-text"><b>' + esc(e.client) + '</b> — ' + esc(e.note) + '</div>' +
@@ -674,7 +797,66 @@
     document.getElementById('set-lead').value = settings.lead;
     document.getElementById('set-grace').value = settings.grace;
     document.getElementById('set-backend-url').value = conn.backendUrl;
-    document.getElementById('set-admin-key').value = conn.adminKey;
+  }
+
+  /* ---------- team page (admin only) ---------- */
+  function statusPillHTML(status){
+    var labels = { pending:'Pending', active:'Active', removed:'Removed', rejected:'Rejected' };
+    return '<span class="pill pill-' + status + '">' + (labels[status] || status) + '</span>';
+  }
+
+  function renderTeam(){
+    if (!isLoggedIn() || auth.user.role !== 'admin') return;
+    apiCall('listTeam').then(function(data){
+      var users = data.users;
+      renderPendingTable(users.filter(function(u){ return u.status === 'pending'; }));
+      renderResetTable(users.filter(function(u){ return u.status === 'active' && u.pinResetRequested; }));
+      renderTeamTable(users.filter(function(u){ return u.status !== 'pending'; }));
+    }).catch(function(err){ showToast('Could not load team: ' + err.message); });
+  }
+
+  function renderPendingTable(list){
+    var tbody = document.querySelector('#pending-table tbody');
+    if (!list.length){ tbody.innerHTML = '<tr><td colspan="4" class="empty">No pending registrations.</td></tr>'; return; }
+    tbody.innerHTML = list.map(function(u){
+      return '<tr>' +
+        '<td class="cell-name">' + esc(u.fullName) + '</td>' +
+        '<td>' + esc(u.username) + '</td>' +
+        '<td class="tabular">' + fmtDate(new Date(u.createdAt)) + '</td>' +
+        '<td class="row-actions">' +
+          '<button class="btn btn-secondary btn-sm" data-approve-reg="' + u.id + '">Approve</button>' +
+          '<button class="btn btn-danger btn-sm" data-reject-reg="' + u.id + '">Reject</button>' +
+        '</td></tr>';
+    }).join('');
+  }
+
+  function renderResetTable(list){
+    var tbody = document.querySelector('#reset-requests-table tbody');
+    if (!list.length){ tbody.innerHTML = '<tr><td colspan="3" class="empty">No pending PIN reset requests.</td></tr>'; return; }
+    tbody.innerHTML = list.map(function(u){
+      return '<tr>' +
+        '<td class="cell-name">' + esc(u.fullName) + '</td>' +
+        '<td>' + esc(u.username) + '</td>' +
+        '<td class="row-actions"><button class="btn btn-secondary btn-sm" data-approve-reset="' + u.id + '">Approve reset</button></td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function renderTeamTable(list){
+    var tbody = document.querySelector('#team-table tbody');
+    if (!list.length){ tbody.innerHTML = '<tr><td colspan="5" class="empty">No team members yet.</td></tr>'; return; }
+    tbody.innerHTML = list.map(function(u){
+      var removeBtn = (u.role === 'admin' || u.status !== 'active')
+        ? ''
+        : '<button class="btn btn-danger btn-sm" data-remove-user="' + u.id + '">Remove</button>';
+      return '<tr>' +
+        '<td class="cell-name">' + esc(u.fullName) + '</td>' +
+        '<td>' + esc(u.username) + '</td>' +
+        '<td>' + (u.role === 'admin' ? 'Admin' : 'Employee') + '</td>' +
+        '<td>' + statusPillHTML(u.status) + '</td>' +
+        '<td class="row-actions">' + removeBtn + '</td>' +
+        '</tr>';
+    }).join('');
   }
 
   /* ---------- detail panel ---------- */
@@ -768,11 +950,11 @@
     document.querySelectorAll('.nav-btn').forEach(function(b){
       if (b.dataset.view === view) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
     });
+    if (view === 'team') renderTeam();
   }
 
   /* ---------- add client modal ---------- */
   function openAdd(){
-    if (!hasBackend()){ showToast('Connect a backend in Settings first'); showView('settings'); return; }
     document.getElementById('a-start').value = new Date().toISOString().slice(0,10);
     document.getElementById('a-grace').value = settings.grace;
     document.getElementById('add-modal-wrap').classList.add('open');
@@ -785,12 +967,65 @@
     document.getElementById('add-form').reset();
   }
 
+  /* ---------- screen switching (connect / auth / app) ---------- */
+  function showScreen(name){
+    document.getElementById('connect-screen').hidden = name !== 'connect';
+    document.getElementById('auth-screen').hidden = name !== 'auth';
+    document.getElementById('app-shell').hidden = name !== 'app';
+  }
+  function showAuthPanel(name){
+    ['login','register','forgot','setpin'].forEach(function(p){
+      document.getElementById(p + '-panel').hidden = (p !== name);
+    });
+  }
+  function showAuthError(panel, msg){
+    var el = document.getElementById(panel + '-error');
+    el.textContent = msg; el.hidden = false;
+  }
+  function hideAuthError(panel){
+    document.getElementById(panel + '-error').hidden = true;
+  }
+
+  function enterApp(token, user){
+    auth.token = token; auth.user = user;
+    document.getElementById('me-name').textContent = user.fullName;
+    document.getElementById('me-role').textContent = user.role === 'admin' ? 'Admin' : 'Employee';
+    var isAdmin = user.role === 'admin';
+    document.getElementById('team-nav-label').hidden = !isAdmin;
+    document.getElementById('team-nav-group').hidden = !isAdmin;
+    showScreen('app');
+    showView('overview');
+    refreshFromBackend();
+  }
+
+  function doLogout(){
+    var tok = auth.token;
+    if (tok){
+      fetch(conn.backendUrl, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'logout', token: tok })
+      }).catch(function(){});
+    }
+    auth.token = null; auth.user = null;
+    clients = []; selectedId = null;
+    document.getElementById('login-username').value = '';
+    document.getElementById('login-pin').value = '';
+    showScreen('auth');
+    showAuthPanel('login');
+  }
+
   /* ---------- wire up ---------- */
   document.addEventListener('DOMContentLoaded', function(){
     loadCredentials().then(function(c){
       conn = c;
-      renderSettingsForm();
-      refreshFromBackend();
+      document.getElementById('connect-backend-url').value = conn.backendUrl;
+      document.getElementById('set-backend-url').value = conn.backendUrl;
+      if (hasBackend()){
+        showScreen('auth');
+        showAuthPanel('login');
+      } else {
+        showScreen('connect');
+      }
     });
 
     document.querySelectorAll('.nav-btn').forEach(function(b){
@@ -800,11 +1035,43 @@
     document.body.addEventListener('click', function(e){
       var viewBtn = e.target.closest('[data-view-client]');
       if (viewBtn){ openDetail(viewBtn.dataset.viewClient); return; }
-      var settingsBtn = e.target.closest('[data-view-btn]');
-      if (settingsBtn){ showView(settingsBtn.dataset.viewBtn); return; }
       var row = e.target.closest('#clients-table tbody tr[data-id], #attention-table tbody tr[data-id]');
       if (row && !e.target.closest('button')){ openDetail(row.dataset.id); return; }
       if (e.target.closest('[data-open-add]')){ openAdd(); return; }
+
+      var approveReg = e.target.closest('[data-approve-reg]');
+      if (approveReg){
+        apiCall('approveRegistration', { userId: Number(approveReg.dataset.approveReg) })
+          .then(function(){ showToast('Registration approved'); renderTeam(); })
+          .catch(function(err){ showToast('Failed: ' + err.message); });
+        return;
+      }
+      var rejectReg = e.target.closest('[data-reject-reg]');
+      if (rejectReg){
+        apiCall('rejectRegistration', { userId: Number(rejectReg.dataset.rejectReg) })
+          .then(function(){ showToast('Registration rejected'); renderTeam(); })
+          .catch(function(err){ showToast('Failed: ' + err.message); });
+        return;
+      }
+      var approveReset = e.target.closest('[data-approve-reset]');
+      if (approveReset){
+        apiCall('approvePinReset', { userId: Number(approveReset.dataset.approveReset) })
+          .then(function(){ showToast('PIN reset approved'); renderTeam(); })
+          .catch(function(err){ showToast('Failed: ' + err.message); });
+        return;
+      }
+      var removeUser = e.target.closest('[data-remove-user]');
+      if (removeUser){
+        if (removeUser.dataset.confirm === '1'){
+          apiCall('removeEmployee', { userId: Number(removeUser.dataset.removeUser) })
+            .then(function(){ showToast('Access removed'); renderTeam(); })
+            .catch(function(err){ showToast('Failed: ' + err.message); });
+        } else {
+          removeUser.dataset.confirm = '1';
+          removeUser.textContent = 'Click again to confirm';
+        }
+        return;
+      }
     });
 
     document.getElementById('d-close').addEventListener('click', closeDetail);
@@ -866,18 +1133,81 @@
     document.getElementById('backend-form').addEventListener('submit', function(e){
       e.preventDefault();
       conn.backendUrl = document.getElementById('set-backend-url').value.trim();
-      conn.adminKey = document.getElementById('set-admin-key').value.trim();
       saveCredentials(conn).then(function(){
-        showToast('Backend settings saved');
-        return refreshFromBackend();
+        showToast('Backend URL saved — please log in again');
+        document.getElementById('connect-backend-url').value = conn.backendUrl;
+        doLogout();
       });
     });
-    document.getElementById('test-connection').addEventListener('click', function(){
-      conn.backendUrl = document.getElementById('set-backend-url').value.trim();
-      conn.adminKey = document.getElementById('set-admin-key').value.trim();
-      if (!hasBackend()){ showToast('Enter a backend URL and admin key first'); return; }
-      apiCall('list').then(function(){ showToast('Connection OK'); setConnected(true); })
-        .catch(function(err){ showToast('Connection failed: ' + err.message); setConnected(false); });
+
+    document.getElementById('logout-btn').addEventListener('click', doLogout);
+
+    document.getElementById('connect-form').addEventListener('submit', function(e){
+      e.preventDefault();
+      conn.backendUrl = document.getElementById('connect-backend-url').value.trim();
+      saveCredentials(conn).then(function(){
+        document.getElementById('set-backend-url').value = conn.backendUrl;
+        showScreen('auth');
+        showAuthPanel('login');
+      });
+    });
+
+    document.querySelectorAll('[data-auth-switch]').forEach(function(b){
+      b.addEventListener('click', function(){ showAuthPanel(b.dataset.authSwitch); });
+    });
+
+    document.getElementById('login-form').addEventListener('submit', function(e){
+      e.preventDefault();
+      hideAuthError('login');
+      var username = document.getElementById('login-username').value.trim();
+      var pin = document.getElementById('login-pin').value.trim();
+      apiCall('login', { username: username, pin: pin }).then(function(data){
+        if (data.needsPinSetup){
+          pendingSetPinUsername = data.username;
+          document.getElementById('setpin-sub').textContent = 'Your PIN was reset. Choose a new one to finish logging in.';
+          showAuthPanel('setpin');
+          return;
+        }
+        enterApp(data.token, data.user);
+      }).catch(function(err){ showAuthError('login', err.message); });
+    });
+
+    document.getElementById('register-form').addEventListener('submit', function(e){
+      e.preventDefault();
+      hideAuthError('register');
+      var payload = {
+        fullName: document.getElementById('register-fullname').value.trim(),
+        username: document.getElementById('register-username').value.trim(),
+        pin: document.getElementById('register-pin').value.trim()
+      };
+      apiCall('register', payload).then(function(data){
+        if (data.status === 'active'){
+          enterApp(data.token, data.user);
+        } else {
+          showToast(data.message || 'Registered — waiting for admin approval.');
+          document.getElementById('register-form').reset();
+          showAuthPanel('login');
+        }
+      }).catch(function(err){ showAuthError('register', err.message); });
+    });
+
+    document.getElementById('forgot-form').addEventListener('submit', function(e){
+      e.preventDefault();
+      var username = document.getElementById('forgot-username').value.trim();
+      apiCall('requestPinReset', { username: username }).then(function(data){
+        showToast(data.message || 'Reset requested.');
+        document.getElementById('forgot-form').reset();
+        showAuthPanel('login');
+      }).catch(function(err){ showToast('Failed: ' + err.message); });
+    });
+
+    document.getElementById('setpin-form').addEventListener('submit', function(e){
+      e.preventDefault();
+      hideAuthError('setpin');
+      var newPin = document.getElementById('setpin-pin').value.trim();
+      apiCall('setPin', { username: pendingSetPinUsername, newPin: newPin }).then(function(data){
+        enterApp(data.token, data.user);
+      }).catch(function(err){ showAuthError('setpin', err.message); });
     });
 
     document.addEventListener('keydown', function(e){

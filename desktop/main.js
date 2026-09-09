@@ -108,10 +108,13 @@ ipcMain.on('install-update', () => {
 });
 
 /**
- * Backend URL + admin key, encrypted at rest with the OS's own secure
- * storage (Keychain on macOS, Credential Manager on Windows, libsecret on
- * Linux) via Electron's safeStorage, instead of the plain-text localStorage
- * the browser-opened dashboard/index.html falls back to. Falls back to an
+ * The Backend URL, encrypted at rest with the OS's own secure storage
+ * (Keychain on macOS, Credential Manager on Windows, libsecret on Linux)
+ * via Electron's safeStorage, instead of the plain-text localStorage the
+ * browser-opened dashboard/index.html falls back to. There's no admin key
+ * anymore — the dashboard has its own login (username + PIN) handled
+ * entirely by the backend; login session tokens are kept in the
+ * renderer's memory only and never written here. Falls back to an
  * unencrypted file only on the rare system where no OS keychain is
  * available at all (safeStorage.isEncryptionAvailable() === false).
  */
@@ -122,20 +125,20 @@ function credentialsFilePath() {
 ipcMain.handle('get-credentials', () => {
   try {
     const filePath = credentialsFilePath();
-    if (!fs.existsSync(filePath)) return { backendUrl: '', adminKey: '' };
+    if (!fs.existsSync(filePath)) return { backendUrl: '' };
     const raw = fs.readFileSync(filePath);
     const json = safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(raw) : raw.toString('utf8');
     const parsed = JSON.parse(json);
-    return { backendUrl: parsed.backendUrl || '', adminKey: parsed.adminKey || '' };
+    return { backendUrl: parsed.backendUrl || '' };
   } catch (err) {
     console.error('Failed to read stored credentials:', err);
-    return { backendUrl: '', adminKey: '' };
+    return { backendUrl: '' };
   }
 });
 
 ipcMain.handle('set-credentials', (_event, creds) => {
   try {
-    const json = JSON.stringify({ backendUrl: (creds && creds.backendUrl) || '', adminKey: (creds && creds.adminKey) || '' });
+    const json = JSON.stringify({ backendUrl: (creds && creds.backendUrl) || '' });
     const data = safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(json) : Buffer.from(json, 'utf8');
     fs.writeFileSync(credentialsFilePath(), data, { mode: 0o600 });
     return { ok: true };
