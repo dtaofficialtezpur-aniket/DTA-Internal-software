@@ -208,6 +208,16 @@ if ($method === 'GET') {
         json_out(['error' => 'Unknown or missing action for GET. Use POST for everything else.']);
     }
     handle_status($pdo, $_GET);
+} elseif ($method === 'POST' && str_starts_with($_SERVER['CONTENT_TYPE'] ?? '', 'multipart/form-data')) {
+    // File uploads only — everything else is JSON below. Multipart is
+    // needed here because the file bytes shouldn't be base64-inflated
+    // into a JSON body.
+    $action = $_POST['action'] ?? null;
+    if ($action !== 'uploadFile') {
+        json_out(['error' => 'Unknown action: ' . $action]);
+    }
+    $user = require_admin_session($pdo, $_POST['token'] ?? null);
+    handle_upload_file($pdo, $_POST, $_FILES['file'] ?? null, $user);
 } elseif ($method === 'POST') {
     $body = json_decode(file_get_contents('php://input'), true) ?: [];
     $action = $body['action'] ?? null;
@@ -285,6 +295,35 @@ if ($method === 'GET') {
         case 'approvePinReset':
             require_admin_session($pdo, $body['token'] ?? null);
             handle_approve_pin_reset($pdo, $body);
+            break;
+
+        // File library. listFiles/downloadFile: any logged-in user, but
+        // filtered to what they're allowed to see. Everything else that
+        // manages folders/files/permissions is admin-only.
+        case 'listFolders':
+            require_admin_session($pdo, $body['token'] ?? null);
+            handle_list_folders($pdo);
+            break;
+        case 'createFolder':
+            handle_create_folder($pdo, $body, require_admin_session($pdo, $body['token'] ?? null));
+            break;
+        case 'deleteFolder':
+            require_admin_session($pdo, $body['token'] ?? null);
+            handle_delete_folder($pdo, $body);
+            break;
+        case 'listFiles':
+            handle_list_files($pdo, require_session($pdo, $body['token'] ?? null));
+            break;
+        case 'setFileAccess':
+            require_admin_session($pdo, $body['token'] ?? null);
+            handle_set_file_access($pdo, $body);
+            break;
+        case 'deleteFile':
+            require_admin_session($pdo, $body['token'] ?? null);
+            handle_delete_file($pdo, $body);
+            break;
+        case 'downloadFile':
+            handle_download_file($pdo, $body, require_session($pdo, $body['token'] ?? null));
             break;
 
         default:
@@ -621,4 +660,215 @@ function handle_update_settings(PDO $pdo, array $body): void
     if (isset($body['lead'])) set_setting($pdo, 'leadDays', (string) (int) $body['lead']);
     if (isset($body['grace'])) set_setting($pdo, 'defaultGrace', (string) (int) $body['grace']);
     json_out(['ok' => true, 'settings' => get_all_settings($pdo)]);
+}
+
+/* ---------------- file library ---------------- */
+
+function find_folder(PDO $pdo, int $id): ?array
+{
+    $stmt = $pdo->prepare('SELECT * FROM folders WHERE id = ?');
+    $stmt->execute([$id]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}
+
+function find_file(PDO $pdo, int $id): ?array
+{
+    $stmt = $pdo->prepare('SELECT * FROM files WHERE id = ?');
+    $stmt->execute([$id]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}
+
+function folder_path(PDO $pdo, ?int $folderId): string
+{
+    $parts = [];
+    $guard = 0;
+    while ($folderId !== null && $guard++ < 50) {
+        $f = find_folder($pdo, $folderId);
+        if (!$f) break;
+        array_unshift($parts, $f['name']);
+        $folderId = $f['parent_id'] !== null ? (int) $f['parent_id'] : null;
+    }
+    return $parts ? implode(' / ', $parts) : '';
+}
+
+function has_file_access(PDO $pdo, int $fileId, int $userId): bool
+{
+    $stmt = $pdo->prepare('SELECT 1 FROM file_access WHERE file_id = ? AND user_id = ?');
+    $stmt->execute([$fileId, $userId]);
+    return (bool) $stmt->fetchColumn();
+}
+
+function handle_list_folders(PDO $pdo): void
+{
+    $rows = $pdo->query('SELECT id, name, parent_id FROM folders ORDER BY name ASC')->fetchAll();
+    $out = array_map(function ($f) {
+        return ['id' => (int) $f['id'], 'name' => $f['name'], 'parentId' => $f['parent_id'] !== null ? (int) $f['parent_id'] : null];
+    }, $rows);
+    json_out(['ok' => true, 'folders' => $out]);
+}
+
+function handle_create_folder(PDO $pdo, array $body, array $user): void
+{
+    $name = trim((string) ($body['name'] ?? ''));
+    $parentId = isset($body['parentId']) && $body['parentId'] !== null ? (int) $body['parentId'] : null;
+
+    if ($name === '' || strlen($name) > 255) {
+        json_out(['error' => 'Folder name is required.']);
+    }
+    if ($parentId !== null && !find_folder($pdo, $parentId)) {
+        json_out(['error' => 'Parent folder not found.']);
+    }
+
+    $stmt = $pdo->prepare('INSERT INTO folders (name, parent_id, created_by, created_at) VALUES (?, ?, ?, NOW())');
+    $stmt->execute([$name, $parentId, (int) $user['id']]);
+    json_out(['ok' => true, 'folder' => ['id' => (int) $pdo->lastInsertId(), 'name' => $name, 'parentId' => $parentId]]);
+}
+
+function handle_delete_folder(PDO $pdo, array $body): void
+{
+    $id = (int) ($body['folderId'] ?? 0);
+    if (!find_folder($pdo, $id)) {
+        json_out(['error' => 'Folder not found.']);
+    }
+    $hasSubfolder = $pdo->prepare('SELECT 1 FROM folders WHERE parent_id = ?');
+    $hasSubfolder->execute([$id]);
+    $hasFile = $pdo->prepare('SELECT 1 FROM files WHERE folder_id = ?');
+    $hasFile->execute([$id]);
+    if ($hasSubfolder->fetchColumn() || $hasFile->fetchColumn()) {
+        json_out(['error' => 'Folder is not empty — delete or move its contents first.']);
+    }
+    $pdo->prepare('DELETE FROM folders WHERE id = ?')->execute([$id]);
+    json_out(['ok' => true]);
+}
+
+function file_to_json(array $f, ?array $accessUserIds, ?string $path): array
+{
+    $out = [
+        'id' => (int) $f['id'],
+        'folderId' => $f['folder_id'] !== null ? (int) $f['folder_id'] : null,
+        'filename' => $f['filename'],
+        'sizeBytes' => (int) $f['size_bytes'],
+        'uploadedAt' => $f['uploaded_at'],
+    ];
+    if ($accessUserIds !== null) $out['accessUserIds'] = $accessUserIds;
+    if ($path !== null) $out['folderPath'] = $path;
+    return $out;
+}
+
+function handle_list_files(PDO $pdo, array $user): void
+{
+    if ($user['role'] === 'admin') {
+        $rows = $pdo->query('SELECT * FROM files ORDER BY uploaded_at DESC')->fetchAll();
+        $accessStmt = $pdo->prepare('SELECT user_id FROM file_access WHERE file_id = ?');
+        $out = [];
+        foreach ($rows as $f) {
+            $accessStmt->execute([$f['id']]);
+            $accessUserIds = array_map('intval', array_column($accessStmt->fetchAll(), 'user_id'));
+            $out[] = file_to_json($f, $accessUserIds, null);
+        }
+        json_out(['ok' => true, 'files' => $out]);
+    }
+
+    $stmt = $pdo->prepare('
+        SELECT f.* FROM files f
+        JOIN file_access a ON a.file_id = f.id
+        WHERE a.user_id = ?
+        ORDER BY f.uploaded_at DESC
+    ');
+    $stmt->execute([$user['id']]);
+    $out = [];
+    foreach ($stmt->fetchAll() as $f) {
+        $out[] = file_to_json($f, null, folder_path($pdo, $f['folder_id'] !== null ? (int) $f['folder_id'] : null));
+    }
+    json_out(['ok' => true, 'files' => $out]);
+}
+
+function handle_upload_file(PDO $pdo, array $body, ?array $uploadedFile, array $user): void
+{
+    if (!$uploadedFile || ($uploadedFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        json_out(['error' => 'No file uploaded, or the upload failed.']);
+    }
+
+    $folderId = isset($body['folderId']) && $body['folderId'] !== '' ? (int) $body['folderId'] : null;
+    if ($folderId !== null && !find_folder($pdo, $folderId)) {
+        json_out(['error' => 'Folder not found.']);
+    }
+
+    $originalName = basename((string) $uploadedFile['name']);
+    $ext = pathinfo($originalName, PATHINFO_EXTENSION);
+    $storageName = bin2hex(random_bytes(20)) . ($ext !== '' ? '.' . preg_replace('/[^a-zA-Z0-9]/', '', $ext) : '');
+
+    if (!move_uploaded_file($uploadedFile['tmp_name'], UPLOAD_DIR . '/' . $storageName)) {
+        json_out(['error' => 'Could not save the uploaded file on the server.']);
+    }
+
+    $stmt = $pdo->prepare('
+        INSERT INTO files (folder_id, filename, storage_name, size_bytes, uploaded_by, uploaded_at)
+        VALUES (?, ?, ?, ?, ?, NOW())
+    ');
+    $stmt->execute([$folderId, $originalName, $storageName, (int) $uploadedFile['size'], (int) $user['id']]);
+
+    $file = find_file($pdo, (int) $pdo->lastInsertId());
+    json_out(['ok' => true, 'file' => file_to_json($file, [], null)]);
+}
+
+function handle_set_file_access(PDO $pdo, array $body): void
+{
+    $fileId = (int) ($body['fileId'] ?? 0);
+    if (!find_file($pdo, $fileId)) {
+        json_out(['error' => 'File not found.']);
+    }
+    $userIds = array_unique(array_map('intval', (array) ($body['userIds'] ?? [])));
+
+    $pdo->beginTransaction();
+    $pdo->prepare('DELETE FROM file_access WHERE file_id = ?')->execute([$fileId]);
+    $insert = $pdo->prepare('INSERT INTO file_access (file_id, user_id) VALUES (?, ?)');
+    foreach ($userIds as $uid) {
+        $u = find_user_by_id($pdo, $uid);
+        if ($u && $u['role'] === 'employee' && $u['status'] === 'active') {
+            $insert->execute([$fileId, $uid]);
+        }
+    }
+    $pdo->commit();
+    json_out(['ok' => true]);
+}
+
+function handle_delete_file(PDO $pdo, array $body): void
+{
+    $fileId = (int) ($body['fileId'] ?? 0);
+    $file = find_file($pdo, $fileId);
+    if (!$file) {
+        json_out(['error' => 'File not found.']);
+    }
+    $path = UPLOAD_DIR . '/' . $file['storage_name'];
+    if (is_file($path)) {
+        unlink($path);
+    }
+    $pdo->prepare('DELETE FROM file_access WHERE file_id = ?')->execute([$fileId]);
+    $pdo->prepare('DELETE FROM files WHERE id = ?')->execute([$fileId]);
+    json_out(['ok' => true]);
+}
+
+function handle_download_file(PDO $pdo, array $body, array $user): void
+{
+    $fileId = (int) ($body['fileId'] ?? 0);
+    $file = find_file($pdo, $fileId);
+    if (!$file) {
+        json_out(['error' => 'File not found.']);
+    }
+    if ($user['role'] !== 'admin' && !has_file_access($pdo, $fileId, (int) $user['id'])) {
+        json_out(['error' => 'You do not have access to this file.']);
+    }
+    $path = UPLOAD_DIR . '/' . $file['storage_name'];
+    if (!is_file($path)) {
+        json_out(['error' => 'File is missing on the server.']);
+    }
+
+    header('Content-Type: application/octet-stream');
+    header('Content-Disposition: attachment; filename="' . str_replace('"', '', $file['filename']) . '"');
+    header('Content-Length: ' . filesize($path));
+    readfile($path);
+    exit;
 }

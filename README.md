@@ -21,6 +21,10 @@ app opens — no session is kept between launches. The admin can remove
 someone's access at any time, which takes effect immediately (their next
 action anywhere in the app kicks them back to the login screen).
 
+The admin also has a **Files** page: create folders, upload files, and pick
+which employees can see and download each one — an employee only ever sees
+the files the admin has explicitly shared with them.
+
 The Backend URL isn't something you type into the app — it's one constant
 (`BACKEND_URL`) baked into `dashboard/index.html`, since this whole team
 shares a single backend/database. Change that constant (and the matching
