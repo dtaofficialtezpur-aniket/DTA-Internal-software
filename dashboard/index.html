@@ -308,6 +308,10 @@
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="7.3"/><path d="M10 5.8V10l3 2"/></svg>
           Activity Log
         </button>
+        <button class="nav-btn" data-view="files">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2.5 6.2c0-.9.7-1.6 1.6-1.6h3.4l1.6 1.8h6.8c.9 0 1.6.7 1.6 1.6v6.4c0 .9-.7 1.6-1.6 1.6H4.1c-.9 0-1.6-.7-1.6-1.6z"/></svg>
+          Files
+        </button>
       </div>
       <div class="nav-group-label">Build</div>
       <div class="nav">
@@ -434,6 +438,51 @@
         </tr></thead><tbody></tbody></table></div>
       </section>
 
+      <!-- FILES -->
+      <section data-page="files" hidden>
+        <div class="page-head"><div>
+          <h1>Files</h1>
+          <div class="page-sub" id="files-page-sub">Upload files into folders and choose which employees can access each one.</div>
+        </div></div>
+
+        <div id="files-admin-tools">
+          <div class="card" style="padding:20px 22px;margin-bottom:18px;">
+            <h2 style="font-size:1rem;margin-bottom:4px;">Folders</h2>
+            <div class="page-sub" style="margin-bottom:14px;">Create folders to organize files. A folder must be empty before it can be deleted.</div>
+            <form id="create-folder-form" style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;">
+              <label style="display:flex;flex-direction:column;gap:5px;font-size:.82rem;font-weight:600;color:var(--ink-muted);flex:1;min-width:160px;">Folder name
+                <input type="text" id="cf-name" required>
+              </label>
+              <label style="display:flex;flex-direction:column;gap:5px;font-size:.82rem;font-weight:600;color:var(--ink-muted);flex:1;min-width:160px;">Parent folder
+                <select id="cf-parent"><option value="">(root)</option></select>
+              </label>
+              <div><button type="submit" class="btn btn-primary">Create folder</button></div>
+            </form>
+            <div class="table-wrap" style="margin-top:16px;"><table id="folders-table"><thead><tr>
+              <th>Folder</th><th>Path</th><th></th>
+            </tr></thead><tbody></tbody></table></div>
+          </div>
+
+          <div class="card" style="padding:20px 22px;margin-bottom:18px;">
+            <h2 style="font-size:1rem;margin-bottom:4px;">Upload a file</h2>
+            <form id="upload-file-form" style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;">
+              <label style="display:flex;flex-direction:column;gap:5px;font-size:.82rem;font-weight:600;color:var(--ink-muted);flex:1;min-width:160px;">Folder
+                <select id="uf-folder"><option value="">(root)</option></select>
+              </label>
+              <label style="display:flex;flex-direction:column;gap:5px;font-size:.82rem;font-weight:600;color:var(--ink-muted);flex:2;min-width:200px;">File
+                <input type="file" id="uf-file" required>
+              </label>
+              <div><button type="submit" class="btn btn-primary">Upload</button></div>
+            </form>
+          </div>
+        </div>
+
+        <div class="section-title"><h2>Files</h2></div>
+        <div class="table-wrap"><table id="files-table"><thead><tr>
+          <th>File</th><th>Folder</th><th>Size</th><th>Uploaded</th><th></th>
+        </tr></thead><tbody></tbody></table></div>
+      </section>
+
       <!-- SETTINGS -->
       <section data-page="settings" hidden>
         <div class="page-head"><div>
@@ -549,6 +598,19 @@
   </div>
 </div>
 
+<!-- manage file access modal -->
+<div class="modal-wrap" id="access-modal-wrap">
+  <div class="modal">
+    <h2 style="font-size:1.15rem;" id="access-modal-title">Manage access</h2>
+    <div class="page-sub">Choose which employees can see and download this file.</div>
+    <div id="access-modal-list" style="display:flex;flex-direction:column;gap:8px;margin-top:14px;max-height:300px;overflow-y:auto;"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px;">
+      <button type="button" class="btn btn-ghost" id="access-cancel">Cancel</button>
+      <button type="button" class="btn btn-primary" id="access-save">Save access</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -593,6 +655,9 @@
   // Never persisted to disk — every app launch requires the PIN again.
   var auth = { token: null, user: null };
   var pendingSetPinUsername = null;
+  var folders = [];
+  var files = [];
+  var accessModalFileId = null;
 
   function isLoggedIn(){ return !!(auth.token && auth.user); }
   function isAuthErrorMessage(msg){
@@ -804,6 +869,152 @@
     }).join('');
   }
 
+  /* ---------- files page ---------- */
+  function fmtBytes(n){
+    if (n < 1024) return n + ' B';
+    if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+    return (n/1024/1024).toFixed(1) + ' MB';
+  }
+
+  function folderPathById(id){
+    var parts = [];
+    var guard = 0;
+    while (id !== null && id !== undefined && guard++ < 50){
+      var f = folders.filter(function(x){ return x.id === id; })[0];
+      if (!f) break;
+      parts.unshift(f.name);
+      id = f.parentId;
+    }
+    return parts.length ? parts.join(' / ') : '(root)';
+  }
+
+  function buildFolderOptions(){
+    var byParent = {};
+    folders.forEach(function(f){
+      var key = f.parentId === null ? 'root' : f.parentId;
+      (byParent[key] = byParent[key] || []).push(f);
+    });
+    var out = [];
+    function walk(parentKey, depth){
+      (byParent[parentKey] || []).forEach(function(f){
+        out.push({ id: f.id, label: '— '.repeat(depth) + f.name });
+        walk(f.id, depth + 1);
+      });
+    }
+    walk('root', 0);
+    return out;
+  }
+
+  function renderFolderSelects(){
+    var html = '<option value="">(root)</option>' + buildFolderOptions().map(function(o){
+      return '<option value="' + o.id + '">' + esc(o.label) + '</option>';
+    }).join('');
+    document.getElementById('cf-parent').innerHTML = html;
+    document.getElementById('uf-folder').innerHTML = html;
+  }
+
+  function renderFoldersTable(){
+    var tbody = document.querySelector('#folders-table tbody');
+    if (!folders.length){ tbody.innerHTML = '<tr><td colspan="3" class="empty">No folders yet.</td></tr>'; return; }
+    tbody.innerHTML = folders.slice().sort(function(a,b){ return folderPathById(a.id).localeCompare(folderPathById(b.id)); }).map(function(f){
+      return '<tr>' +
+        '<td class="cell-name">' + esc(f.name) + '</td>' +
+        '<td>' + esc(folderPathById(f.id)) + '</td>' +
+        '<td class="row-actions"><button class="btn btn-danger btn-sm" data-delete-folder="' + f.id + '">Delete</button></td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function renderFilesTable(){
+    var isAdmin = auth.user && auth.user.role === 'admin';
+    var tbody = document.querySelector('#files-table tbody');
+    if (!files.length){ tbody.innerHTML = '<tr><td colspan="5" class="empty">No files yet.</td></tr>'; return; }
+    tbody.innerHTML = files.map(function(f){
+      var path = isAdmin ? folderPathById(f.folderId) : (f.folderPath || '(root)');
+      var actions = '<button class="btn btn-secondary btn-sm" data-download-file="' + f.id + '">Download</button>';
+      if (isAdmin){
+        actions += ' <button class="btn btn-secondary btn-sm" data-manage-access="' + f.id + '">Manage access</button>' +
+          ' <button class="btn btn-danger btn-sm" data-delete-file="' + f.id + '">Delete</button>';
+      }
+      return '<tr>' +
+        '<td class="cell-name">' + esc(f.filename) + '</td>' +
+        '<td>' + esc(path) + '</td>' +
+        '<td class="tabular">' + fmtBytes(f.sizeBytes) + '</td>' +
+        '<td>' + fmtDate(new Date(f.uploadedAt)) + '</td>' +
+        '<td class="row-actions">' + actions + '</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function loadFolders(){
+    return apiCall('listFolders').then(function(data){
+      folders = data.folders;
+      renderFoldersTable();
+      renderFolderSelects();
+    }).catch(function(err){ showToast('Could not load folders: ' + err.message); });
+  }
+
+  function loadFiles(){
+    return apiCall('listFiles').then(function(data){
+      files = data.files;
+      renderFilesTable();
+    }).catch(function(err){ showToast('Could not load files: ' + err.message); });
+  }
+
+  function renderFilesPage(){
+    var isAdmin = auth.user && auth.user.role === 'admin';
+    document.getElementById('files-admin-tools').hidden = !isAdmin;
+    document.getElementById('files-page-sub').textContent = isAdmin
+      ? 'Upload files into folders and choose which employees can access each one.'
+      : 'Files your admin has shared with you.';
+    if (isAdmin) loadFolders();
+    loadFiles();
+  }
+
+  function downloadFile(f){
+    fetch(BACKEND_URL, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'downloadFile', token: auth.token, fileId: f.id })
+    }).then(function(res){
+      var ct = res.headers.get('Content-Type') || '';
+      if (ct.indexOf('application/json') > -1){
+        return res.json().then(function(data){ throw new Error(data.error || 'Download failed.'); });
+      }
+      return res.blob().then(function(blob){
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = f.filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+      });
+    }).catch(function(err){ showToast('Download failed: ' + err.message); });
+  }
+
+  function openAccessModal(file){
+    accessModalFileId = file.id;
+    document.getElementById('access-modal-title').textContent = 'Manage access — ' + file.filename;
+    apiCall('listTeam').then(function(data){
+      var employees = data.users.filter(function(u){ return u.role === 'employee' && u.status === 'active'; });
+      var list = document.getElementById('access-modal-list');
+      if (!employees.length){
+        list.innerHTML = '<div class="empty">No employees yet.</div>';
+      } else {
+        list.innerHTML = employees.map(function(u){
+          var checked = file.accessUserIds && file.accessUserIds.indexOf(u.id) > -1 ? 'checked' : '';
+          return '<label style="display:flex;align-items:center;gap:8px;font-size:.85rem;">' +
+            '<input type="checkbox" value="' + u.id + '" ' + checked + '> ' + esc(u.fullName) + ' (' + esc(u.username) + ')</label>';
+        }).join('');
+      }
+      document.getElementById('access-modal-wrap').classList.add('open');
+      document.getElementById('backdrop').classList.add('open');
+    }).catch(function(err){ showToast('Could not load team: ' + err.message); });
+  }
+  function closeAccessModal(){
+    document.getElementById('access-modal-wrap').classList.remove('open');
+    if (!selectedId) document.getElementById('backdrop').classList.remove('open');
+    accessModalFileId = null;
+  }
+
   /* ---------- detail panel ---------- */
   function openDetail(id){
     selectedId = id;
@@ -896,6 +1107,7 @@
       if (b.dataset.view === view) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
     });
     if (view === 'team') renderTeam();
+    if (view === 'files') renderFilesPage();
   }
 
   /* ---------- add client modal ---------- */
@@ -952,6 +1164,7 @@
     }
     auth.token = null; auth.user = null;
     clients = []; selectedId = null;
+    folders = []; files = []; accessModalFileId = null;
     document.getElementById('login-username').value = '';
     document.getElementById('login-pin').value = '';
     showScreen('auth');
@@ -993,10 +1206,83 @@
         }
         return;
       }
+
+      var deleteFolder = e.target.closest('[data-delete-folder]');
+      if (deleteFolder){
+        if (deleteFolder.dataset.confirm === '1'){
+          apiCall('deleteFolder', { folderId: Number(deleteFolder.dataset.deleteFolder) })
+            .then(function(){ showToast('Folder deleted'); loadFolders(); })
+            .catch(function(err){ showToast('Failed: ' + err.message); });
+        } else {
+          deleteFolder.dataset.confirm = '1';
+          deleteFolder.textContent = 'Click again to confirm';
+        }
+        return;
+      }
+      var deleteFileBtn = e.target.closest('[data-delete-file]');
+      if (deleteFileBtn){
+        if (deleteFileBtn.dataset.confirm === '1'){
+          apiCall('deleteFile', { fileId: Number(deleteFileBtn.dataset.deleteFile) })
+            .then(function(){ showToast('File deleted'); loadFiles(); })
+            .catch(function(err){ showToast('Failed: ' + err.message); });
+        } else {
+          deleteFileBtn.dataset.confirm = '1';
+          deleteFileBtn.textContent = 'Click again to confirm';
+        }
+        return;
+      }
+      var downloadBtn = e.target.closest('[data-download-file]');
+      if (downloadBtn){
+        var dlFile = files.filter(function(x){ return x.id === Number(downloadBtn.dataset.downloadFile); })[0];
+        if (dlFile) downloadFile(dlFile);
+        return;
+      }
+      var manageAccessBtn = e.target.closest('[data-manage-access]');
+      if (manageAccessBtn){
+        var maFile = files.filter(function(x){ return x.id === Number(manageAccessBtn.dataset.manageAccess); })[0];
+        if (maFile) openAccessModal(maFile);
+        return;
+      }
     });
 
     document.getElementById('d-close').addEventListener('click', closeDetail);
-    document.getElementById('backdrop').addEventListener('click', function(){ closeDetail(); closeAdd(); });
+    document.getElementById('backdrop').addEventListener('click', function(){ closeDetail(); closeAdd(); closeAccessModal(); });
+    document.getElementById('access-cancel').addEventListener('click', closeAccessModal);
+    document.getElementById('access-save').addEventListener('click', function(){
+      var ids = Array.prototype.slice.call(document.querySelectorAll('#access-modal-list input:checked')).map(function(i){ return Number(i.value); });
+      apiCall('setFileAccess', { fileId: accessModalFileId, userIds: ids }).then(function(){
+        showToast('Access updated');
+        closeAccessModal();
+        loadFiles();
+      }).catch(function(err){ showToast('Failed: ' + err.message); });
+    });
+
+    document.getElementById('create-folder-form').addEventListener('submit', function(e){
+      e.preventDefault();
+      var payload = { name: document.getElementById('cf-name').value.trim(), parentId: document.getElementById('cf-parent').value || null };
+      apiCall('createFolder', payload).then(function(){
+        showToast('Folder created');
+        document.getElementById('create-folder-form').reset();
+        loadFolders();
+      }).catch(function(err){ showToast('Failed: ' + err.message); });
+    });
+
+    document.getElementById('upload-file-form').addEventListener('submit', function(e){
+      e.preventDefault();
+      var fileInput = document.getElementById('uf-file');
+      if (!fileInput.files.length) return;
+      var fd = new FormData();
+      fd.append('action', 'uploadFile');
+      fd.append('token', auth.token);
+      fd.append('folderId', document.getElementById('uf-folder').value || '');
+      fd.append('file', fileInput.files[0]);
+      fetch(BACKEND_URL, { method: 'POST', body: fd }).then(function(res){ return res.json(); }).then(function(data){
+        if (data.error) throw new Error(data.error);
+        showToast('File uploaded');
+        document.getElementById('upload-file-form').reset();
+        loadFiles();
+      }).catch(function(err){ showToast('Upload failed: ' + err.message); });
+    });
 
     document.getElementById('client-search').addEventListener('input', renderClients);
     document.getElementById('status-filter').addEventListener('change', renderClients);
@@ -1125,7 +1411,7 @@
     });
 
     document.addEventListener('keydown', function(e){
-      if (e.key === 'Escape'){ closeDetail(); closeAdd(); }
+      if (e.key === 'Escape'){ closeDetail(); closeAdd(); closeAccessModal(); }
     });
   });
 })();

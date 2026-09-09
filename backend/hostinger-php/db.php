@@ -33,7 +33,28 @@ function get_pdo(): PDO
         PDO::ATTR_EMULATE_PREPARES => false,
     ]);
     ensure_schema($pdo);
+    ensure_upload_dir();
     return $pdo;
+}
+
+define('UPLOAD_DIR', __DIR__ . '/uploads');
+
+/**
+ * Creates the uploads/ folder (and locks it down with a .htaccess) the
+ * first time it's needed — same "no manual server step" spirit as
+ * ensure_schema(). Files inside are named randomly (see handle_upload_file
+ * in api.php), and this .htaccess blocks direct web access to them anyway
+ * — the only way to fetch one is through api.php's own permission check.
+ */
+function ensure_upload_dir(): void
+{
+    if (!is_dir(UPLOAD_DIR)) {
+        mkdir(UPLOAD_DIR, 0755, true);
+    }
+    $htaccess = UPLOAD_DIR . '/.htaccess';
+    if (!file_exists($htaccess)) {
+        file_put_contents($htaccess, "Require all denied\n");
+    }
 }
 
 function ensure_schema(PDO $pdo): void
@@ -102,6 +123,47 @@ function ensure_schema(PDO $pdo): void
             created_at DATETIME NOT NULL,
             expires_at DATETIME NOT NULL,
             INDEX (user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
+    // Admin-created folders for the file library. Any folder can nest under
+    // another (parent_id) or sit at the root (parent_id NULL).
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS folders (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            parent_id INT NULL,
+            created_by INT NOT NULL,
+            created_at DATETIME NOT NULL,
+            INDEX (parent_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
+    // Uploaded files. The bytes live on disk under uploads/ (see
+    // ensure_upload_dir()) named by storage_name, never the original
+    // filename, so a guessed/enumerated URL can't retrieve anything —
+    // access always goes through api.php's own permission check.
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS files (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            folder_id INT NULL,
+            filename VARCHAR(255) NOT NULL,
+            storage_name VARCHAR(64) NOT NULL,
+            size_bytes BIGINT NOT NULL,
+            uploaded_by INT NOT NULL,
+            uploaded_at DATETIME NOT NULL,
+            INDEX (folder_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
+    // Per-employee grants: an employee can see/download a file only if a
+    // row exists here for (file_id, their user_id). The admin bypasses
+    // this entirely and always sees everything.
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS file_access (
+            file_id INT NOT NULL,
+            user_id INT NOT NULL,
+            PRIMARY KEY (file_id, user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 

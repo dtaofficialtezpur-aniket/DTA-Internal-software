@@ -70,6 +70,18 @@ the server afterward** — anyone who can load it can do the same. Having
 file/FTP access to the server is what proves it's really you, same as
 `setup.php`.
 
+## 7. File sharing
+- From the admin's **Files** page: create folders, upload files into them,
+  and for each file choose which employees can see and download it (click
+  **Manage access** on that file's row). Everyone else stays locked out —
+  an employee only sees files explicitly checked for them, nothing else in
+  the folder.
+- Uploaded files are stored in a new `uploads/` folder next to `api.php`,
+  created automatically on first upload — nothing to set up by hand.
+  It's locked down with its own `.htaccess` so nobody can fetch a file by
+  guessing its URL; every download goes through the same login+access
+  check as everything else in the app.
+
 ## Notes
 - `api.php`/`db.php` create their own tables automatically on first
   request — `schema.sql` is just a reference if you'd rather import by

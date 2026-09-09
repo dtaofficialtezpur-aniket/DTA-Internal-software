@@ -57,3 +57,37 @@ CREATE TABLE IF NOT EXISTS sessions (
     expires_at DATETIME NOT NULL,
     INDEX (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Admin-created folders for the file library. Nest under another folder
+-- (parent_id) or sit at the root (parent_id NULL).
+CREATE TABLE IF NOT EXISTS folders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    parent_id INT NULL,
+    created_by INT NOT NULL,
+    created_at DATETIME NOT NULL,
+    INDEX (parent_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Uploaded files. Bytes live on disk under uploads/, named by
+-- storage_name (random, not the original filename) — see
+-- ensure_upload_dir() in db.php.
+CREATE TABLE IF NOT EXISTS files (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    folder_id INT NULL,
+    filename VARCHAR(255) NOT NULL,
+    storage_name VARCHAR(64) NOT NULL,
+    size_bytes BIGINT NOT NULL,
+    uploaded_by INT NOT NULL,
+    uploaded_at DATETIME NOT NULL,
+    INDEX (folder_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Per-employee grants: an employee can see/download a file only if a row
+-- exists here for (file_id, their user_id). The admin bypasses this and
+-- always sees everything.
+CREATE TABLE IF NOT EXISTS file_access (
+    file_id INT NOT NULL,
+    user_id INT NOT NULL,
+    PRIMARY KEY (file_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
