@@ -29,22 +29,20 @@ portable build only.
 
 - `contextIsolation` on, `nodeIntegration` off, `sandbox` on. The only
   bridge to the renderer is `preload.js`, which exposes nothing but the
-  update-ready event, an install-update trigger, and get/set credentials.
+  update-ready event and an install-update trigger — there's no credential
+  storage here at all anymore.
 - All permission requests (camera, mic, geolocation, etc.) are denied.
-- Network requests are limited to HTTPS only (the Backend URL is
-  supplied in the Connect screen — the Hostinger PHP backend, or anything
-  else, so it can't be pinned to a fixed host list).
+- Network requests are locked to the one backend host this build is
+  configured for (`ALLOWED_HOST` in `main.js`), which must match
+  `BACKEND_URL` in `dashboard/index.html` — update both together if that
+  ever changes.
 - Navigation and new-window creation from renderer content is blocked;
   external links open in the system browser instead.
-- The Backend URL is stored encrypted at rest via `safeStorage` (the OS's
-  own keychain — Windows Credential Manager, macOS Keychain, or libsecret
-  on Linux), in `credentials.dat` under the app's user-data folder — not
-  in plain-text `localStorage` like the browser-opened
-  `dashboard/index.html` falls back to. Falls back to an unencrypted file
-  only on the rare system with no OS keychain available at all. There's
-  no admin key to store — login (username + 6-digit PIN) is handled
-  entirely by the backend, and the session token it returns lives only in
-  the page's memory for that run, never written to disk.
+- There's nothing to store on disk for login: the Backend URL is a fixed
+  constant baked into `dashboard/index.html`, not something typed in and
+  saved, and login (username + 6-digit PIN) is handled entirely by the
+  backend — the session token it returns lives only in the page's memory
+  for that run, never written anywhere.
 - `dashboard/index.html` itself was hardened too: a CSP meta tag, and an
   `esc()` helper applied everywhere client-controlled text (client name,
   software name, activity notes, full names) is inserted into the page,

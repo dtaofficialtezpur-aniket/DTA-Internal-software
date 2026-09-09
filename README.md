@@ -13,12 +13,19 @@ always initiates the check, so it works from behind any firewall/NAT with no
 listener needed on the customer's machine.
 
 The dashboard itself has real accounts: the first person to register becomes
-the admin automatically; everyone after that registers as an employee and
-sits pending until the admin approves them. Each person picks their own
-6-digit PIN and logs in with it every time the app opens — no session is
-kept between launches. The admin can remove someone's access at any time,
-which takes effect immediately (their next action anywhere in the app kicks
-them back to the login screen).
+the admin automatically (registration is closed after that). Employees
+don't self-register — the admin creates their account (name + username)
+from the Team page, and they set their own 6-digit PIN the first time they
+log in with that username. Everyone logs in with their PIN every time the
+app opens — no session is kept between launches. The admin can remove
+someone's access at any time, which takes effect immediately (their next
+action anywhere in the app kicks them back to the login screen).
+
+The Backend URL isn't something you type into the app — it's one constant
+(`BACKEND_URL`) baked into `dashboard/index.html`, since this whole team
+shares a single backend/database. Change that constant (and the matching
+CSP `connect-src` value right above it) if you ever need to point at a
+different backend.
 
 ## Parts of this repo
 
@@ -44,17 +51,19 @@ picked up the next time the desktop app is built.
 
 1. Follow `backend/hostinger-php/SETUP.md` to deploy the backend and get a
    Backend URL.
-2. Open `dashboard/index.html` in a browser (or run the desktop app —
-   `cd desktop && npm install && npm start`) → paste the Backend URL on the
-   Connect screen → Register. The first account created becomes the admin.
-3. Add a client from the dashboard, copy its Client ID + API key.
-4. Send a status check yourself (from wherever you're testing) to:
+2. Set that URL as `BACKEND_URL` in `dashboard/index.html` (and update the
+   CSP `connect-src` right above it to match your domain).
+3. Open `dashboard/index.html` in a browser (or run the desktop app —
+   `cd desktop && npm install && npm start`) → Register. The first account
+   created becomes the admin.
+4. Add a client from the dashboard, copy its Client ID + API key.
+5. Send a status check yourself (from wherever you're testing) to:
    `<backend URL>?action=status&client_id=<id>&api_key=<key>`
-5. From the dashboard, pause that client and re-check — the response should
+6. From the dashboard, pause that client and re-check — the response should
    flip from `active` to `paused`. Resume it and it flips back.
-6. To try the team flow: register a second account in a different browser
-   session (or after logging out) — it'll sit pending until you approve it
-   from the admin's **Team** page.
+7. To try the team flow: from the admin's **Team** page, add an employee
+   (name + username, no PIN) — then log out and log in as them to see the
+   first-login PIN-setup screen.
 
 ## Later
 

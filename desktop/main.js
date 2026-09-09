@@ -1,6 +1,5 @@
-const { app, BrowserWindow, Menu, Notification, ipcMain, session, shell, safeStorage } = require('electron');
+const { app, BrowserWindow, Menu, Notification, ipcMain, session, shell } = require('electron');
 const path = require('node:path');
-const fs = require('node:fs');
 const { autoUpdater } = require('electron-updater');
 
 let mainWindow = null;
@@ -59,14 +58,15 @@ function lockDownSession() {
   // from web content, etc.) — this app needs none of them.
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
 
-  // The Backend URL is admin-supplied in Settings (Google Apps Script, a
-  // self-hosted PHP backend, or anything else), so it can't be pinned to a
-  // fixed list of hosts. Allow any HTTPS request (plus local files); block
-  // everything else, including plain HTTP.
+  // The dashboard has one fixed backend baked into dashboard/index.html
+  // (BACKEND_URL) rather than a Settings field. Mirror that host here —
+  // if you change BACKEND_URL in the HTML, update ALLOWED_HOST to match.
+  const ALLOWED_HOST = 'dtaonline.in';
   session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
     try {
       const url = new URL(details.url);
-      if (url.protocol === 'file:' || url.protocol === 'https:') return callback({ cancel: false });
+      if (url.protocol === 'file:') return callback({ cancel: false });
+      if (url.protocol === 'https:' && url.hostname === ALLOWED_HOST) return callback({ cancel: false });
       callback({ cancel: true });
     } catch {
       callback({ cancel: true });
@@ -105,47 +105,6 @@ function setUpAutoUpdates() {
 
 ipcMain.on('install-update', () => {
   autoUpdater.quitAndInstall();
-});
-
-/**
- * The Backend URL, encrypted at rest with the OS's own secure storage
- * (Keychain on macOS, Credential Manager on Windows, libsecret on Linux)
- * via Electron's safeStorage, instead of the plain-text localStorage the
- * browser-opened dashboard/index.html falls back to. There's no admin key
- * anymore — the dashboard has its own login (username + PIN) handled
- * entirely by the backend; login session tokens are kept in the
- * renderer's memory only and never written here. Falls back to an
- * unencrypted file only on the rare system where no OS keychain is
- * available at all (safeStorage.isEncryptionAvailable() === false).
- */
-function credentialsFilePath() {
-  return path.join(app.getPath('userData'), 'credentials.dat');
-}
-
-ipcMain.handle('get-credentials', () => {
-  try {
-    const filePath = credentialsFilePath();
-    if (!fs.existsSync(filePath)) return { backendUrl: '' };
-    const raw = fs.readFileSync(filePath);
-    const json = safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(raw) : raw.toString('utf8');
-    const parsed = JSON.parse(json);
-    return { backendUrl: parsed.backendUrl || '' };
-  } catch (err) {
-    console.error('Failed to read stored credentials:', err);
-    return { backendUrl: '' };
-  }
-});
-
-ipcMain.handle('set-credentials', (_event, creds) => {
-  try {
-    const json = JSON.stringify({ backendUrl: (creds && creds.backendUrl) || '' });
-    const data = safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(json) : Buffer.from(json, 'utf8');
-    fs.writeFileSync(credentialsFilePath(), data, { mode: 0o600 });
-    return { ok: true };
-  } catch (err) {
-    console.error('Failed to save credentials:', err);
-    return { ok: false, error: String(err) };
-  }
 });
 
 app.whenReady().then(() => {
