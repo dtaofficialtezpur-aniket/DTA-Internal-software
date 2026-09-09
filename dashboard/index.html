@@ -478,10 +478,30 @@
   var selectedId = null;
   var connected = false;
 
-  var conn = {
-    backendUrl: localStorage.getItem('dta-subctl-backend-url') || '',
-    adminKey: localStorage.getItem('dta-subctl-admin-key') || ''
-  };
+  var conn = { backendUrl: '', adminKey: '' };
+
+  /* ---------- credential storage ----------
+     In the desktop app, window.electronAPI is present and stores the
+     backend URL + admin key encrypted via the OS keychain. Opened as a
+     plain HTML file in a browser, there's no such API, so it falls back
+     to localStorage — same as before. */
+  function loadCredentials(){
+    if (window.electronAPI && window.electronAPI.getCredentials){
+      return window.electronAPI.getCredentials().catch(function(){ return { backendUrl:'', adminKey:'' }; });
+    }
+    return Promise.resolve({
+      backendUrl: localStorage.getItem('dta-subctl-backend-url') || '',
+      adminKey: localStorage.getItem('dta-subctl-admin-key') || ''
+    });
+  }
+  function saveCredentials(c){
+    if (window.electronAPI && window.electronAPI.setCredentials){
+      return window.electronAPI.setCredentials({ backendUrl: c.backendUrl, adminKey: c.adminKey });
+    }
+    localStorage.setItem('dta-subctl-backend-url', c.backendUrl);
+    localStorage.setItem('dta-subctl-admin-key', c.adminKey);
+    return Promise.resolve();
+  }
 
   /* ---------- backend calls ---------- */
   function hasBackend(){ return !!(conn.backendUrl && conn.adminKey); }
@@ -767,8 +787,11 @@
 
   /* ---------- wire up ---------- */
   document.addEventListener('DOMContentLoaded', function(){
-    renderSettingsForm();
-    refreshFromBackend();
+    loadCredentials().then(function(c){
+      conn = c;
+      renderSettingsForm();
+      refreshFromBackend();
+    });
 
     document.querySelectorAll('.nav-btn').forEach(function(b){
       b.addEventListener('click', function(){ showView(b.dataset.view); });
@@ -844,10 +867,10 @@
       e.preventDefault();
       conn.backendUrl = document.getElementById('set-backend-url').value.trim();
       conn.adminKey = document.getElementById('set-admin-key').value.trim();
-      localStorage.setItem('dta-subctl-backend-url', conn.backendUrl);
-      localStorage.setItem('dta-subctl-admin-key', conn.adminKey);
-      showToast('Backend settings saved');
-      refreshFromBackend();
+      saveCredentials(conn).then(function(){
+        showToast('Backend settings saved');
+        return refreshFromBackend();
+      });
     });
     document.getElementById('test-connection').addEventListener('click', function(){
       conn.backendUrl = document.getElementById('set-backend-url').value.trim();
