@@ -29,13 +29,20 @@ portable build only.
 
 - `contextIsolation` on, `nodeIntegration` off, `sandbox` on. The only
   bridge to the renderer is `preload.js`, which exposes nothing but the
-  update-ready event and an install-update trigger.
+  update-ready event, an install-update trigger, and get/set credentials.
 - All permission requests (camera, mic, geolocation, etc.) are denied.
-- Network requests are restricted to the Google Apps Script hosts the
-  dashboard actually talks to (`script.google.com`,
-  `script.googleusercontent.com`) plus Google Fonts.
+- Network requests are limited to HTTPS only (the Backend URL is
+  admin-supplied in Settings — Google Apps Script, a self-hosted PHP
+  backend, or anything else — so it can't be pinned to a fixed host list).
 - Navigation and new-window creation from renderer content is blocked;
   external links open in the system browser instead.
+- The Backend URL + admin key are stored encrypted at rest via
+  `safeStorage` (the OS's own keychain — Windows Credential Manager,
+  macOS Keychain, or libsecret on Linux), in `credentials.dat` under the
+  app's user-data folder — not in plain-text `localStorage` like the
+  browser-opened `dashboard/index.html` falls back to. Falls back to an
+  unencrypted file only on the rare system with no OS keychain available
+  at all.
 - `dashboard/index.html` itself was hardened too: a CSP meta tag, and an
   `esc()` helper applied everywhere client-controlled text (client name,
   software name, activity notes) is inserted into the page, so a

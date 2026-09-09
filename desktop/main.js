@@ -1,5 +1,6 @@
-const { app, BrowserWindow, Menu, Notification, ipcMain, session, shell } = require('electron');
+const { app, BrowserWindow, Menu, Notification, ipcMain, session, shell, safeStorage } = require('electron');
 const path = require('node:path');
+const fs = require('node:fs');
 const { autoUpdater } = require('electron-updater');
 
 let mainWindow = null;
@@ -104,6 +105,44 @@ function setUpAutoUpdates() {
 
 ipcMain.on('install-update', () => {
   autoUpdater.quitAndInstall();
+});
+
+/**
+ * Backend URL + admin key, encrypted at rest with the OS's own secure
+ * storage (Keychain on macOS, Credential Manager on Windows, libsecret on
+ * Linux) via Electron's safeStorage, instead of the plain-text localStorage
+ * the browser-opened dashboard/index.html falls back to. Falls back to an
+ * unencrypted file only on the rare system where no OS keychain is
+ * available at all (safeStorage.isEncryptionAvailable() === false).
+ */
+function credentialsFilePath() {
+  return path.join(app.getPath('userData'), 'credentials.dat');
+}
+
+ipcMain.handle('get-credentials', () => {
+  try {
+    const filePath = credentialsFilePath();
+    if (!fs.existsSync(filePath)) return { backendUrl: '', adminKey: '' };
+    const raw = fs.readFileSync(filePath);
+    const json = safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(raw) : raw.toString('utf8');
+    const parsed = JSON.parse(json);
+    return { backendUrl: parsed.backendUrl || '', adminKey: parsed.adminKey || '' };
+  } catch (err) {
+    console.error('Failed to read stored credentials:', err);
+    return { backendUrl: '', adminKey: '' };
+  }
+});
+
+ipcMain.handle('set-credentials', (_event, creds) => {
+  try {
+    const json = JSON.stringify({ backendUrl: (creds && creds.backendUrl) || '', adminKey: (creds && creds.adminKey) || '' });
+    const data = safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(json) : Buffer.from(json, 'utf8');
+    fs.writeFileSync(credentialsFilePath(), data, { mode: 0o600 });
+    return { ok: true };
+  } catch (err) {
+    console.error('Failed to save credentials:', err);
+    return { ok: false, error: String(err) };
+  }
 });
 
 app.whenReady().then(() => {
