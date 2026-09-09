@@ -1,9 +1,9 @@
 <?php
 /**
  * Database connection + one-time schema setup.
- * Mirrors backend/google-apps-script/Code.gs's ensureSheets_() — creates
- * its tables on first use so there's no separate manual import step,
- * though schema.sql is also provided if you'd rather import it by hand.
+ * Tables are created automatically on first use — no separate manual
+ * import step, though schema.sql is also provided if you'd rather import
+ * it by hand.
  */
 
 function get_config(): array
@@ -73,11 +73,41 @@ function ensure_schema(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 
-    $hasAdminKey = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'adminKey'")->fetchColumn();
-    if ($hasAdminKey === false) {
-        $adminKey = bin2hex(random_bytes(16));
+    // One row per person who can use the dashboard. The first person ever
+    // to complete registration becomes 'admin' automatically; everyone
+    // after that is an 'employee' and starts 'pending' until the admin
+    // approves them.
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS users (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            username VARCHAR(64) NOT NULL UNIQUE,
+            full_name VARCHAR(255) NOT NULL,
+            role VARCHAR(16) NOT NULL DEFAULT 'employee',
+            status VARCHAR(16) NOT NULL DEFAULT 'pending',
+            pin_hash VARCHAR(255) NULL,
+            pin_reset_requested TINYINT(1) NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL,
+            decided_at DATETIME NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
+    // A login issues a token kept only in the app's memory for that run
+    // (never written to disk) — closing the app and reopening it always
+    // requires the PIN again. Tokens are stored here so an admin removing
+    // someone invalidates their access immediately, not just at expiry.
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS sessions (
+            token CHAR(64) PRIMARY KEY,
+            user_id INT NOT NULL,
+            created_at DATETIME NOT NULL,
+            expires_at DATETIME NOT NULL,
+            INDEX (user_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
+    $hasDefaults = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'agencyName'")->fetchColumn();
+    if ($hasDefaults === false) {
         $insert = $pdo->prepare('INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)');
-        $insert->execute(['adminKey', $adminKey]);
         $insert->execute(['agencyName', 'DTA']);
         $insert->execute(['leadDays', '7']);
         $insert->execute(['defaultGrace', '5']);
