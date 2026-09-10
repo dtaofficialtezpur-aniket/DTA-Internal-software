@@ -95,16 +95,17 @@ function ensure_schema(PDO $pdo): void
     ");
 
     // One row per person who can use the dashboard. The first person ever
-    // to complete registration becomes 'admin' automatically; everyone
-    // after that is an 'employee' and starts 'pending' until the admin
-    // approves them.
+    // to register becomes 'admin' automatically; everyone else is an
+    // 'employee' created directly by the admin from the Team page — both
+    // start 'active' immediately, there's no approval step. decided_at is
+    // set when an admin removes someone (their access-revoked timestamp).
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS users (
             id INT AUTO_INCREMENT PRIMARY KEY,
             username VARCHAR(64) NOT NULL UNIQUE,
             full_name VARCHAR(255) NOT NULL,
             role VARCHAR(16) NOT NULL DEFAULT 'employee',
-            status VARCHAR(16) NOT NULL DEFAULT 'pending',
+            status VARCHAR(16) NOT NULL DEFAULT 'active',
             pin_hash VARCHAR(255) NULL,
             pin_reset_requested TINYINT(1) NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL,
