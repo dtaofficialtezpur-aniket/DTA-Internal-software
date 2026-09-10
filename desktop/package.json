@@ -7,11 +7,12 @@
   "author": "DTA",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "dist": "electron-builder",
-    "dist:win": "electron-builder --win",
-    "dist:mac": "electron-builder --mac",
-    "dist:linux": "electron-builder --linux"
+    "build:dashboard": "npm --prefix ../dashboard install && npm --prefix ../dashboard run build",
+    "start": "npm run build:dashboard && electron .",
+    "dist": "npm run build:dashboard && electron-builder",
+    "dist:win": "npm run build:dashboard && electron-builder --win",
+    "dist:mac": "npm run build:dashboard && electron-builder --mac",
+    "dist:linux": "npm run build:dashboard && electron-builder --linux"
   },
   "devDependencies": {
     "electron": "^33.2.0",
@@ -29,7 +30,7 @@
     ],
     "extraResources": [
       {
-        "from": "../dashboard",
+        "from": "../dashboard/dist",
         "to": "dashboard"
       }
     ],

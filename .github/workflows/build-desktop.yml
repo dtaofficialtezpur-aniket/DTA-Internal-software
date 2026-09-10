@@ -22,11 +22,21 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: desktop/package-lock.json
+          cache-dependency-path: |
+            desktop/package-lock.json
+            dashboard/package-lock.json
 
-      - name: Install dependencies
+      - name: Install desktop dependencies
         working-directory: desktop
         run: npm ci
+
+      - name: Install dashboard dependencies
+        working-directory: dashboard
+        run: npm ci
+
+      - name: Build dashboard (React app electron-builder packages)
+        working-directory: dashboard
+        run: npm run build
 
       - name: Build and publish (on tag push)
         if: startsWith(github.ref, 'refs/tags/')

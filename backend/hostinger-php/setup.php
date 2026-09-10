@@ -13,7 +13,7 @@ header('Content-Type: text/plain; charset=utf-8');
 get_pdo(); // creates all tables if they don't exist yet
 
 echo "Setup complete. Tables are ready.\n\n";
-echo "Next: make sure dashboard/index.html's BACKEND_URL constant points at\n";
+echo "Next: make sure dashboard/src/constants.js's BACKEND_URL constant points at\n";
 echo "this file's URL with 'api.php' instead of 'setup.php', then open the\n";
 echo "app and register -- the first account created becomes the admin\n";
 echo "automatically. Everyone after that is added by the admin from the\n";
