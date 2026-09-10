@@ -330,6 +330,7 @@
     </div>
 
     <div class="sidebar-foot">
+      <button class="btn btn-primary btn-sm btn-block" id="update-btn" hidden style="margin-bottom:8px;">Update available — restart to install</button>
       <div>Signed in as <b id="me-name"></b><br><span id="me-role"></span></div>
       <button class="btn btn-ghost btn-sm btn-block" id="logout-btn" style="margin-top:8px;">Log out</button>
     </div>
@@ -1171,10 +1172,24 @@
     showAuthPanel('login');
   }
 
+  /* ---------- desktop auto-update (no-op outside the Electron app) ---------- */
+  function setUpUpdateButton(){
+    if (!window.electronAPI || !window.electronAPI.onUpdateReady) return;
+    window.electronAPI.onUpdateReady(function(info){
+      var btn = document.getElementById('update-btn');
+      btn.hidden = false;
+      btn.textContent = 'Update ' + (info && info.version ? 'v' + info.version + ' ' : '') + 'ready — restart to install';
+    });
+    document.getElementById('update-btn').addEventListener('click', function(){
+      window.electronAPI.installUpdate();
+    });
+  }
+
   /* ---------- wire up ---------- */
   document.addEventListener('DOMContentLoaded', function(){
     showScreen('auth');
     showAuthPanel('login');
+    setUpUpdateButton();
 
     document.querySelectorAll('.nav-btn').forEach(function(b){
       b.addEventListener('click', function(){ showView(b.dataset.view); });

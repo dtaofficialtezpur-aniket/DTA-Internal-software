@@ -53,5 +53,7 @@ portable build only.
 
 `electron-updater` checks GitHub Releases on this repo for new versions
 (every 6 hours, plus once on launch) and downloads updates automatically
-in the background. This part of the code is wired up but the in-app
-"Update available" button UI is not built yet — that's a follow-up.
+in the background. Once a download finishes, a button appears at the
+bottom of the sidebar ("Update available — restart to install") and a
+one-time OS notification fires; clicking the button restarts the app and
+installs it.
