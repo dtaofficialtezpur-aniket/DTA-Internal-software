@@ -6,9 +6,13 @@ let mainWindow = null;
 let updateReadyNotified = false;
 
 function dashboardHtmlPath() {
+  // Always the built output (dashboard/dist/, produced by `npm run
+  // build` in dashboard/) -- never the Vite source dashboard/index.html,
+  // which just references /src/main.jsx and has nothing to render on
+  // its own without the build step.
   return app.isPackaged
     ? path.join(process.resourcesPath, 'dashboard', 'index.html')
-    : path.join(__dirname, '..', 'dashboard', 'index.html');
+    : path.join(__dirname, '..', 'dashboard', 'dist', 'index.html');
 }
 
 function createWindow() {

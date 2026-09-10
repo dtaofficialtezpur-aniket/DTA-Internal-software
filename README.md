@@ -26,22 +26,24 @@ which employees can see and download each one — an employee only ever sees
 the files the admin has explicitly shared with them.
 
 The Backend URL isn't something you type into the app — it's one constant
-(`BACKEND_URL`) baked into `dashboard/index.html`, since this whole team
-shares a single backend/database. Change that constant (and the matching
-CSP `connect-src` value right above it) if you ever need to point at a
-different backend.
+(`BACKEND_URL`) baked into `dashboard/src/constants.js`, since this whole
+team shares a single backend/database. Change that constant (and the
+matching CSP `connect-src` value in `dashboard/index.html`) if you ever
+need to point at a different backend.
 
 ## Parts of this repo
 
 - **`dashboard/`** — the admin dashboard itself (login/register, add
   clients, pause/resume, mark paid, view activity, manage the team, file
-  library): `index.html` (markup) + `styles.css` + `js/` (one file per
-  feature area, loaded as plain ES modules — no build step, no
-  framework). Open `index.html` directly in a browser to try changes
-  fast.
-- **`desktop/`** — an Electron wrapper that packages `dashboard/index.html`
-  as a real downloadable desktop app (Windows/Mac/Linux), with auto-update
-  checking and hardened security settings. See `desktop/README.md`.
+  library), built with React + Vite: `src/` has one component per page
+  (`pages/`), shared UI pieces (`components/`), and app-wide state in a
+  single React Context (`state/AppContext.jsx`). `npm run build` compiles
+  it to `dist/` — that built output is what actually ships, both in the
+  desktop app and if you ever host the dashboard on the web.
+- **`desktop/`** — an Electron wrapper that packages the built
+  `dashboard/dist/` as a real downloadable desktop app (Windows/Mac/Linux),
+  with auto-update checking and hardened security settings. See
+  `desktop/README.md`.
 - **`backend/hostinger-php/`** — the backend: PHP + MySQL, built for
   Hostinger (or any PHP/MySQL) hosting. Handles both the client-software
   status check and the dashboard's accounts/clients/settings. See
@@ -49,20 +51,23 @@ different backend.
 
 ### Workflow for changes
 
-Edit files under `dashboard/` directly, refresh a browser tab to try it —
-no build step (plain ES modules, no bundler). `desktop/` just packages the
-whole `dashboard/` folder, so a change there is picked up the next time
-the desktop app is built.
+`cd dashboard && npm run dev` starts a live-reloading dev server for fast
+iteration. When you're done, `npm run build` produces the real `dist/`
+output — that's what `desktop/` packages, so a change isn't picked up by
+the desktop app until you rebuild the dashboard (`desktop`'s own
+`npm start`/`npm run dist*` scripts do this automatically).
 
 ## Quick start
 
 1. Follow `backend/hostinger-php/SETUP.md` to deploy the backend and get a
    Backend URL.
-2. Set that URL as `BACKEND_URL` in `dashboard/index.html` (and update the
-   CSP `connect-src` right above it to match your domain).
-3. Open `dashboard/index.html` in a browser (or run the desktop app —
-   `cd desktop && npm install && npm start`) → Register. The first account
-   created becomes the admin.
+2. Set that URL as `BACKEND_URL` in `dashboard/src/constants.js` (and
+   update the CSP `connect-src` in `dashboard/index.html` to match your
+   domain).
+3. Run the desktop app (`cd desktop && npm install && npm start` — this
+   builds the dashboard automatically) → Register. The first account
+   created becomes the admin. (For quick UI iteration without Electron,
+   `cd dashboard && npm install && npm run dev` also works in a browser.)
 4. Add a client from the dashboard, copy its Client ID + API key.
 5. Send a status check yourself (from wherever you're testing) to:
    `<backend URL>?action=status&client_id=<id>&api_key=<key>`
@@ -79,6 +84,5 @@ the desktop app is built.
   contract either way.
 - Wire the same status-check logic into the real client software once it's
   built (desktop app via Electron/Tauri, or a web app).
-- Design pass on the desktop app's Update button, the new auth/Team screens,
-  and packaged installer polish (icon, signing) — deferred for now to get a
-  working build out.
+- Design/visual polish pass, and packaged installer polish (icon, signing)
+  — deferred for now to get a working build out.
