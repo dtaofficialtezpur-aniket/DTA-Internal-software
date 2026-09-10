@@ -33,12 +33,12 @@ account.
 
 ## 4. Point the app at this backend
 The Backend URL isn't typed into the app — it's a constant baked into
-`dashboard/index.html` (`BACKEND_URL`, near the top of the `<script>`
-block), since this whole team shares one backend. Before first use, open
-that file and set it to `https://yourdomain.com/subctl/api.php`, and
-update the `connect-src` value in the CSP `<meta>` tag near the top of the
-file to match your domain. The desktop app packages this same file, so
-one edit covers both.
+`dashboard/js/state.js` (`BACKEND_URL`, near the top of the file), since
+this whole team shares one backend. Before first use, open that file and
+set it to `https://yourdomain.com/subctl/api.php`, and update the
+`connect-src` value in the CSP `<meta>` tag near the top of
+`dashboard/index.html` to match your domain. The desktop app packages the
+whole `dashboard/` folder, so these two edits cover both.
 
 ## 5. Register the admin account
 1. Open the dashboard (or the desktop app).

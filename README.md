@@ -33,10 +33,12 @@ different backend.
 
 ## Parts of this repo
 
-- **`dashboard/index.html`** — the admin dashboard itself (login/register,
-  add clients, pause/resume, mark paid, view activity, manage the team), as
-  a single HTML file. Open it directly in a browser to try changes fast, no
-  build step.
+- **`dashboard/`** — the admin dashboard itself (login/register, add
+  clients, pause/resume, mark paid, view activity, manage the team, file
+  library): `index.html` (markup) + `styles.css` + `js/` (one file per
+  feature area, loaded as plain ES modules — no build step, no
+  framework). Open `index.html` directly in a browser to try changes
+  fast.
 - **`desktop/`** — an Electron wrapper that packages `dashboard/index.html`
   as a real downloadable desktop app (Windows/Mac/Linux), with auto-update
   checking and hardened security settings. See `desktop/README.md`.
@@ -47,9 +49,10 @@ different backend.
 
 ### Workflow for changes
 
-Edit `dashboard/index.html` directly, refresh a browser tab to try it — no
-build step. `desktop/` just packages that same file, so a change there is
-picked up the next time the desktop app is built.
+Edit files under `dashboard/` directly, refresh a browser tab to try it —
+no build step (plain ES modules, no bundler). `desktop/` just packages the
+whole `dashboard/` folder, so a change there is picked up the next time
+the desktop app is built.
 
 ## Quick start
 
