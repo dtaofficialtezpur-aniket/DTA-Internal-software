@@ -34,20 +34,21 @@ portable build only.
 - All permission requests (camera, mic, geolocation, etc.) are denied.
 - Network requests are locked to the one backend host this build is
   configured for (`ALLOWED_HOST` in `main.js`), which must match
-  `BACKEND_URL` in `dashboard/index.html` — update both together if that
+  `BACKEND_URL` in `dashboard/js/state.js` — update both together if that
   ever changes.
 - Navigation and new-window creation from renderer content is blocked;
   external links open in the system browser instead.
 - There's nothing to store on disk for login: the Backend URL is a fixed
-  constant baked into `dashboard/index.html`, not something typed in and
+  constant baked into `dashboard/js/state.js`, not something typed in and
   saved, and login (username + 6-digit PIN) is handled entirely by the
-  backend — the session token it returns lives only in the page's memory
+  backend — the session token it returns lives only in memory (`state.js`)
   for that run, never written anywhere.
-- `dashboard/index.html` itself was hardened too: a CSP meta tag, and an
-  `esc()` helper applied everywhere client-controlled text (client name,
-  software name, activity notes, full names) is inserted into the page,
-  so a malicious value typed into a client or account record can't inject
-  HTML/script.
+- The dashboard itself was hardened too: a CSP meta tag in `index.html`
+  (scripts load only from local files, no inline `<script>` left at all),
+  and an `esc()` helper applied everywhere client-controlled text (client
+  name, software name, activity notes, full names) is inserted into the
+  page, so a malicious value typed into a client or account record can't
+  inject HTML/script.
 
 ## Auto-update
 
