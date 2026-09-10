@@ -111,8 +111,8 @@ function user_public(array $u): array
 
 /**
  * Resolves a session token to its user, or fails the request. Also fails
- * (not just "not found") if the account was removed/rejected since the
- * token was issued — a removed employee loses access immediately.
+ * (not just "not found") if the account was removed since the token was
+ * issued — a removed employee loses access immediately.
  */
 function require_session(PDO $pdo, ?string $token): array
 {
