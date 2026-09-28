@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 
 const BrandMark = () => (
@@ -12,6 +12,13 @@ export default function AuthScreen(){
   const [panel, setPanel] = useState('login');
   const [pendingSetPinUsername, setPendingSetPinUsername] = useState(null);
   const [setpinReason, setSetpinReason] = useState('');
+  const [registrationOpen, setRegistrationOpen] = useState(false);
+
+  useEffect(() => {
+    call('setupStatus').then((data) => {
+      setRegistrationOpen(!!data.registrationOpen);
+    }).catch(() => {});
+  }, [call]);
 
   return (
     <div className="auth-shell">
@@ -29,9 +36,10 @@ export default function AuthScreen(){
             call={call} login={login}
             onNeedsPinSetup={(username) => { setPendingSetPinUsername(username); setSetpinReason('Your PIN was reset. Choose a new one to finish logging in.'); setPanel('setpin'); }}
             onSwitch={setPanel}
+            registrationOpen={registrationOpen}
           />
         )}
-        {panel === 'register' && <RegisterPanel call={call} login={login} onSwitch={setPanel} />}
+        {panel === 'register' && registrationOpen && <RegisterPanel call={call} login={login} onSwitch={setPanel} />}
         {panel === 'forgot' && <ForgotPanel call={call} showToast={showToast} onSwitch={setPanel} />}
         {panel === 'setpin' && (
           <SetPinPanel
@@ -45,7 +53,7 @@ export default function AuthScreen(){
   );
 }
 
-function LoginPanel({ call, login, onNeedsPinSetup, onSwitch }){
+function LoginPanel({ call, login, onNeedsPinSetup, onSwitch, registrationOpen }){
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
@@ -73,8 +81,12 @@ function LoginPanel({ call, login, onNeedsPinSetup, onSwitch }){
         <button type="submit" className="btn btn-primary btn-block">Log in</button>
       </form>
       <div className="auth-switch">
-        New here? <button type="button" data-auth-switch="register" onClick={() => onSwitch('register')}>Register</button>
-        &nbsp;·&nbsp;
+        {registrationOpen && (
+          <>
+            New here? <button type="button" data-auth-switch="register" onClick={() => onSwitch('register')}>Register</button>
+            &nbsp;·&nbsp;
+          </>
+        )}
         <button type="button" data-auth-switch="forgot" onClick={() => onSwitch('forgot')}>Forgot PIN?</button>
       </div>
     </div>
