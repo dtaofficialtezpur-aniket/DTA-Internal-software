@@ -7,6 +7,7 @@ const AppContext = createContext(null);
 export function AppProvider({ children }){
   const [auth, setAuth] = useState({ token: null, user: null }); // never persisted — every launch requires the PIN again
   const [clients, setClients] = useState([]);
+  const [normalClients, setNormalClients] = useState([]);
   const [folders, setFolders] = useState([]);
   const [files, setFiles] = useState([]);
   const [settings, setSettings] = useState({ name: 'DTA', lead: 7, grace: 5 });
@@ -15,7 +16,9 @@ export function AppProvider({ children }){
   // file-access modal all sit behind one backdrop, and Escape closes all
   // three, so they're lifted here instead of living in separate pages.
   const [selectedClientId, setSelectedClientId] = useState(null);
+  const [selectedNormalClientId, setSelectedNormalClientId] = useState(null);
   const [addClientOpen, setAddClientOpen] = useState(false);
+  const [addClientType, setAddClientType] = useState(null); // null = type chooser; 'subscription' | 'normal'
   const [accessModalFile, setAccessModalFile] = useState(null);
 
   const [toast, setToast] = useState(null);
@@ -36,8 +39,9 @@ export function AppProvider({ children }){
       }
       return { token: null, user: null };
     });
-    setClients([]); setFolders([]); setFiles([]);
-    setSelectedClientId(null); setAddClientOpen(false); setAccessModalFile(null);
+    setClients([]); setNormalClients([]); setFolders([]); setFiles([]);
+    setSelectedClientId(null); setSelectedNormalClientId(null);
+    setAddClientOpen(false); setAddClientType(null); setAccessModalFile(null);
   }, []);
 
   const call = useCallback((action, payload) => {
@@ -67,19 +71,29 @@ export function AppProvider({ children }){
         history: (c.history || []).map((h) => ({ ...h, t: new Date(h.timestamp) }))
           .sort((a, b) => b.t - a.t),
       })));
+      setNormalClients((data.normalClients || []).map((c) => ({
+        ...c,
+        createdAt: new Date(c.createdAt),
+        history: (c.history || []).map((h) => ({ ...h, t: new Date(h.timestamp) }))
+          .sort((a, b) => b.t - a.t),
+      })));
     }).catch((err) => showToast('Could not load data: ' + err.message));
   }, [call, showToast]);
 
   const closeOverlays = useCallback(() => {
-    setSelectedClientId(null); setAddClientOpen(false); setAccessModalFile(null);
+    setSelectedClientId(null); setSelectedNormalClientId(null);
+    setAddClientOpen(false); setAddClientType(null);
+    setAccessModalFile(null);
   }, []);
 
   const value = {
     auth, login: (token, user) => setAuth({ token, user }),
     isLoggedIn: !!(auth.token && auth.user),
-    clients, folders, setFolders, files, setFiles, settings,
+    clients, normalClients, folders, setFolders, files, setFiles, settings,
     selectedClientId, setSelectedClientId,
+    selectedNormalClientId, setSelectedNormalClientId,
     addClientOpen, setAddClientOpen,
+    addClientType, setAddClientType,
     accessModalFile, setAccessModalFile,
     closeOverlays,
     toast, showToast,
