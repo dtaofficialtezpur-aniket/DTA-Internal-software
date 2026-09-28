@@ -229,6 +229,9 @@ if ($method === 'GET') {
         case 'register':
             handle_register($pdo, $body);
             break;
+        case 'setupStatus':
+            handle_setup_status($pdo);
+            break;
         case 'login':
             handle_login($pdo, $body);
             break;
@@ -367,6 +370,12 @@ function handle_status(PDO $pdo, array $params): void
 }
 
 /* ---------------- auth actions ---------------- */
+
+function handle_setup_status(PDO $pdo): void
+{
+    $hasAdmin = (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn() > 0;
+    json_out(['ok' => true, 'registrationOpen' => !$hasAdmin]);
+}
 
 function handle_register(PDO $pdo, array $body): void
 {
