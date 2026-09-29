@@ -4,7 +4,10 @@ on:
   push:
     tags:
       - 'v*.*.*'
-  workflow_dispatch: {} # lets you trigger a build manually from the Actions tab, no tag needed
+  # Trigger a build+publish manually (Actions tab, or the actions_run_trigger tool) --
+  # electron-builder creates the git tag and the GitHub Release itself, from the version
+  # already in desktop/package.json, so nothing needs to push a tag first.
+  workflow_dispatch: {}
 
 permissions:
   contents: write # needed so electron-builder can publish to GitHub Releases
@@ -38,25 +41,8 @@ jobs:
         working-directory: dashboard
         run: npm run build
 
-      - name: Build and publish (on tag push)
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Build and publish
         working-directory: desktop
         run: npx electron-builder --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build only (manual run, no tag)
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        working-directory: desktop
-        run: npx electron-builder --publish never
-
-      - name: Upload build as a workflow artifact
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: desktop-${{ matrix.os }}
-          path: |
-            desktop/release/*.exe
-            desktop/release/*.dmg
-            desktop/release/*.AppImage
-          if-no-files-found: warn
