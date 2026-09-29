@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
+import { BACKEND_URL } from '../constants.js';
 
 export default function AddClientModal(){
   const { addClientOpen, setAddClientOpen, addClientType, setAddClientType } = useApp();
@@ -46,6 +47,36 @@ function TypeChooser({ onChoose, onCancel }){
   );
 }
 
+function DocumentAutofill({ clientType, onFields }){
+  const { auth, showToast } = useApp();
+  const [loading, setLoading] = useState(false);
+
+  function onFile(e){
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    setLoading(true);
+    const fd = new FormData();
+    fd.append('action', 'extractClientDocument');
+    fd.append('token', auth.token);
+    fd.append('clientType', clientType);
+    fd.append('file', file);
+    fetch(BACKEND_URL, { method: 'POST', body: fd }).then((res) => res.json()).then((data) => {
+      if (data.error) throw new Error(data.error);
+      onFields(data.fields || {});
+      showToast('Filled from document — review before creating');
+    }).catch((err) => showToast('Could not read document: ' + err.message))
+      .finally(() => setLoading(false));
+  }
+
+  return (
+    <label className="btn btn-secondary btn-sm" style={{cursor: loading ? 'default' : 'pointer', display:'inline-flex', marginTop:'12px'}}>
+      {loading ? 'Reading document…' : 'Upload a document to autofill'}
+      <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" style={{display:'none'}} disabled={loading} onChange={onFile} />
+    </label>
+  );
+}
+
 function SubscriptionClientForm({ onBack, onDone }){
   const { settings, call, refreshFromBackend, showToast } = useApp();
   const [client, setClient] = useState('');
@@ -77,6 +108,13 @@ function SubscriptionClientForm({ onBack, onDone }){
     <div>
       <h2 style={{fontSize:'1.15rem'}}>Add a subscription client</h2>
       <div className="page-sub">Creates a Client ID and API key for a new DTA software deployment.</div>
+      <DocumentAutofill clientType="subscription" onFields={(f) => {
+        if (f.clientName) setClient(f.clientName);
+        if (f.softwareName) setSoftware(f.softwareName);
+        if (f.amount != null) setAmount(String(f.amount));
+        if (f.cycle === 'Monthly' || f.cycle === 'Annual') setCycle(f.cycle);
+        if (f.startDate) setStart(f.startDate);
+      }} />
       <form id="add-form" onSubmit={submit}>
         <div className="form-grid">
           <label className="full">Client company name
@@ -142,6 +180,14 @@ function NormalClientForm({ onBack, onDone }){
     <div>
       <h2 style={{fontSize:'1.15rem'}}>Add a normal client</h2>
       <div className="page-sub">Just basic details — no Client ID, no API key, no billing cycle.</div>
+      <DocumentAutofill clientType="normal" onFields={(f) => {
+        if (f.clientName) setClient(f.clientName);
+        if (f.address) setAddress(f.address);
+        if (f.contact) setContact(f.contact);
+        if (f.totalAmount != null) setTotalAmount(String(f.totalAmount));
+        if (f.advancePayment != null) setAdvancePayment(String(f.advancePayment));
+        if (f.notes) setNotes(f.notes);
+      }} />
       <form id="add-normal-form" onSubmit={submit}>
         <div className="form-grid">
           <label className="full">Client name
