@@ -86,15 +86,15 @@ file/FTP access to the server is what proves it's really you, same as
 
 ## 8. Autofill new clients from an uploaded document
 - Both "Add client" forms (Subscription and Normal) have an "Upload a
-  document to autofill" button — upload a PDF or photo of a client's
-  details and it fills the form for you to review before creating.
-- This needs an Anthropic API key: get one at
-  https://console.anthropic.com/, then add it to `config.php` as
-  `anthropic_api_key`. Leave it `null` (the default) to leave the button
-  disabled — nothing else in the app is affected either way.
-- Each upload costs a small amount (a few cents) against that API key's
-  billing — it's not free, but there's no separate step to enable it
-  beyond adding the key.
+  document to autofill" button — upload a PDF and it fills the form for
+  you to review before creating. No setup, no API key, no cost.
+- Only works with a PDF that has real, selectable text — it reads the
+  text layer directly out of the file and matches "Label: value" style
+  lines (e.g. "Client Name: ...", "Total Amount: ...") against a set of
+  known labels. A scanned/photographed page has no text layer, so it
+  won't work on those — type those in by hand instead.
+- It's a best-effort match, not a guarantee: always shown in the form for
+  you to check before clicking Create, nothing is submitted automatically.
 
 ## Notes
 - `api.php`/`db.php` create their own tables automatically on first

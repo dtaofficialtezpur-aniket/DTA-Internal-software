@@ -70,10 +70,13 @@ function DocumentAutofill({ clientType, onFields }){
   }
 
   return (
-    <label className="btn btn-secondary btn-sm" style={{cursor: loading ? 'default' : 'pointer', display:'inline-flex', marginTop:'12px'}}>
-      {loading ? 'Reading document…' : 'Upload a document to autofill'}
-      <input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" style={{display:'none'}} disabled={loading} onChange={onFile} />
-    </label>
+    <div style={{marginTop:'12px'}}>
+      <label className="btn btn-secondary btn-sm" style={{cursor: loading ? 'default' : 'pointer', display:'inline-flex'}}>
+        {loading ? 'Reading document…' : 'Upload a PDF to autofill'}
+        <input type="file" accept=".pdf" style={{display:'none'}} disabled={loading} onChange={onFile} />
+      </label>
+      <div className="page-sub" style={{marginTop:'4px'}}>Only works with a text-based PDF, not a scanned photo.</div>
+    </div>
   );
 }
 

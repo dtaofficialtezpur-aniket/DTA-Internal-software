@@ -9,10 +9,4 @@ return [
     'db_name' => 'uXXXXXXXX_subctl',
     'db_user' => 'uXXXXXXXX_subctl',
     'db_pass' => 'change-me',
-
-    // Optional: only needed for the "Upload a document to autofill" button
-    // on the Add Client forms. Get a key at https://console.anthropic.com/
-    // — leave as null to leave that feature disabled (the button won't
-    // work, but nothing else is affected).
-    'anthropic_api_key' => null,
 ];
