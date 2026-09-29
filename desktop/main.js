@@ -74,14 +74,24 @@ function lockDownSession() {
 
   // The dashboard has one fixed backend baked into dashboard/index.html
   // (BACKEND_URL) rather than a Settings field. Mirror that host here —
-  // if you change BACKEND_URL in the HTML, update ALLOWED_HOST to match.
-  const ALLOWED_HOST = 'dtaonline.in';
+  // if you change BACKEND_URL in the HTML, update ALLOWED_HOSTS to match.
+  //
+  // Also allowed: the auto-updater's own traffic. electron-updater's
+  // ElectronHttpExecutor makes its requests through Electron's net module,
+  // which is subject to this same session-level filter -- without these
+  // hosts allowed, every update check gets silently cancelled here before
+  // it ever reaches GitHub, no matter how correctly the release/token are
+  // set up on the other end.
+  const ALLOWED_HOSTS = ['dtaonline.in', 'api.github.com', 'github.com'];
+  const ALLOWED_HOST_SUFFIXES = ['.githubusercontent.com'];
   session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
     try {
       const url = new URL(details.url);
       if (url.protocol === 'file:') return callback({ cancel: false });
-      if (url.protocol === 'https:' && url.hostname === ALLOWED_HOST) return callback({ cancel: false });
-      callback({ cancel: true });
+      if (url.protocol !== 'https:') return callback({ cancel: true });
+      const allowed = ALLOWED_HOSTS.includes(url.hostname)
+        || ALLOWED_HOST_SUFFIXES.some((suffix) => url.hostname.endsWith(suffix));
+      callback({ cancel: !allowed });
     } catch {
       callback({ cancel: true });
     }
