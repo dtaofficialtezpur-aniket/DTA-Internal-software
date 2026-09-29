@@ -248,11 +248,15 @@ if ($method === 'GET') {
     // needed here because the file bytes shouldn't be base64-inflated
     // into a JSON body.
     $action = $_POST['action'] ?? null;
-    if ($action !== 'uploadFile') {
+    if ($action === 'uploadFile') {
+        $user = require_admin_session($pdo, $_POST['token'] ?? null);
+        handle_upload_file($pdo, $_POST, $_FILES['file'] ?? null, $user);
+    } elseif ($action === 'extractClientDocument') {
+        require_session($pdo, $_POST['token'] ?? null);
+        handle_extract_client_document($pdo, $_POST, $_FILES['file'] ?? null);
+    } else {
         json_out(['error' => 'Unknown action: ' . $action]);
     }
-    $user = require_admin_session($pdo, $_POST['token'] ?? null);
-    handle_upload_file($pdo, $_POST, $_FILES['file'] ?? null, $user);
 } elseif ($method === 'POST') {
     $body = json_decode(file_get_contents('php://input'), true) ?: [];
     $action = $body['action'] ?? null;
@@ -983,6 +987,156 @@ function handle_upload_file(PDO $pdo, array $body, ?array $uploadedFile, array $
 
     $file = find_file($pdo, (int) $pdo->lastInsertId());
     json_out(['ok' => true, 'file' => file_to_json($file, [], null)]);
+}
+
+/* ---------------- document upload -> autofill the Add Client form ----------------
+ * Free, no-API-key extraction: pulls the text layer straight out of the PDF
+ * (no OCR, so a scanned/photographed page has no text to find) and matches
+ * "Label: value" style lines against a set of known labels per field. Best-
+ * effort by nature -- always shown to the user to review before creating
+ * the client, never submitted on its own.
+ */
+
+const CLIENT_DOC_FIELD_LABELS = [
+    'subscription' => [
+        'clientName' => ['Client Name', 'Client', 'Customer Name', 'Customer', 'Company', 'Company Name', 'Name'],
+        'softwareName' => ['Software Name', 'Software', 'Product', 'Product Name', 'Service'],
+        'amount' => ['Plan Amount', 'Amount', 'Price', 'Fee', 'Subscription Amount'],
+        'cycle' => ['Billing Cycle', 'Cycle'],
+        'startDate' => ['Start Date', 'Date'],
+    ],
+    'normal' => [
+        'clientName' => ['Client Name', 'Name', 'Customer Name', 'Customer'],
+        'address' => ['Address'],
+        'contact' => ['Contact', 'Contact Details', 'Phone', 'Mobile', 'Email'],
+        'totalAmount' => ['Total Amount', 'Total', 'Amount'],
+        'advancePayment' => ['Advance Payment', 'Advance', 'Paid', 'Amount Paid'],
+        'notes' => ['Notes', 'Remarks', 'Other Details', 'Details'],
+    ],
+];
+
+function pdf_extract_text(string $bytes): string
+{
+    if (!preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $bytes, $streams)) {
+        return '';
+    }
+
+    $text = '';
+    foreach ($streams[1] as $stream) {
+        $decoded = @gzuncompress($stream);
+        if ($decoded === false) {
+            $decoded = @gzinflate($stream);
+        }
+        $content = $decoded !== false ? $decoded : $stream;
+
+        // Walk the content stream in order: a paren string feeds the current
+        // line, while a line-move operator (Td/TD/T*, the usual "next line"
+        // operators between Tj calls) starts a new one -- otherwise every
+        // Tj on a page collapses into a single run-on line.
+        if (preg_match_all('/\((?:\\\\.|[^()\\\\])*\)|\bTd\b|\bTD\b|\bT\*/', $content, $tokens)) {
+            foreach ($tokens[0] as $token) {
+                if ($token[0] !== '(') {
+                    $text .= "\n";
+                    continue;
+                }
+                $inner = substr($token, 1, -1);
+                $inner = preg_replace_callback('/\\\\([0-7]{1,3}|.)/', function ($m) {
+                    $esc = $m[1];
+                    if (preg_match('/^[0-7]{1,3}$/', $esc)) return chr(octdec($esc));
+                    return ['n' => "\n", 'r' => "\r", 't' => "\t"][$esc] ?? $esc;
+                }, $inner);
+                $text .= $inner;
+            }
+        }
+        $text .= "\n";
+    }
+    return $text;
+}
+
+function extract_client_fields_from_text(string $text, string $clientType): array
+{
+    $fields = [];
+    $lines = preg_split('/\n+/', $text);
+    $labelMap = CLIENT_DOC_FIELD_LABELS[$clientType];
+
+    foreach ($lines as $line) {
+        $line = trim(preg_replace('/\s+/', ' ', $line));
+        if ($line === '') continue;
+        foreach ($labelMap as $field => $labels) {
+            if (isset($fields[$field])) continue;
+            foreach ($labels as $label) {
+                if (preg_match('/^' . preg_quote($label, '/') . '\s*[:\-]\s*(.+)$/i', $line, $m)) {
+                    $fields[$field] = trim($m[1]);
+                    break;
+                }
+            }
+        }
+    }
+
+    // Contact: fall back to scanning the whole text for an email/phone if no
+    // labelled line matched one.
+    if ($clientType === 'normal' && empty($fields['contact'])) {
+        $found = [];
+        if (preg_match('/[\w.+-]+@[\w-]+\.[\w.-]+/', $text, $m)) $found[] = $m[0];
+        if (preg_match('/(?:\+?\d[\d \-]{8,13}\d)/', $text, $m)) $found[] = trim($m[0]);
+        if ($found) $fields['contact'] = implode(', ', $found);
+    }
+
+    // Amount-ish fields: find the actual number (comma thousands-separators
+    // and all) rather than stripping non-digits, which would let a stray
+    // period from a currency abbreviation like "Rs." corrupt the value.
+    foreach (['amount', 'totalAmount', 'advancePayment'] as $moneyField) {
+        if (isset($fields[$moneyField])) {
+            if (preg_match('/\d[\d,]*(?:\.\d+)?/', $fields[$moneyField], $m)) {
+                $fields[$moneyField] = (float) str_replace(',', '', $m[0]);
+            } else {
+                unset($fields[$moneyField]);
+            }
+        }
+    }
+
+    if (isset($fields['cycle'])) {
+        $fields['cycle'] = stripos($fields['cycle'], 'year') !== false || stripos($fields['cycle'], 'annual') !== false
+            ? 'Annual' : 'Monthly';
+    }
+
+    if (isset($fields['startDate'])) {
+        $ts = strtotime($fields['startDate']);
+        $fields['startDate'] = $ts !== false ? date('Y-m-d', $ts) : null;
+        if ($fields['startDate'] === null) unset($fields['startDate']);
+    }
+
+    return $fields;
+}
+
+function handle_extract_client_document(PDO $pdo, array $body, ?array $uploadedFile): void
+{
+    if (!$uploadedFile || ($uploadedFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        json_out(['error' => 'No file uploaded, or the upload failed.']);
+    }
+    if ($uploadedFile['size'] > 15 * 1024 * 1024) {
+        json_out(['error' => 'File is too large (max 15 MB).']);
+    }
+
+    $clientType = ($body['clientType'] ?? '') === 'normal' ? 'normal' : 'subscription';
+
+    $ext = strtolower(pathinfo((string) $uploadedFile['name'], PATHINFO_EXTENSION));
+    if ($ext !== 'pdf') {
+        json_out(['error' => 'Only PDF files are supported, and only ones with real (selectable) text — a scanned photo has no text to read.']);
+    }
+
+    $bytes = file_get_contents($uploadedFile['tmp_name']);
+    $text = pdf_extract_text($bytes);
+    if (trim($text) === '') {
+        json_out(['error' => 'Could not find any text in that PDF — it looks like a scanned image rather than a text document.']);
+    }
+
+    $fields = extract_client_fields_from_text($text, $clientType);
+    if (empty($fields)) {
+        json_out(['error' => 'Could not recognize any client details in that PDF. Try a file with clear "Label: value" lines, e.g. "Client Name: ...".']);
+    }
+
+    json_out(['ok' => true, 'fields' => $fields]);
 }
 
 function handle_set_file_access(PDO $pdo, array $body): void
