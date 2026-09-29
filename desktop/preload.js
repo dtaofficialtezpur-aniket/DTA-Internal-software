@@ -6,7 +6,11 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   isDesktop: true,
   platform: process.platform,
-  appVersion: process.env.npm_package_version || null,
+  // process.env.npm_package_version only exists when launched via `npm
+  // start` -- a packaged app is double-clicked, not run through npm, so
+  // that was always null in the real installed app. Ask the main process
+  // instead, which always knows its own version (app.getVersion()).
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
 
   // Fires once, when a downloaded update is ready to install.
   onUpdateReady: (callback) => {
