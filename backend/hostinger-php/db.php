@@ -127,6 +127,24 @@ function ensure_schema(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 
+    // Basic-details clients — no Client ID/API key/subscription cycle,
+    // just contact info and a running total/advance/remaining payment.
+    // Kept in their own table so they never mix with the licensed
+    // 'clients' above; the two are managed as separate lists.
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS normal_clients (
+            id VARCHAR(32) PRIMARY KEY,
+            client_name VARCHAR(255) NOT NULL,
+            address TEXT NULL,
+            contact VARCHAR(255) NULL,
+            total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+            advance_payment DECIMAL(12,2) NOT NULL DEFAULT 0,
+            remaining_payment DECIMAL(12,2) NOT NULL DEFAULT 0,
+            notes TEXT NULL,
+            created_at DATETIME NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
     // Admin-created folders for the file library. Any folder can nest under
     // another (parent_id) or sit at the root (parent_id NULL).
     $pdo->exec("
