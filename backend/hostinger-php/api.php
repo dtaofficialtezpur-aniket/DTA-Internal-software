@@ -248,11 +248,15 @@ if ($method === 'GET') {
     // needed here because the file bytes shouldn't be base64-inflated
     // into a JSON body.
     $action = $_POST['action'] ?? null;
-    if ($action !== 'uploadFile') {
+    if ($action === 'uploadFile') {
+        $user = require_admin_session($pdo, $_POST['token'] ?? null);
+        handle_upload_file($pdo, $_POST, $_FILES['file'] ?? null, $user);
+    } elseif ($action === 'extractClientDocument') {
+        require_session($pdo, $_POST['token'] ?? null);
+        handle_extract_client_document($pdo, $_POST, $_FILES['file'] ?? null);
+    } else {
         json_out(['error' => 'Unknown action: ' . $action]);
     }
-    $user = require_admin_session($pdo, $_POST['token'] ?? null);
-    handle_upload_file($pdo, $_POST, $_FILES['file'] ?? null, $user);
 } elseif ($method === 'POST') {
     $body = json_decode(file_get_contents('php://input'), true) ?: [];
     $action = $body['action'] ?? null;
@@ -983,6 +987,125 @@ function handle_upload_file(PDO $pdo, array $body, ?array $uploadedFile, array $
 
     $file = find_file($pdo, (int) $pdo->lastInsertId());
     json_out(['ok' => true, 'file' => file_to_json($file, [], null)]);
+}
+
+/* ---------------- document upload -> autofill the Add Client form ---------------- */
+
+const CLIENT_DOC_TOOL_SCHEMAS = [
+    'subscription' => [
+        'clientName' => ['type' => 'string', 'description' => 'The client company/person name'],
+        'softwareName' => ['type' => 'string', 'description' => 'Name of the software/product being provided'],
+        'amount' => ['type' => 'number', 'description' => 'The plan/subscription amount, digits only'],
+        'cycle' => ['type' => 'string', 'enum' => ['Monthly', 'Annual'], 'description' => 'Billing cycle'],
+        'startDate' => ['type' => 'string', 'description' => 'Start date in YYYY-MM-DD format'],
+    ],
+    'normal' => [
+        'clientName' => ['type' => 'string', 'description' => 'The client name'],
+        'address' => ['type' => 'string', 'description' => 'The client address'],
+        'contact' => ['type' => 'string', 'description' => 'Phone number and/or email'],
+        'totalAmount' => ['type' => 'number', 'description' => 'Total agreed amount, digits only'],
+        'advancePayment' => ['type' => 'number', 'description' => 'Advance/amount already paid, digits only'],
+        'notes' => ['type' => 'string', 'description' => 'Any other relevant details worth keeping'],
+    ],
+];
+
+function handle_extract_client_document(PDO $pdo, array $body, ?array $uploadedFile): void
+{
+    if (!$uploadedFile || ($uploadedFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        json_out(['error' => 'No file uploaded, or the upload failed.']);
+    }
+    if ($uploadedFile['size'] > 15 * 1024 * 1024) {
+        json_out(['error' => 'File is too large (max 15 MB).']);
+    }
+
+    $clientType = ($body['clientType'] ?? '') === 'normal' ? 'normal' : 'subscription';
+
+    $ext = strtolower(pathinfo((string) $uploadedFile['name'], PATHINFO_EXTENSION));
+    $mediaTypes = ['pdf' => 'application/pdf', 'png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'webp' => 'image/webp'];
+    if (!isset($mediaTypes[$ext])) {
+        json_out(['error' => 'Unsupported file type. Upload a PDF, PNG, or JPG.']);
+    }
+
+    $config = get_config();
+    $apiKey = $config['anthropic_api_key'] ?? null;
+    if (!$apiKey) {
+        json_out(['error' => 'Document upload is not configured on this server (missing anthropic_api_key in config.php).']);
+    }
+
+    $bytes = file_get_contents($uploadedFile['tmp_name']);
+    $base64 = base64_encode($bytes);
+    $mediaType = $mediaTypes[$ext];
+    $blockType = $mediaType === 'application/pdf' ? 'document' : 'image';
+
+    $properties = CLIENT_DOC_TOOL_SCHEMAS[$clientType];
+    $toolInputSchema = [
+        'type' => 'object',
+        'properties' => $properties,
+        'required' => [],
+    ];
+
+    $payload = [
+        'model' => 'claude-sonnet-5',
+        'max_tokens' => 1024,
+        'messages' => [[
+            'role' => 'user',
+            'content' => [
+                [
+                    'type' => $blockType,
+                    'source' => ['type' => 'base64', 'media_type' => $mediaType, 'data' => $base64],
+                ],
+                [
+                    'type' => 'text',
+                    'text' => 'Extract the client details from this document into the extract_client_details tool. Leave a field out entirely if it is not present in the document — never guess or invent a value.',
+                ],
+            ],
+        ]],
+        'tools' => [[
+            'name' => 'extract_client_details',
+            'description' => 'Records the client details found in the document.',
+            'input_schema' => $toolInputSchema,
+        ]],
+        'tool_choice' => ['type' => 'tool', 'name' => 'extract_client_details'],
+    ];
+
+    $ch = curl_init('https://api.anthropic.com/v1/messages');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 60,
+        CURLOPT_HTTPHEADER => [
+            'x-api-key: ' . $apiKey,
+            'anthropic-version: 2023-06-01',
+            'content-type: application/json',
+        ],
+        CURLOPT_POSTFIELDS => json_encode($payload),
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($response === false) {
+        json_out(['error' => 'Could not reach the document reader: ' . $curlError]);
+    }
+    $data = json_decode($response, true);
+    if ($httpCode !== 200) {
+        $msg = $data['error']['message'] ?? ('HTTP ' . $httpCode);
+        json_out(['error' => 'Document reader failed: ' . $msg]);
+    }
+
+    $fields = null;
+    foreach ($data['content'] ?? [] as $block) {
+        if (($block['type'] ?? '') === 'tool_use') {
+            $fields = $block['input'] ?? [];
+            break;
+        }
+    }
+    if ($fields === null) {
+        json_out(['error' => 'Could not extract any details from that document.']);
+    }
+
+    json_out(['ok' => true, 'fields' => $fields]);
 }
 
 function handle_set_file_access(PDO $pdo, array $body): void
