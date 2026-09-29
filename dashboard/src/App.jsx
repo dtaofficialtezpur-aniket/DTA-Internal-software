@@ -9,12 +9,13 @@ import Team from './pages/Team.jsx';
 import Files from './pages/Files.jsx';
 import Settings from './pages/Settings.jsx';
 import ClientDetailPanel from './components/ClientDetailPanel.jsx';
+import NormalClientDetailPanel from './components/NormalClientDetailPanel.jsx';
 import AddClientModal from './components/AddClientModal.jsx';
 import ManageAccessModal from './components/ManageAccessModal.jsx';
 import Toast from './components/Toast.jsx';
 
 export default function App(){
-  const { isLoggedIn, auth, refreshFromBackend, selectedClientId, addClientOpen, accessModalFile, closeOverlays } = useApp();
+  const { isLoggedIn, auth, refreshFromBackend, selectedClientId, selectedNormalClientId, addClientOpen, accessModalFile, closeOverlays } = useApp();
   const [view, setView] = useState('overview');
 
   useEffect(() => {
@@ -34,7 +35,7 @@ export default function App(){
   if (!isLoggedIn) return <AuthScreen />;
 
   const isAdmin = auth.user.role === 'admin';
-  const overlayOpen = !!(selectedClientId || addClientOpen || accessModalFile);
+  const overlayOpen = !!(selectedClientId || selectedNormalClientId || addClientOpen || accessModalFile);
 
   return (
     <div className="app">
@@ -52,6 +53,7 @@ export default function App(){
 
       <div className={'backdrop' + (overlayOpen ? ' open' : '')} onClick={closeOverlays} />
       <ClientDetailPanel />
+      <NormalClientDetailPanel />
       <AddClientModal />
       <ManageAccessModal />
       <Toast />

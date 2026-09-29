@@ -27,6 +27,21 @@ CREATE TABLE IF NOT EXISTS history (
     INDEX (client_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Basic-details clients — no Client ID/API key/subscription cycle, just
+-- contact info and a running total/advance/remaining payment. Kept
+-- separate from 'clients' above; the two are managed as separate lists.
+CREATE TABLE IF NOT EXISTS normal_clients (
+    id VARCHAR(32) PRIMARY KEY,
+    client_name VARCHAR(255) NOT NULL,
+    address TEXT NULL,
+    contact VARCHAR(255) NULL,
+    total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    advance_payment DECIMAL(12,2) NOT NULL DEFAULT 0,
+    remaining_payment DECIMAL(12,2) NOT NULL DEFAULT 0,
+    notes TEXT NULL,
+    created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS settings (
     setting_key VARCHAR(64) PRIMARY KEY,
     setting_value VARCHAR(255) NOT NULL
