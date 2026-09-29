@@ -15,6 +15,12 @@ permissions:
 jobs:
   build:
     strategy:
+      # One at a time, not in parallel. When the release for this tag doesn't
+      # exist yet, each electron-builder run that finds no existing release
+      # creates its own -- running all 3 platforms at once raced and split
+      # the assets across two separate draft releases instead of one. A job
+      # running after the first has a real release to find and attach to.
+      max-parallel: 1
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
