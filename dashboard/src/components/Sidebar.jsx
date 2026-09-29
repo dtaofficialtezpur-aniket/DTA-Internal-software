@@ -31,10 +31,20 @@ function useUpdateReady(){
   return update;
 }
 
+function useAppVersion(){
+  const [version, setVersion] = useState(null);
+  useEffect(() => {
+    if (!window.electronAPI || !window.electronAPI.getAppVersion) return;
+    window.electronAPI.getAppVersion().then(setVersion).catch(() => {});
+  }, []);
+  return version;
+}
+
 export default function Sidebar({ view, setView }){
   const { auth, doLogout } = useApp();
   const isAdmin = auth.user.role === 'admin';
   const update = useUpdateReady();
+  const version = useAppVersion();
 
   return (
     <nav className="sidebar" aria-label="Primary">
@@ -79,6 +89,7 @@ export default function Sidebar({ view, setView }){
         )}
         <div>Signed in as <b>{auth.user.fullName}</b><br /><span>{isAdmin ? 'Admin' : 'Employee'}</span></div>
         <button id="logout-btn" className="btn btn-ghost btn-sm btn-block" style={{marginTop:'8px'}} onClick={doLogout}>Log out</button>
+        {version && <div style={{fontSize:'.7rem', color:'var(--ink-faint)', marginTop:'8px'}}>v{version}</div>}
       </div>
     </nav>
   );

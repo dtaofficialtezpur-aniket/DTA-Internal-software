@@ -1,7 +1,7 @@
 {
   "name": "dta-subscription-control",
   "productName": "DTA Subscription Control",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "description": "DTA-internal desktop app for managing client subscriptions and access.",
   "private": true,
   "author": "DTA",
