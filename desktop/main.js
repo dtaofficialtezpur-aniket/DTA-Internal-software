@@ -1,6 +1,21 @@
 const { app, BrowserWindow, Menu, Notification, ipcMain, session, shell } = require('electron');
 const path = require('node:path');
+const fs = require('node:fs');
 const { autoUpdater } = require('electron-updater');
+
+// Update checks fail silently to the user by design (no error dialog for a
+// background check) -- but that also means there was no way to see WHY one
+// failed. This writes every step to a plain text file so that can be read
+// directly, without a dev console: <userData>/update.log (on Windows,
+// %APPDATA%\dta-subscription-control\update.log).
+function logUpdate(line) {
+  try {
+    const logPath = path.join(app.getPath('userData'), 'update.log');
+    fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${line}\n`);
+  } catch {
+    // Nothing sensible to do if even the log write fails.
+  }
+}
 
 let mainWindow = null;
 let updateReadyNotified = false;
@@ -99,7 +114,11 @@ function lockDownSession() {
 }
 
 function setUpAutoUpdates() {
-  if (!app.isPackaged) return; // no update feed to check against in dev
+  logUpdate(`app started, version=${app.getVersion()} isPackaged=${app.isPackaged}`);
+  if (!app.isPackaged) {
+    logUpdate('not packaged -- skipping update checks (no feed to check against in dev)');
+    return;
+  }
 
   autoUpdater.setFeedURL({
     provider: 'github',
@@ -112,7 +131,13 @@ function setUpAutoUpdates() {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = false;
 
+  autoUpdater.on('checking-for-update', () => logUpdate('checking for update...'));
+  autoUpdater.on('update-available', (info) => logUpdate(`update available: ${info.version}`));
+  autoUpdater.on('update-not-available', (info) => logUpdate(`no update available (latest is ${info.version})`));
+  autoUpdater.on('download-progress', (p) => logUpdate(`downloading: ${Math.round(p.percent)}%`));
+
   autoUpdater.on('update-downloaded', (info) => {
+    logUpdate(`update downloaded: ${info.version}`);
     if (mainWindow) mainWindow.webContents.send('update-ready', { version: info.version });
 
     if (!updateReadyNotified) {
@@ -127,10 +152,11 @@ function setUpAutoUpdates() {
   });
 
   autoUpdater.on('error', (err) => {
+    logUpdate(`ERROR: ${err && err.stack ? err.stack : err}`);
     console.error('Auto-update check failed:', err);
   });
 
-  const checkNow = () => autoUpdater.checkForUpdates().catch((err) => console.error(err));
+  const checkNow = () => autoUpdater.checkForUpdates().catch((err) => logUpdate(`ERROR (checkForUpdates threw): ${err && err.stack ? err.stack : err}`));
   checkNow();
   setInterval(checkNow, 6 * 60 * 60 * 1000); // re-check every 6 hours
 }
