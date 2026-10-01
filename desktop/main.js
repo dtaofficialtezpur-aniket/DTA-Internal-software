@@ -20,16 +20,6 @@ function logUpdate(line) {
 let mainWindow = null;
 let updateReadyNotified = false;
 
-// This repo is private, so the update feed (GitHub Releases) needs auth to
-// read it -- this is a fine-grained GitHub PAT scoped to ONLY this one repo,
-// with just "Contents: Read-only" permission, so it can do nothing else on
-// the account it belongs to. To rotate it: generate a new one the same way
-// at https://github.com/settings/personal-access-tokens/new, replace the
-// value below, bump the version in package.json, and cut a new release --
-// installs already running the old build keep working off the old token
-// until they pick up that release.
-const UPDATE_FEED_TOKEN = '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';
-
 function dashboardHtmlPath() {
   // Always the built output (dashboard/dist/, produced by `npm run
   // build` in dashboard/) -- never the Vite source dashboard/index.html,
@@ -120,14 +110,10 @@ function setUpAutoUpdates() {
     return;
   }
 
-  autoUpdater.setFeedURL({
-    provider: 'github',
-    owner: 'dtaofficialtezpur-aniket',
-    repo: 'DTA-Internal-software',
-    private: true,
-    token: UPDATE_FEED_TOKEN,
-  });
-
+  // Repo is public, so no setFeedURL/token needed -- electron-builder
+  // already baked the GitHub owner/repo into app-update.yml at build time
+  // (from the "publish" block in package.json), and electron-updater reads
+  // that automatically.
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = false;
 
