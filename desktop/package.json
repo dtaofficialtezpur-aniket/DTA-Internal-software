@@ -41,7 +41,7 @@
       {
         "provider": "github",
         "owner": "dtaofficialtezpur-aniket",
-        "repo": "DTA-Internal-software"
+        "repo": "DTA-Subscription-Control-Releases"
       }
     ],
     "win": { "target": "nsis" },
