@@ -33,6 +33,17 @@
 }
 
 *{box-sizing:border-box;}
+
+/* Scrollbars, everywhere — thin, theme-colored, rounded, instead of the
+   OS default. scrollbar-width/-color cover Firefox; the ::-webkit-*
+   pseudo-elements cover Chrome/Electron (the ones that actually matter
+   here, since the desktop app and most browsers are Chromium-based). */
+*{scrollbar-width:thin; scrollbar-color:var(--border-strong) transparent;}
+::-webkit-scrollbar{width:10px; height:10px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border-strong); border-radius:99px; border:2px solid transparent; background-clip:padding-box;}
+::-webkit-scrollbar-thumb:hover{background:var(--ink-faint); background-clip:padding-box;}
+::-webkit-scrollbar-corner{background:transparent;}
 body{margin:0;background:var(--surface);color:var(--ink);font-family:"Public Sans",-apple-system,Segoe UI,sans-serif;font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;}
 h1,h2,h3{font-family:"Manrope",sans-serif;color:var(--ink);text-wrap:balance;margin:0;}
 a{color:var(--accent);}
