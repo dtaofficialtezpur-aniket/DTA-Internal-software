@@ -5,7 +5,7 @@ import StatusPill from '../components/StatusPill.jsx';
 
 export default function Clients(){
   const { clients, normalClients, settings, setAddClientOpen, setSelectedClientId, setSelectedNormalClientId } = useApp();
-  const [tab, setTab] = useState('subscription');
+  const [tab, setTab] = useState('all');
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all');
 
@@ -22,6 +22,21 @@ export default function Clients(){
     return !ql || c.client.toLowerCase().includes(ql) || (c.contact || '').toLowerCase().includes(ql);
   });
 
+  // "Active" here means still ongoing — a paused subscription client
+  // doesn't count, but every normal client does (they have no pause
+  // concept of their own). Only the search box applies on this tab, not
+  // the subscription-only status filter above.
+  const activeQl = q.toLowerCase();
+  const activeRows = [
+    ...clients
+      .filter((c) => computeStatus(c, settings.lead) !== 'paused')
+      .filter((c) => !activeQl || c.client.toLowerCase().includes(activeQl) || c.software.toLowerCase().includes(activeQl))
+      .map((c) => ({ kind: 'subscription', c })),
+    ...normalClients
+      .filter((c) => !activeQl || c.client.toLowerCase().includes(activeQl) || (c.contact || '').toLowerCase().includes(activeQl))
+      .map((c) => ({ kind: 'normal', c })),
+  ];
+
   return (
     <section>
       <div className="page-head">
@@ -36,9 +51,48 @@ export default function Clients(){
       </div>
 
       <div style={{display:'flex', gap:'8px', marginBottom:'14px'}}>
+        <button type="button" className={'btn btn-sm ' + (tab === 'all' ? 'btn-primary' : 'btn-secondary')} onClick={() => setTab('all')}>All active clients</button>
         <button type="button" className={'btn btn-sm ' + (tab === 'subscription' ? 'btn-primary' : 'btn-secondary')} onClick={() => setTab('subscription')}>Subscription clients</button>
         <button type="button" className={'btn btn-sm ' + (tab === 'normal' ? 'btn-primary' : 'btn-secondary')} onClick={() => setTab('normal')}>Normal clients</button>
       </div>
+
+      {tab === 'all' && (
+        <>
+          <div className="toolbar" style={{marginBottom:'14px'}}>
+            <div className="search">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="8.5" cy="8.5" r="5.3"/><path d="m16 16-3.2-3.2"/></svg>
+              <input type="text" placeholder="Search clients…" value={q} onChange={(e) => setQ(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="table-wrap">
+            <table><thead><tr><th>Client</th><th>Type</th><th>Detail</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                {activeRows.length === 0 && <tr><td colSpan="5" className="empty">No active clients match this search.</td></tr>}
+                {activeRows.map(({ kind, c }) => (
+                  kind === 'subscription' ? (
+                    <tr key={'s-' + c.id}>
+                      <td><div className="cell-name">{c.client}</div><div className="cell-sub">{c.software}</div></td>
+                      <td>Subscription</td>
+                      <td className="tabular">{fmtMoney(c.amount)} <span style={{color:'var(--ink-faint)'}}>/ {c.cycle === 'Monthly' ? 'mo' : 'yr'}</span></td>
+                      <td><StatusPill status={computeStatus(c, settings.lead)} /></td>
+                      <td className="row-actions"><button className="btn btn-secondary btn-sm" onClick={() => setSelectedClientId(c.id)}>View</button></td>
+                    </tr>
+                  ) : (
+                    <tr key={'n-' + c.id}>
+                      <td><div className="cell-name">{c.client}</div><div className="cell-sub">{c.contact || c.address || '—'}</div></td>
+                      <td>Normal</td>
+                      <td className="tabular">{fmtMoney(c.remainingPayment)} <span style={{color:'var(--ink-faint)'}}>remaining</span></td>
+                      <td>—</td>
+                      <td className="row-actions"><button className="btn btn-secondary btn-sm" onClick={() => setSelectedNormalClientId(c.id)}>View</button></td>
+                    </tr>
+                  )
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {tab === 'subscription' && (
         <>
