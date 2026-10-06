@@ -720,6 +720,16 @@ function handle_list(PDO $pdo): void
 
 function handle_add(PDO $pdo, array $body): void
 {
+    $clientName = trim((string) ($body['client'] ?? ''));
+    $softwareName = trim((string) ($body['software'] ?? ''));
+    if ($clientName === '' || $softwareName === '') {
+        json_out(['error' => 'Client name and software name are required.']);
+    }
+    $amount = (float) ($body['amount'] ?? 0);
+    if ($amount <= 0) {
+        json_out(['error' => 'Plan amount must be greater than zero.']);
+    }
+
     $id = gen_client_id($pdo);
     $apiKey = gen_api_key();
     $settings = get_all_settings($pdo);
@@ -736,10 +746,9 @@ function handle_add(PDO $pdo, array $body): void
     ');
     $stmt->execute([
         $id, $apiKey,
-        substr((string) ($body['client'] ?? ''), 0, 255),
-        substr((string) ($body['software'] ?? ''), 0, 255),
-        $cycle,
-        (float) ($body['amount'] ?? 0),
+        substr($clientName, 0, 255),
+        substr($softwareName, 0, 255),
+        $cycle, $amount,
         $start, $nextDue, $grace, 'active',
     ]);
 
@@ -813,6 +822,9 @@ function handle_add_normal_client(PDO $pdo, array $body): void
 
     $totalAmount = max(0, (float) ($body['totalAmount'] ?? 0));
     $advancePayment = max(0, (float) ($body['advancePayment'] ?? 0));
+    if ($advancePayment > $totalAmount) {
+        json_out(['error' => 'Advance payment cannot be more than the total amount.']);
+    }
     $remainingPayment = max(0, $totalAmount - $advancePayment);
 
     $id = gen_normal_client_id($pdo);
@@ -847,6 +859,9 @@ function handle_update_normal_client(PDO $pdo, array $body): void
 
     $totalAmount = max(0, (float) ($body['totalAmount'] ?? 0));
     $advancePayment = max(0, (float) ($body['advancePayment'] ?? 0));
+    if ($advancePayment > $totalAmount) {
+        json_out(['error' => 'Advance payment cannot be more than the total amount.']);
+    }
     $remainingPayment = max(0, $totalAmount - $advancePayment);
 
     $stmt = $pdo->prepare('

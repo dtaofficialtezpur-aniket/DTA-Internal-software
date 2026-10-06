@@ -158,13 +158,13 @@ function SubscriptionClientForm({ onBack, onDone }){
       <form id="add-form" onSubmit={submit}>
         <div className="form-grid">
           <label className="full">Client company name
-            <input id="a-client" type="text" required placeholder="e.g. Coastal Traders LLP" value={client} onChange={(e) => setClient(e.target.value)} />
+            <input id="a-client" type="text" required maxLength={255} placeholder="e.g. Coastal Traders LLP" value={client} onChange={(e) => setClient(e.target.value)} />
           </label>
           <label className="full">Software name
-            <input id="a-software" type="text" required placeholder="e.g. Coastal Billing" value={software} onChange={(e) => setSoftware(e.target.value)} />
+            <input id="a-software" type="text" required maxLength={255} placeholder="e.g. Coastal Billing" value={software} onChange={(e) => setSoftware(e.target.value)} />
           </label>
           <label>Plan amount (₹)
-            <input id="a-amount" type="number" min="0" required placeholder="5000" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <input id="a-amount" type="number" min="0.01" step="0.01" required placeholder="5000" value={amount} onChange={(e) => setAmount(e.target.value)} />
           </label>
           <label>Billing cycle
             <select id="a-cycle" value={cycle} onChange={(e) => setCycle(e.target.value)}>
@@ -204,9 +204,12 @@ function NormalClientForm({ onBack, onDone }){
 
   function submit(e){
     e.preventDefault();
+    const total = Number(totalAmount) || 0;
+    const advance = Number(advancePayment) || 0;
+    if (advance > total){ showToast('Advance payment cannot be more than the total amount'); return; }
     const payload = {
       client: client.trim(), address: address.trim(), contact: contact.trim(),
-      totalAmount: Number(totalAmount) || 0, advancePayment: Number(advancePayment) || 0,
+      totalAmount: total, advancePayment: advance,
       notes: notes.trim(),
     };
     call('addNormalClient', payload).then(() => {
@@ -231,25 +234,25 @@ function NormalClientForm({ onBack, onDone }){
       <form id="add-normal-form" onSubmit={submit}>
         <div className="form-grid">
           <label className="full">Client name
-            <input id="an-client" type="text" required placeholder="e.g. Ravi Kumar" value={client} onChange={(e) => setClient(e.target.value)} />
+            <input id="an-client" type="text" required maxLength={255} placeholder="e.g. Ravi Kumar" value={client} onChange={(e) => setClient(e.target.value)} />
           </label>
           <label className="full">Address
-            <input id="an-address" type="text" placeholder="Address" value={address} onChange={(e) => setAddress(e.target.value)} />
+            <input id="an-address" type="text" maxLength={2000} placeholder="Address" value={address} onChange={(e) => setAddress(e.target.value)} />
           </label>
           <label className="full">Contact details
-            <input id="an-contact" type="text" placeholder="Phone / email" value={contact} onChange={(e) => setContact(e.target.value)} />
+            <input id="an-contact" type="text" maxLength={255} placeholder="Phone / email" value={contact} onChange={(e) => setContact(e.target.value)} />
           </label>
           <label>Total amount (₹)
-            <input id="an-total" type="number" min="0" value={totalAmount} onChange={(e) => setTotalAmount(e.target.value)} />
+            <input id="an-total" type="number" min="0" step="0.01" value={totalAmount} onChange={(e) => setTotalAmount(e.target.value)} />
           </label>
           <label>Advance payment (₹)
-            <input id="an-advance" type="number" min="0" value={advancePayment} onChange={(e) => setAdvancePayment(e.target.value)} />
+            <input id="an-advance" type="number" min="0" step="0.01" max={totalAmount || undefined} value={advancePayment} onChange={(e) => setAdvancePayment(e.target.value)} />
           </label>
           <label className="full">Remaining payment (₹)
             <input type="text" disabled value={'₹' + remaining.toLocaleString('en-IN')} />
           </label>
           <label className="full">Other details
-            <input id="an-notes" type="text" placeholder="Anything else worth noting" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <input id="an-notes" type="text" maxLength={2000} placeholder="Anything else worth noting" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </label>
         </div>
         <div style={{display:'flex', justifyContent:'space-between', gap:'8px', marginTop:'18px'}}>
