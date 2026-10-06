@@ -27,9 +27,16 @@ export default function NormalClientDetailPanel(){
 
   function saveEdit(e){
     e.preventDefault();
+    const clientName = form.client.trim();
+    if (!clientName){ showToast('Client name is required'); return; }
+    const totalAmount = Number(form.totalAmount) || 0;
+    const advancePayment = Number(form.advancePayment) || 0;
+    if (totalAmount < 0 || advancePayment < 0){ showToast('Amounts cannot be negative'); return; }
+    if (advancePayment > totalAmount){ showToast('Advance payment cannot be more than the total amount'); return; }
+
     call('updateNormalClient', {
-      id: c.id, client: form.client.trim(), address: form.address.trim(), contact: form.contact.trim(),
-      totalAmount: Number(form.totalAmount) || 0, advancePayment: Number(form.advancePayment) || 0,
+      id: c.id, client: clientName, address: form.address.trim(), contact: form.contact.trim(),
+      totalAmount, advancePayment,
       notes: form.notes.trim(),
     }).then(() => {
       setEditing(false);
@@ -108,29 +115,31 @@ export default function NormalClientDetailPanel(){
         )}
 
         {editing && (
-          <form className="settings-form" onSubmit={saveEdit}>
-            <label>Client name
-              <input required value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} />
-            </label>
-            <label>Address
-              <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-            </label>
-            <label>Contact details
-              <input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
-            </label>
-            <label>Total amount (₹)
-              <input type="number" min="0" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} />
-            </label>
-            <label>Advance payment (₹)
-              <input type="number" min="0" value={form.advancePayment} onChange={(e) => setForm({ ...form, advancePayment: e.target.value })} />
-            </label>
-            <label>Remaining payment (₹)
-              <input type="text" disabled value={'₹' + remainingPreview.toLocaleString('en-IN')} />
-            </label>
-            <label>Other details
-              <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-            </label>
-            <div style={{display:'flex', justifyContent:'flex-end', gap:'8px'}}>
+          <form onSubmit={saveEdit}>
+            <div className="form-grid">
+              <label className="full">Client name
+                <input required maxLength={255} value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} />
+              </label>
+              <label className="full">Address
+                <input maxLength={2000} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              </label>
+              <label className="full">Contact details
+                <input maxLength={255} value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
+              </label>
+              <label>Total amount (₹)
+                <input type="number" min="0" step="0.01" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} />
+              </label>
+              <label>Advance payment (₹)
+                <input type="number" min="0" step="0.01" max={form.totalAmount || undefined} value={form.advancePayment} onChange={(e) => setForm({ ...form, advancePayment: e.target.value })} />
+              </label>
+              <label className="full">Remaining payment (₹)
+                <input type="text" disabled value={'₹' + remainingPreview.toLocaleString('en-IN')} />
+              </label>
+              <label className="full">Other details
+                <input maxLength={2000} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+              </label>
+            </div>
+            <div style={{display:'flex', justifyContent:'flex-end', gap:'8px', marginTop:'18px'}}>
               <button type="button" className="btn btn-ghost" onClick={() => setEditing(false)}>Cancel</button>
               <button type="submit" className="btn btn-primary">Save</button>
             </div>
