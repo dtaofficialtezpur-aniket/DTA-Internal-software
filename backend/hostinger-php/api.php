@@ -374,6 +374,10 @@ if ($method === 'GET') {
             require_session($pdo, $body['token'] ?? null);
             handle_regenerate_key($pdo, $body);
             break;
+        case 'deleteClient':
+            require_session($pdo, $body['token'] ?? null);
+            handle_delete_client($pdo, $body);
+            break;
         case 'addNormalClient':
             require_session($pdo, $body['token'] ?? null);
             handle_add_normal_client($pdo, $body);
@@ -891,6 +895,20 @@ function handle_delete_normal_client(PDO $pdo, array $body): void
     if (!$c) json_out(['error' => 'Client not found: ' . $id]);
 
     $stmt = $pdo->prepare('DELETE FROM normal_clients WHERE id = ?');
+    $stmt->execute([$id]);
+    $del = $pdo->prepare('DELETE FROM history WHERE client_id = ?');
+    $del->execute([$id]);
+
+    json_out(['ok' => true]);
+}
+
+function handle_delete_client(PDO $pdo, array $body): void
+{
+    $id = $body['id'] ?? '';
+    $c = find_client($pdo, $id);
+    if (!$c) json_out(['error' => 'Client not found: ' . $id]);
+
+    $stmt = $pdo->prepare('DELETE FROM clients WHERE id = ?');
     $stmt->execute([$id]);
     $del = $pdo->prepare('DELETE FROM history WHERE client_id = ?');
     $del->execute([$id]);
