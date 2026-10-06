@@ -186,6 +186,28 @@ function ensure_schema(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 
+    // Invoices generated for a client (subscription or normal). The PDF
+    // itself is never stored here -- it's regenerated client-side from
+    // this row whenever someone downloads it (see dashboard/src/invoices)
+    // -- this table is just the record of what was issued. client_name is
+    // a snapshot at issue time, so an invoice still reads correctly even
+    // if the client's name is later edited or the client itself deleted.
+    // The display number (e.g. "DTA-D007") is this row's own auto-
+    // increment id, zero-padded -- see invoice_to_json().
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS invoices (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            client_type VARCHAR(16) NOT NULL,
+            client_id VARCHAR(32) NOT NULL,
+            client_name VARCHAR(255) NOT NULL,
+            description VARCHAR(255) NULL,
+            amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+            issued_date DATETIME NOT NULL,
+            created_by INT NOT NULL,
+            INDEX (client_type, client_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
     $hasDefaults = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'agencyName'")->fetchColumn();
     if ($hasDefaults === false) {
         $insert = $pdo->prepare('INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)');

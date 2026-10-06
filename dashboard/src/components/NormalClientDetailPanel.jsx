@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { actionColor, fmtDateTime, fmtMoney } from '../utils.js';
+import InvoiceSection from './InvoiceSection.jsx';
 
 export default function NormalClientDetailPanel(){
   const { normalClients, selectedNormalClientId, setSelectedNormalClientId, call, refreshFromBackend, showToast } = useApp();
@@ -95,6 +96,13 @@ export default function NormalClientDetailPanel(){
                 </div>
               </form>
             )}
+
+            <InvoiceSection
+              clientType="normal"
+              clientId={c.id}
+              defaultAmount={c.remainingPayment || c.totalAmount}
+              billTo={{ name: c.client, extraLines: [c.address, c.contact].filter(Boolean) }}
+            />
           </>
         )}
 
