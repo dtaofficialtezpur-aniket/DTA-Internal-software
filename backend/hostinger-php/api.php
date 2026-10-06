@@ -387,7 +387,7 @@ if ($method === 'GET') {
             handle_record_normal_client_payment($pdo, $body);
             break;
         case 'deleteNormalClient':
-            require_admin_session($pdo, $body['token'] ?? null);
+            require_session($pdo, $body['token'] ?? null);
             handle_delete_normal_client($pdo, $body);
             break;
         case 'updateSettings':
