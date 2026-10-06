@@ -148,14 +148,19 @@ function require_admin_session(PDO $pdo, ?string $token): array
 
 // One shared, sequential ID for every client, either type -- the first
 // ever issued is DTA-D001, the next DTA-D002, and so on, regardless of
-// whether it's a subscription or normal client. client_sequence exists
-// only to hand out these numbers atomically (its own auto-increment id
-// IS the number); nothing else reads it. Existing clients keep their
-// older DTA-CL-xxxx/DTA-NC-xxxx ids -- this only applies going forward.
+// whether it's a subscription or normal client -- and re-used once a
+// client is deleted, so the count always reflects what currently exists
+// rather than climbing forever. Finds the lowest free number across both
+// tables. Existing clients keep their older DTA-CL-xxxx/DTA-NC-xxxx ids
+// -- this only applies going forward.
 function gen_shared_client_id(PDO $pdo): string
 {
-    $pdo->exec('INSERT INTO client_sequence (created_at) VALUES (NOW())');
-    return sprintf('DTA-D%03d', (int) $pdo->lastInsertId());
+    $stmt = $pdo->prepare('SELECT 1 FROM clients WHERE id = ? UNION SELECT 1 FROM normal_clients WHERE id = ?');
+    for ($n = 1; ; $n++) {
+        $id = sprintf('DTA-D%03d', $n);
+        $stmt->execute([$id, $id]);
+        if (!$stmt->fetchColumn()) return $id;
+    }
 }
 
 function gen_api_key(): string
