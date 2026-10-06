@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { BACKEND_URL } from '../constants.js';
+import { recognizeDocumentText } from '../ocr/runOcr.js';
+import { extractClientFieldsFromText } from '../ocr/extractFields.js';
 
 export default function AddClientModal(){
   const { addClientOpen, setAddClientOpen, addClientType, setAddClientType } = useApp();
@@ -49,33 +51,68 @@ function TypeChooser({ onChoose, onCancel }){
 
 function DocumentAutofill({ clientType, onFields }){
   const { auth, showToast } = useApp();
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState(null); // null, or a progress label string
 
-  function onFile(e){
-    const file = e.target.files[0];
-    e.target.value = '';
-    if (!file) return;
-    setLoading(true);
+  // Text-based PDFs go through the backend (fast, no download). A scanned/
+  // photographed document — or any PDF the backend can't read text from,
+  // or no connection to reach it at all — falls back to OCR running
+  // entirely in the browser (see ocr/runOcr.js). Plain image files always
+  // go straight to OCR, since the backend only reads PDFs.
+  function readViaServer(file){
     const fd = new FormData();
     fd.append('action', 'extractClientDocument');
     fd.append('token', auth.token);
     fd.append('clientType', clientType);
     fd.append('file', file);
-    fetch(BACKEND_URL, { method: 'POST', body: fd }).then((res) => res.json()).then((data) => {
+    return fetch(BACKEND_URL, { method: 'POST', body: fd }).then((res) => res.json()).then((data) => {
       if (data.error) throw new Error(data.error);
-      onFields(data.fields || {});
+      return data.fields || {};
+    });
+  }
+
+  function readViaOcr(file){
+    return recognizeDocumentText(file, (label) => setStatus(label))
+      .then((text) => extractClientFieldsFromText(text, clientType));
+  }
+
+  async function onFile(e){
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+    setStatus('Reading document…');
+    try {
+      let fields;
+      if (isPdf){
+        try {
+          fields = await readViaServer(file);
+        } catch (err) {
+          setStatus('No text layer found — running OCR locally, this can take a bit…');
+          fields = await readViaOcr(file);
+        }
+      } else {
+        setStatus('Running OCR locally, this can take a bit…');
+        fields = await readViaOcr(file);
+      }
+      if (!fields || Object.keys(fields).length === 0){
+        throw new Error('Could not recognize any client details in that document.');
+      }
+      onFields(fields);
       showToast('Filled from document — review before creating');
-    }).catch((err) => showToast('Could not read document: ' + err.message))
-      .finally(() => setLoading(false));
+    } catch (err) {
+      showToast('Could not read document: ' + err.message);
+    } finally {
+      setStatus(null);
+    }
   }
 
   return (
     <div style={{marginTop:'12px'}}>
-      <label className="btn btn-secondary btn-sm" style={{cursor: loading ? 'default' : 'pointer', display:'inline-flex'}}>
-        {loading ? 'Reading document…' : 'Upload a PDF to autofill'}
-        <input type="file" accept=".pdf" style={{display:'none'}} disabled={loading} onChange={onFile} />
+      <label className="btn btn-secondary btn-sm" style={{cursor: status ? 'default' : 'pointer', display:'inline-flex'}}>
+        {status || 'Upload a PDF or photo to autofill'}
+        <input type="file" accept=".pdf,image/*" style={{display:'none'}} disabled={!!status} onChange={onFile} />
       </label>
-      <div className="page-sub" style={{marginTop:'4px'}}>Only works with a text-based PDF, not a scanned photo.</div>
+      <div className="page-sub" style={{marginTop:'4px'}}>Works with typed PDFs and scanned/photographed documents — scans just take longer (read locally, nothing uploaded).</div>
     </div>
   );
 }
