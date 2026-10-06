@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../state/AppContext.jsx';
+import logo from '../assets/dta-logo.png';
 
 const BrandMark = () => (
   <div className="brand-mark" aria-hidden="true">
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="3.4" height="12" rx="1.6" fill="var(--accent-ink)"/><rect x="9.6" y="2" width="3.4" height="12" rx="1.6" fill="var(--accent-ink)"/></svg>
+    <img src={logo} alt="" width="34" height="34" />
   </div>
 );
 
@@ -27,7 +28,7 @@ export default function AuthScreen(){
           <BrandMark />
           <div>
             <div className="brand-name">DTA</div>
-            <div className="brand-sub">Subscription Control</div>
+            <div className="brand-sub">Digital department</div>
           </div>
         </div>
 

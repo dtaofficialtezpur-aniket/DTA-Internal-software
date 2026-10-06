@@ -36,7 +36,7 @@ function createWindow() {
     height: 820,
     minWidth: 900,
     minHeight: 600,
-    title: 'DTA Subscription Control',
+    title: 'DTA Digital department',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -131,7 +131,7 @@ function setUpAutoUpdates() {
       if (Notification.isSupported()) {
         new Notification({
           title: 'Update available',
-          body: `DTA Subscription Control ${info.version} is ready — click the Update button in the app to install.`,
+          body: `DTA Digital department ${info.version} is ready — click the Update button in the app to install.`,
         }).show();
       }
     }

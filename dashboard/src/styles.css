@@ -47,7 +47,8 @@ code, .mono{font-family:"IBM Plex Mono",ui-monospace,monospace;}
 .sidebar{width:248px;flex-shrink:0;background:var(--surface-raised);border-right:1px solid var(--border);
   display:flex;flex-direction:column;gap:28px;padding:22px 16px;position:sticky;top:0;height:100vh;overflow-y:auto;}
 .brand{display:flex;align-items:center;gap:10px;padding:4px 8px;}
-.brand-mark{width:34px;height:34px;border-radius:9px;background:var(--accent);flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.brand-mark{width:34px;height:34px;border-radius:9px;background:var(--accent);flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.brand-mark img{width:100%;height:100%;object-fit:cover;}
 .brand-name{font-family:"Manrope",sans-serif;font-weight:800;font-size:1rem;letter-spacing:-.01em;}
 .brand-sub{font-size:.72rem;color:var(--ink-muted);margin-top:1px;}
 
