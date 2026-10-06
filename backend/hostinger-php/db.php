@@ -208,6 +208,18 @@ function ensure_schema(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 
+    // Hands out one shared, sequential id (DTA-D001, DTA-D002, ...) to
+    // every new client, subscription or normal alike -- see
+    // gen_shared_client_id() in api.php. This table holds nothing but an
+    // auto-increment counter; its own id IS the number issued. Existing
+    // clients created before this keep their older ids unchanged.
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS client_sequence (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            created_at DATETIME NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
     $hasDefaults = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'agencyName'")->fetchColumn();
     if ($hasDefaults === false) {
         $insert = $pdo->prepare('INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)');
