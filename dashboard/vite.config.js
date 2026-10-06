@@ -39,6 +39,23 @@ export default defineConfig({
         // API responses change too often and need the online/offline
         // queue logic in AppContext.jsx, not a cache-first strategy.
         globPatterns: ['**/*.{js,css,html,png}'],
+        // The OCR engine + PDF renderer (src/ocr/runOcr.js) are ~10MB of
+        // static assets nobody may ever need (only used for scanned/
+        // photographed documents) — excluded from the eager install-time
+        // precache above, and instead cached the first time they're
+        // actually fetched, via the runtime rule below. After that first
+        // use, OCR keeps working offline too.
+        globIgnores: ['tesseract/**', 'pdfjs/**'],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.includes('/tesseract/') || url.pathname.includes('/pdfjs/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'ocr-engine',
+              expiration: { maxEntries: 20 },
+            },
+          },
+        ],
       },
     }),
   ],

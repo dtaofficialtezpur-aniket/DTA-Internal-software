@@ -8,7 +8,17 @@
   Electron loads (dist/index.html + bundled assets), or `npm run dev`
   for a live-reloading dev server while editing.
 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://dtaonline.in; object-src 'none'; base-uri 'none'; form-action 'none';">
+<!--
+  script-src: 'wasm-unsafe-eval' is for the OCR engine (ocr/runOcr.js),
+  which compiles a local WebAssembly module -- no remote code, nothing
+  from 'unsafe-eval' proper, just what WASM instantiation itself needs.
+  worker-src: tesseract.js and pdf.js each spin up their own Worker from
+  a same-origin script (public/tesseract/, public/pdfjs/).
+  connect-src: 'self' lets those same local worker/core/language files
+  actually be fetched -- the dtaonline.in origin is still the only thing
+  reachable for everything else (the real API).
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://dtaonline.in; object-src 'none'; base-uri 'none'; form-action 'none';">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0f1621">
 <link rel="manifest" href="manifest.webmanifest">
