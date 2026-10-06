@@ -41,7 +41,7 @@ function useAppVersion(){
 }
 
 export default function Sidebar({ view, setView }){
-  const { auth, doLogout } = useApp();
+  const { auth, doLogout, pendingCount } = useApp();
   const isAdmin = auth.user.role === 'admin';
   const update = useUpdateReady();
   const version = useAppVersion();
@@ -82,6 +82,11 @@ export default function Sidebar({ view, setView }){
       </div>
 
       <div className="sidebar-foot">
+        {pendingCount > 0 && (
+          <div style={{fontSize:'.72rem', color:'var(--ink-faint)', marginBottom:'8px'}}>
+            {pendingCount} change{pendingCount === 1 ? '' : 's'} waiting to sync
+          </div>
+        )}
         {update && (
           <button className="btn btn-primary btn-sm btn-block" style={{marginBottom:'8px'}} onClick={() => window.electronAPI.installUpdate()}>
             Update {update.version ? 'v' + update.version + ' ' : ''}ready — restart to install
