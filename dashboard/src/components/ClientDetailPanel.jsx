@@ -78,6 +78,7 @@ export default function ClientDetailPanel(){
               clientType="subscription"
               clientId={c.id}
               defaultAmount={c.amount}
+              defaultDescription={`${c.software} subscription (${c.cycle})`}
               billTo={{ name: c.client, extraLines: [c.software] }}
             />
 
