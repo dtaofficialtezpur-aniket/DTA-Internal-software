@@ -17,18 +17,19 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg'],
+      includeAssets: ['icon.png'],
       manifest: {
-        name: 'DTA Subscription Control',
-        short_name: 'DTA Subs',
+        name: 'DTA Digital department',
+        short_name: 'DTA',
         description: 'DTA-internal client subscription and access manager.',
-        theme_color: '#3d4fe0',
-        background_color: '#ffffff',
+        theme_color: '#0f1621',
+        background_color: '#0f1621',
         display: 'standalone',
         start_url: '.',
         scope: '.',
         icons: [
-          { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
+          { src: 'icon.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'icon.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
@@ -37,7 +38,7 @@ export default defineConfig({
         // is handled separately through IndexedDB, not HTTP caching —
         // API responses change too often and need the online/offline
         // queue logic in AppContext.jsx, not a cache-first strategy.
-        globPatterns: ['**/*.{js,css,html,svg}'],
+        globPatterns: ['**/*.{js,css,html,png}'],
       },
     }),
   ],
