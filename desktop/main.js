@@ -93,6 +93,11 @@ function lockDownSession() {
     try {
       const url = new URL(details.url);
       if (url.protocol === 'file:') return callback({ cancel: false });
+      // blob:/data: never leave the renderer -- used for client-generated
+      // downloads (e.g. the invoice PDF's Save-As trigger) and canvas
+      // image data (OCR), not network requests, so they're exempt from
+      // the host allowlist below the same way file: is.
+      if (url.protocol === 'blob:' || url.protocol === 'data:') return callback({ cancel: false });
       if (url.protocol !== 'https:') return callback({ cancel: true });
       const allowed = ALLOWED_HOSTS.includes(url.hostname)
         || ALLOWED_HOST_SUFFIXES.some((suffix) => url.hostname.endsWith(suffix));

@@ -8,8 +8,9 @@ export default function ClientDetailPanel(){
   const { clients, settings, selectedClientId, setSelectedClientId, call, refreshFromBackend, showToast } = useApp();
   const [revealed, setRevealed] = useState(false);
   const [confirmPause, setConfirmPause] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
-  useEffect(() => { setRevealed(false); setConfirmPause(false); }, [selectedClientId]);
+  useEffect(() => { setRevealed(false); setConfirmPause(false); setConfirmDelete(false); }, [selectedClientId]);
 
   const open = !!selectedClientId;
   const c = clients.find((x) => x.id === selectedClientId);
@@ -24,6 +25,15 @@ export default function ClientDetailPanel(){
   function copyKey(){
     try { navigator.clipboard.writeText(c.apiKey); showToast('API key copied'); }
     catch { showToast('Could not copy — select the key manually'); }
+  }
+
+  function del(){
+    if (!confirmDelete){ setConfirmDelete(true); return; }
+    call('deleteClient', { id: c.id }).then(() => {
+      setSelectedClientId(null);
+      showToast(c.client + ' removed');
+      return refreshFromBackend();
+    }).catch((err) => showToast('Failed: ' + err.message));
   }
 
   const s = c ? computeStatus(c, settings.lead) : null;
@@ -72,6 +82,7 @@ export default function ClientDetailPanel(){
                     if (confirmPause) act('pause', {}, c.client + ' paused');
                     else setConfirmPause(true);
                   }}>{confirmPause ? 'Click again to confirm' : 'Pause access'}</button>}
+              <button id="d-delete" className="btn btn-danger btn-sm" type="button" onClick={del}>{confirmDelete ? 'Click again to confirm' : 'Delete client'}</button>
             </div>
 
             <InvoiceSection
