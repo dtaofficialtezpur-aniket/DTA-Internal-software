@@ -106,3 +106,18 @@ CREATE TABLE IF NOT EXISTS file_access (
     user_id INT NOT NULL,
     PRIMARY KEY (file_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Invoices generated for a client. The PDF itself isn't stored -- it's
+-- regenerated client-side from this row on download. The display number
+-- (e.g. "DTA-D007") is this row's own auto-increment id, zero-padded.
+CREATE TABLE IF NOT EXISTS invoices (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    client_type VARCHAR(16) NOT NULL,
+    client_id VARCHAR(32) NOT NULL,
+    client_name VARCHAR(255) NOT NULL,
+    description VARCHAR(255) NULL,
+    amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    issued_date DATETIME NOT NULL,
+    created_by INT NOT NULL,
+    INDEX (client_type, client_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
