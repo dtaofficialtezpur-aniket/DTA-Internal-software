@@ -45,10 +45,16 @@ export default defineConfig({
         // precache above, and instead cached the first time they're
         // actually fetched, via the runtime rule below. After that first
         // use, OCR keeps working offline too.
-        globIgnores: ['tesseract/**', 'pdfjs/**'],
+        // 'lazy-pdf' (see manualChunks below) bundles jsPDF + its
+        // html2canvas/dompurify dependencies and pdfjs-dist — another
+        // ~870KB nobody pays for unless they actually generate an
+        // invoice or OCR a scanned document.
+        globIgnores: ['tesseract/**', 'pdfjs/**', 'assets/lazy-pdf-*.js'],
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname.includes('/tesseract/') || url.pathname.includes('/pdfjs/'),
+            urlPattern: ({ url }) => url.pathname.includes('/tesseract/')
+              || url.pathname.includes('/pdfjs/')
+              || /\/assets\/lazy-pdf-.*\.js$/.test(url.pathname),
             handler: 'CacheFirst',
             options: {
               cacheName: 'ocr-engine',
@@ -63,5 +69,15 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // Groups the heavy, only-used-occasionally PDF/invoice libraries
+        // into one predictably-named chunk so the workbox rules above can
+        // exclude it from the PWA's eager install-time download by name.
+        manualChunks(id){
+          if (/node_modules\/(jspdf|html2canvas|dompurify|pdfjs-dist|canvg|rgbcolor|raf|core-js)\//.test(id)) return 'lazy-pdf';
+        },
+      },
+    },
   },
 });

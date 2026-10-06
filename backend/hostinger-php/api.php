@@ -232,6 +232,68 @@ function normal_client_to_json(array $c): array
     ];
 }
 
+/* ---------------- invoices ---------------- */
+
+function invoice_to_json(array $i): array
+{
+    return [
+        'id' => (int) $i['id'],
+        'number' => sprintf('DTA-D%03d', $i['id']),
+        'clientType' => $i['client_type'],
+        'clientId' => $i['client_id'],
+        'client' => $i['client_name'],
+        'description' => $i['description'],
+        'amount' => (float) $i['amount'],
+        'issuedAt' => $i['issued_date'],
+    ];
+}
+
+function handle_create_invoice(PDO $pdo, array $body, array $user): void
+{
+    $clientType = ($body['clientType'] ?? '') === 'normal' ? 'normal' : 'subscription';
+    $clientId = (string) ($body['clientId'] ?? '');
+
+    if ($clientType === 'normal') {
+        $c = find_normal_client($pdo, $clientId);
+        if (!$c) json_out(['error' => 'Client not found: ' . $clientId]);
+        $clientName = $c['client_name'];
+        $defaultAmount = (float) $c['remaining_payment'];
+    } else {
+        $c = find_client($pdo, $clientId);
+        if (!$c) json_out(['error' => 'Client not found: ' . $clientId]);
+        $clientName = $c['client_name'];
+        $defaultAmount = (float) $c['amount'];
+    }
+
+    $amount = isset($body['amount']) ? (float) $body['amount'] : $defaultAmount;
+    if ($amount <= 0) {
+        json_out(['error' => 'Invoice amount must be greater than zero.']);
+    }
+    $description = substr((string) ($body['description'] ?? ''), 0, 255);
+
+    $stmt = $pdo->prepare('
+        INSERT INTO invoices (client_type, client_id, client_name, description, amount, issued_date, created_by)
+        VALUES (?, ?, ?, ?, ?, NOW(), ?)
+    ');
+    $stmt->execute([$clientType, $clientId, $clientName, $description, $amount, (int) $user['id']]);
+    $id = (int) $pdo->lastInsertId();
+
+    log_event($pdo, $clientId, 'invoiced', 'Invoice ' . sprintf('DTA-D%03d', $id) . ' generated for ' . number_format($amount, 2));
+
+    $stmt = $pdo->prepare('SELECT * FROM invoices WHERE id = ?');
+    $stmt->execute([$id]);
+    json_out(['ok' => true, 'invoice' => invoice_to_json($stmt->fetch())]);
+}
+
+function handle_list_invoices(PDO $pdo, array $body): void
+{
+    $clientType = ($body['clientType'] ?? '') === 'normal' ? 'normal' : 'subscription';
+    $clientId = (string) ($body['clientId'] ?? '');
+    $stmt = $pdo->prepare('SELECT * FROM invoices WHERE client_type = ? AND client_id = ? ORDER BY issued_date DESC, id DESC');
+    $stmt->execute([$clientType, $clientId]);
+    json_out(['ok' => true, 'invoices' => array_map('invoice_to_json', $stmt->fetchAll())]);
+}
+
 /* ---------------- request handling ---------------- */
 
 $pdo = get_pdo();
@@ -335,6 +397,13 @@ if ($method === 'GET') {
         case 'getSettings':
             require_session($pdo, $body['token'] ?? null);
             json_out(get_all_settings($pdo));
+            break;
+        case 'createInvoice':
+            handle_create_invoice($pdo, $body, require_session($pdo, $body['token'] ?? null));
+            break;
+        case 'listInvoices':
+            require_session($pdo, $body['token'] ?? null);
+            handle_list_invoices($pdo, $body);
             break;
 
         // Admin-only team management.
