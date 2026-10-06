@@ -118,13 +118,13 @@ export default function NormalClientDetailPanel(){
           <form onSubmit={saveEdit}>
             <div className="form-grid">
               <label className="full">Client name
-                <input required maxLength={255} value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} />
+                <input type="text" autoComplete="off" required maxLength={255} value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} />
               </label>
               <label className="full">Address
-                <input maxLength={2000} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                <input type="text" autoComplete="off" maxLength={2000} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
               </label>
               <label className="full">Contact details
-                <input maxLength={255} value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
+                <input type="text" autoComplete="off" maxLength={255} value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
               </label>
               <label>Total amount (₹)
                 <input type="number" min="0" step="0.01" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} />
@@ -136,7 +136,7 @@ export default function NormalClientDetailPanel(){
                 <input type="text" disabled value={'₹' + remainingPreview.toLocaleString('en-IN')} />
               </label>
               <label className="full">Other details
-                <input maxLength={2000} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+                <input type="text" autoComplete="off" maxLength={2000} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
               </label>
             </div>
             <div style={{display:'flex', justifyContent:'flex-end', gap:'8px', marginTop:'18px'}}>
