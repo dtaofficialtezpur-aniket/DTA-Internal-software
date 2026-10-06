@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { actionColor, computeStatus, fmtDate, fmtDateTime, fmtMoney, maskKey } from '../utils.js';
 import StatusPill from './StatusPill.jsx';
+import InvoiceSection from './InvoiceSection.jsx';
 
 export default function ClientDetailPanel(){
   const { clients, settings, selectedClientId, setSelectedClientId, call, refreshFromBackend, showToast } = useApp();
@@ -72,6 +73,13 @@ export default function ClientDetailPanel(){
                     else setConfirmPause(true);
                   }}>{confirmPause ? 'Click again to confirm' : 'Pause access'}</button>}
             </div>
+
+            <InvoiceSection
+              clientType="subscription"
+              clientId={c.id}
+              defaultAmount={c.amount}
+              billTo={{ name: c.client, extraLines: [c.software] }}
+            />
 
             <div>
               <div style={{fontSize:'.78rem', fontWeight:700, color:'var(--ink-muted)', marginBottom:'8px'}}>History</div>
