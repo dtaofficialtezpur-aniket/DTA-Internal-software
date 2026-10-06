@@ -101,6 +101,7 @@ export default function NormalClientDetailPanel(){
               clientType="normal"
               clientId={c.id}
               defaultAmount={c.remainingPayment || c.totalAmount}
+              defaultDescription={c.notes || ''}
               billTo={{ name: c.client, extraLines: [c.address, c.contact].filter(Boolean) }}
             />
           </>
