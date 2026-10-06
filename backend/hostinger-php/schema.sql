@@ -121,3 +121,11 @@ CREATE TABLE IF NOT EXISTS invoices (
     created_by INT NOT NULL,
     INDEX (client_type, client_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Hands out one shared, sequential id (DTA-D001, DTA-D002, ...) to every
+-- new client, subscription or normal alike -- its own auto-increment id
+-- IS the number issued. Existing clients keep their older ids.
+CREATE TABLE IF NOT EXISTS client_sequence (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

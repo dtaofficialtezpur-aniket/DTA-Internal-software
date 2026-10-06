@@ -146,14 +146,16 @@ function require_admin_session(PDO $pdo, ?string $token): array
 
 /* ---------------- client helpers (unchanged shape) ---------------- */
 
-function gen_client_id(PDO $pdo): string
+// One shared, sequential ID for every client, either type -- the first
+// ever issued is DTA-D001, the next DTA-D002, and so on, regardless of
+// whether it's a subscription or normal client. client_sequence exists
+// only to hand out these numbers atomically (its own auto-increment id
+// IS the number); nothing else reads it. Existing clients keep their
+// older DTA-CL-xxxx/DTA-NC-xxxx ids -- this only applies going forward.
+function gen_shared_client_id(PDO $pdo): string
 {
-    do {
-        $id = 'DTA-CL-' . random_int(1000, 9999);
-        $stmt = $pdo->prepare('SELECT 1 FROM clients WHERE id = ?');
-        $stmt->execute([$id]);
-    } while ($stmt->fetchColumn());
-    return $id;
+    $pdo->exec('INSERT INTO client_sequence (created_at) VALUES (NOW())');
+    return sprintf('DTA-D%03d', (int) $pdo->lastInsertId());
 }
 
 function gen_api_key(): string
@@ -198,16 +200,6 @@ function client_to_json(array $c): array
 }
 
 /* ---------------- normal client helpers (basic-details clients) ---------------- */
-
-function gen_normal_client_id(PDO $pdo): string
-{
-    do {
-        $id = 'DTA-NC-' . random_int(1000, 9999);
-        $stmt = $pdo->prepare('SELECT 1 FROM normal_clients WHERE id = ?');
-        $stmt->execute([$id]);
-    } while ($stmt->fetchColumn());
-    return $id;
-}
 
 function find_normal_client(PDO $pdo, string $id): ?array
 {
@@ -730,7 +722,7 @@ function handle_add(PDO $pdo, array $body): void
         json_out(['error' => 'Plan amount must be greater than zero.']);
     }
 
-    $id = gen_client_id($pdo);
+    $id = gen_shared_client_id($pdo);
     $apiKey = gen_api_key();
     $settings = get_all_settings($pdo);
 
@@ -827,7 +819,7 @@ function handle_add_normal_client(PDO $pdo, array $body): void
     }
     $remainingPayment = max(0, $totalAmount - $advancePayment);
 
-    $id = gen_normal_client_id($pdo);
+    $id = gen_shared_client_id($pdo);
     $stmt = $pdo->prepare('
         INSERT INTO normal_clients (id, client_name, address, contact, total_amount, advance_payment, remaining_payment, notes, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
