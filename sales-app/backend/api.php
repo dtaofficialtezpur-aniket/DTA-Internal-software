@@ -543,6 +543,57 @@ function a_cancelDemoRequest(PDO $pdo, array $in): void
     out(['ok' => true]);
 }
 
+// ---------- monthly business (won clients per month / year) ----------
+
+function a_monthlyWon(PDO $pdo, array $in): void
+{
+    $u = current_user($pdo, $in);
+    $fy = !empty($in['fy']); // financial year: April -> March
+    $scope = ''; $sp = [];
+    if ($u['role'] !== 'admin') { $scope = ' AND l.user_id = ?'; $sp[] = $u['id']; }
+    elseif (!empty($in['userId'])) { $scope = ' AND l.user_id = ?'; $sp[] = (int)$in['userId']; }
+
+    $cy = (int)date('Y'); $cm = (int)date('n');
+    $curStart = $fy && $cm < 4 ? $cy - 1 : $cy;           // the current year / financial-year start
+    $year = (int)($in['year'] ?? $curStart);
+    if ($year < 2000 || $year > 2100) fail('Bad year.');
+    $start = sprintf($fy ? '%04d-04-01 00:00:00' : '%04d-01-01 00:00:00', $year);
+    $end = sprintf($fy ? '%04d-04-01 00:00:00' : '%04d-01-01 00:00:00', $year + 1);
+
+    $st = $pdo->prepare("SELECT l.id, l.user_id, l.name, l.state, l.city, l.product_type, l.product_name, l.deal_value, l.won_at, u.full_name AS employee_name
+                         FROM leads l JOIN users u ON u.id = l.user_id
+                         WHERE l.stage = 'won' AND l.won_at >= ? AND l.won_at < ? $scope ORDER BY l.won_at DESC, l.id DESC LIMIT 5000");
+    $st->execute(array_merge([$start, $end], $sp));
+    $rows = $st->fetchAll();
+
+    $months = [];
+    for ($i = 0; $i < 12; $i++) {
+        $m = ($fy ? 3 + $i : $i) % 12 + 1;                     // Apr..Mar or Jan..Dec
+        $y = $fy && $m < 4 ? $year + 1 : $year;
+        $months["$y-$m"] = ['year' => $y, 'month' => $m, 'clients' => 0, 'revenue' => 0.0, 'byProduct' => array_fill_keys(PRODUCT_TYPES, 0.0)];
+    }
+    $byEmp = []; $clients = [];
+    foreach ($rows as $r) {
+        $t = strtotime($r['won_at']); $key = date('Y', $t) . '-' . (int)date('n', $t);
+        $v = (float)$r['deal_value'];
+        if (isset($months[$key])) { $months[$key]['clients']++; $months[$key]['revenue'] += $v; $months[$key]['byProduct'][$r['product_type']] += $v; }
+        $byEmp[$r['user_id']] ??= ['userId' => (int)$r['user_id'], 'employee' => $r['employee_name'], 'clients' => 0, 'revenue' => 0.0];
+        $byEmp[$r['user_id']]['clients']++; $byEmp[$r['user_id']]['revenue'] += $v;
+        $clients[] = ['id' => (int)$r['id'], 'userId' => (int)$r['user_id'], 'employee' => $r['employee_name'], 'name' => $r['name'], 'state' => $r['state'], 'city' => $r['city'],
+                      'productType' => $r['product_type'], 'productName' => $r['product_name'], 'dealValue' => $v, 'wonAt' => iso($r['won_at'])];
+    }
+    $mm = $pdo->prepare("SELECT MIN(won_at), MAX(won_at) FROM leads l WHERE l.stage = 'won' AND l.won_at IS NOT NULL $scope");
+    $mm->execute($sp);
+    [$minWon, $maxWon] = $mm->fetch(PDO::FETCH_NUM);
+    $toStart = fn(string $d) => (int)date('Y', strtotime($d)) - ($fy && (int)date('n', strtotime($d)) < 4 ? 1 : 0);
+    $first = min($minWon ? $toStart($minWon) : $curStart, $year);
+    $last = max($maxWon ? $toStart($maxWon) : $curStart, $curStart, $year);
+    $totClients = count($clients); $totRev = array_sum(array_column($clients, 'dealValue'));
+    out(['fy' => $fy, 'year' => $year, 'years' => range($first, $last),
+         'months' => array_values($months), 'totals' => ['clients' => $totClients, 'revenue' => (float)$totRev],
+         'byEmployee' => $u['role'] === 'admin' ? array_values($byEmp) : [], 'clients' => $clients]);
+}
+
 // ---------- stats ----------
 
 function a_stats(PDO $pdo, array $in): void

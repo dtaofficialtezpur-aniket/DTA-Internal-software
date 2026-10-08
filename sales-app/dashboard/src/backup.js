@@ -38,3 +38,6 @@ export function downloadBackup(kind, data){
   else if (kind === 'employees') save(`dta-sales-employees-${d}.csv`, toCsv(EMP_COLS, data.employees), 'csv');
   else save(`dta-sales-full-backup-${d}.json`, JSON.stringify(data, null, 2), 'json');
 }
+
+// Generic CSV download used by report pages.
+export function downloadRows(filename, columns, rows){ save(filename, toCsv(columns, rows), 'csv'); }

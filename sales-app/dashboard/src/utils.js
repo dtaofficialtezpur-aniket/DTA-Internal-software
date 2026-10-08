@@ -1,6 +1,16 @@
 const inr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
 export const fmtINR = (n) => inr.format(Number(n) || 0);
 
+// Short Indian-style amounts for chart labels: 45,000 -> 45k, 2,50,000 -> 2.5L, 1,20,00,000 -> 1.2Cr
+export function fmtShort(n){
+  const v = Number(n) || 0;
+  const t = (x) => String(Math.round(x * 10) / 10);
+  if (v >= 1e7) return t(v / 1e7) + 'Cr';
+  if (v >= 1e5) return t(v / 1e5) + 'L';
+  if (v >= 1e3) return t(v / 1e3) + 'k';
+  return String(Math.round(v));
+}
+
 export function fmtDateTime(iso){
   if (!iso) return '—';
   return new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });

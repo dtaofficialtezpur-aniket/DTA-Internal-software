@@ -6,6 +6,7 @@ import Overview from './pages/Overview.jsx';
 import Leads from './pages/Leads.jsx';
 import Activity from './pages/Activity.jsx';
 import Demos from './pages/Demos.jsx';
+import Monthly from './pages/Monthly.jsx';
 import Team from './pages/Team.jsx';
 
 export default function App(){
@@ -25,6 +26,7 @@ export default function App(){
             {page === 'overview' && <Overview onOpenEmployee={(id) => go('leads', id)} />}
             {page === 'leads' && <Leads key={'l' + focusUser} initialUserId={focusUser} />}
             {page === 'activity' && <Activity key={'a' + focusUser} initialUserId={focusUser} />}
+            {page === 'monthly' && <Monthly key={'m' + focusUser} initialUserId={focusUser} />}
             {page === 'demos' && <Demos />}
             {page === 'team' && user.role === 'admin' && <Team onOpen={go} />}
           </main>

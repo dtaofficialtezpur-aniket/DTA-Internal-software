@@ -18,6 +18,7 @@ export default function Sidebar({ page, onNavigate }){
   const items = [
     ['overview', user.role === 'admin' ? 'Overview' : 'My dashboard'],
     ['leads', user.role === 'admin' ? 'All leads' : 'My leads'],
+    ['monthly', 'Monthly business'],
     ['activity', user.role === 'admin' ? 'Activity feed' : 'My activity'],
     ['demos', user.role === 'admin' ? 'Demo requests' : 'Demo requests'],
     ...(user.role === 'admin' ? [['team', 'Sales team']] : []),

@@ -54,6 +54,20 @@ users.filter((u) => u.role === 'employee').forEach((u) => {
     if (stage === 'won') addAct(u.id, lead, 'client_won', 'Deal value ₹' + lead.dealValue.toLocaleString('en-IN'), Date.parse(lead.wonAt));
   }
 });
+// older wins spread over the past year, so the monthly report has something to show
+users.filter((u) => u.role === 'employee').forEach((u) => {
+  const n = 4 + Math.floor(rnd() * 4);
+  for (let i = 0; i < n; i++) {
+    const productType = pick(['software', 'app', 'website']);
+    const wonMs = now - (45 + Math.floor(rnd() * 300)) * DAY;
+    const est = Math.round((20 + rnd() * 180) / 5) * 1000;
+    const lead = { id: ++leadId, userId: u.id, employee: u.fullName, name: businesses[nameCounter % businesses.length] + ' ' + (Math.floor(nameCounter++ / businesses.length) + 1),
+      contactPerson: 'Mr. Verma', phone: '9' + String(Math.floor(100000000 + rnd() * 899999999)), email: null, state: u.state, city: pick(['Tezpur', 'Guwahati', 'Kochi', 'Pune']),
+      productType, productName: pick(products[productType]), stage: 'won', estValue: est, dealValue: Math.round(est * 0.95 / 500) * 500, nextFollowup: null, notes: null,
+      createdAt: iso(wonMs - 8 * DAY), updatedAt: iso(wonMs), wonAt: iso(wonMs) };
+    leads.push(lead); addAct(u.id, lead, 'lead_added', `New ${productType} lead in ${u.state}`, wonMs - 8 * DAY); addAct(u.id, lead, 'client_won', 'Deal value ₹' + lead.dealValue.toLocaleString('en-IN'), wonMs);
+  }
+});
 activities.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)).forEach((a, i) => { a.id = i + 1; });
 actId = activities.length;
 
@@ -169,6 +183,27 @@ const handlers = {
     const d = demos.find((x) => x.id === p.id && x.userId === me.id); if (!d) throw err('Demo request not found.', 404);
     if (d.status !== 'pending') throw err('Only a pending request can be cancelled -- ask the DTA team.');
     d.status = 'cancelled'; return { ok: true };
+  },
+
+  monthlyWon: (p, me) => {
+    const fy = !!p.fy; const nowD = new Date();
+    const curStart = fy && nowD.getMonth() < 3 ? nowD.getFullYear() - 1 : nowD.getFullYear();
+    const year = Number(p.year) || curStart;
+    const uid = scopeUser(me, p);
+    const startOf = (d) => d.getFullYear() - (fy && d.getMonth() < 3 ? 1 : 0);
+    const won = leads.filter((l) => l.stage === 'won' && (uid === null || l.userId === uid));
+    const inYear = won.filter((l) => startOf(new Date(l.wonAt)) === year).sort((a, b) => b.wonAt.localeCompare(a.wonAt));
+    const months = Array.from({ length: 12 }, (_, i) => { const mo = ((fy ? 3 + i : i) % 12) + 1; return { year: fy && mo < 4 ? year + 1 : year, month: mo, clients: 0, revenue: 0, byProduct: { software: 0, app: 0, website: 0 } }; });
+    const byEmp = {};
+    inYear.forEach((l) => {
+      const d = new Date(l.wonAt); const row = months.find((x) => x.year === d.getFullYear() && x.month === d.getMonth() + 1);
+      if (row) { row.clients++; row.revenue += l.dealValue; row.byProduct[l.productType] += l.dealValue; }
+      const e = (byEmp[l.userId] ??= { userId: l.userId, employee: l.employee, clients: 0, revenue: 0 }); e.clients++; e.revenue += l.dealValue;
+    });
+    const ys = won.map((l) => startOf(new Date(l.wonAt)));
+    const first = Math.min(year, curStart, ...ys), last = Math.max(year, curStart, ...ys);
+    return { fy, year, years: Array.from({ length: last - first + 1 }, (_, i) => first + i), months, totals: { clients: inYear.length, revenue: inYear.reduce((s, l) => s + l.dealValue, 0) },
+      byEmployee: me.role === 'admin' ? Object.values(byEmp) : [], clients: inYear.map((l) => ({ ...l, wonAt: l.wonAt })) };
   },
 
   stats: (p, me) => {
