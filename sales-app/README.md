@@ -15,3 +15,7 @@ Layout: `desktop/` (Electron app employees install — see `desktop/README.md`),
 ## Backup on the admin's computer
 
 Sales team page → **Backup to this computer** (admin only): Leads / Activity / Employees as Excel-friendly CSV, or one full JSON backup. The live data stays on the server so employees can work any time; this is your own copy. PINs and setup codes are never included.
+
+## Single-file preview
+
+`DTA-Sales-Preview.html` is the preview mode as one self-contained file you can double-click (sample data, nothing saved). Rebuild it with `cd dashboard && npm run build:single` and copy `dist-single/index.html` over it.
