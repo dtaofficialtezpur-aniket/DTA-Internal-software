@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
+import { PREVIEW_LOGINS } from '../preview/logins.js';
 import logo from '../assets/dta-logo.png';
 
 export default function AuthScreen(){
@@ -30,6 +31,8 @@ export default function AuthScreen(){
     </label>
   );
 
+  const quick = (username) => { setBusy(true); call('login', { username, pin: '' }).then((d) => login(d.token, d.user)); };
+
   return (
     <div className="auth-shell">
       <form className="card auth-card" onSubmit={submit}>
@@ -50,6 +53,12 @@ export default function AuthScreen(){
           {panel === 'login' && !adminExists && <button type="button" className="link" onClick={() => { setPanel('register'); setError(''); }}>Create admin account</button>}
         </div>
       </form>
+      {import.meta.env.VITE_PREVIEW && (
+        <div className="card auth-card preview-box">
+          <strong>Preview mode — sample data, nothing is saved</strong>
+          {(PREVIEW_LOGINS).map(([label, u]) => <button key={u} className="btn" onClick={() => quick(u)}>{label}</button>)}
+        </div>
+      )}
     </div>
   );
 }

@@ -7,3 +7,7 @@ Standalone sales-team app: one sales employee per state logs leads and activity;
 - "Client" = a lead marked **Won** (with its deal value).
 
 Layout: `desktop/` (Electron app employees install — see `desktop/README.md`), `backend/` (PHP + MySQL, see `backend/SETUP.md`) and `dashboard/` (React + Vite: `npm install && npm run dev`, `npm run build`). It uses the same stack and look as the main DTA dashboard so the two can be merged later.
+
+## Preview mode (no backend needed)
+
+`cd dashboard && npm install && npm run preview:dev` opens the app on sample data (switch between Admin and two employees on the login screen). Nothing is saved. `npm run build:preview` makes a static copy in `dist-preview/`. The normal `npm run build` contains none of this code.

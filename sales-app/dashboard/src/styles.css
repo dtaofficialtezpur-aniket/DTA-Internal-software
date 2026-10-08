@@ -108,7 +108,8 @@ td .tag:first-child,.feed .tag:first-child{margin-left:0;}
 .log-form{display:flex;gap:8px;margin-bottom:8px;} .log-form select{width:130px;flex-shrink:0;}
 .setup-code{font-size:2rem;font-weight:700;letter-spacing:.15em;text-align:center;background:var(--surface-sunken);border-radius:var(--radius-m);padding:14px;user-select:all;}
 
-.auth-shell{min-height:100vh;display:grid;place-items:center;padding:20px;} .auth-card{width:100%;max-width:380px;display:flex;flex-direction:column;gap:12px;padding:28px;}
+.auth-shell{min-height:100vh;display:flex;flex-direction:column;gap:16px;align-items:center;justify-content:center;padding:20px;}
+.preview-box{background:var(--warn-soft);border-color:var(--warn);} .auth-card{width:100%;max-width:380px;display:flex;flex-direction:column;gap:12px;padding:28px;}
 .pin-input{letter-spacing:.4em;text-align:center;font-size:1.1rem;} .form-error{color:var(--crit);background:var(--crit-soft);padding:8px 12px;border-radius:var(--radius-s);font-size:.88rem;}
 .auth-links{display:flex;flex-direction:column;gap:6px;align-items:flex-start;font-size:.88rem;}
 
