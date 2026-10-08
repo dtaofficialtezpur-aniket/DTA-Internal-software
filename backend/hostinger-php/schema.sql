@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS clients (
     grace_days INT NOT NULL DEFAULT 5,
     status VARCHAR(16) NOT NULL DEFAULT 'active',
     paused_at DATETIME NULL,
+    -- Holds the normal-client fields when this row was converted from a
+    -- normal client, so converting back restores them. NULL otherwise.
+    archived_data JSON NULL,
     INDEX (api_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -39,7 +42,11 @@ CREATE TABLE IF NOT EXISTS normal_clients (
     advance_payment DECIMAL(12,2) NOT NULL DEFAULT 0,
     remaining_payment DECIMAL(12,2) NOT NULL DEFAULT 0,
     notes TEXT NULL,
-    created_at DATETIME NOT NULL
+    created_at DATETIME NOT NULL,
+    -- Holds the subscription-client fields (API key included) when this
+    -- row was converted from a subscription client, so converting back
+    -- restores them exactly. NULL otherwise.
+    archived_data JSON NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS settings (
