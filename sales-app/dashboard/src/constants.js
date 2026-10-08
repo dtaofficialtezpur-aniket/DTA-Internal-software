@@ -13,4 +13,6 @@ export const STATES = [
 export const PRODUCTS = { software: 'Software', app: 'Application', website: 'Website' };
 export const STAGES = { new: 'New', contacted: 'Contacted', demo: 'Demo', negotiation: 'Negotiation', won: 'Won', lost: 'Lost' };
 export const ACTIVITY_TYPES = { call: 'Call', visit: 'Visit', meeting: 'Meeting', follow_up: 'Follow-up', note: 'Note' };
-export const ACTIVITY_LABELS = { ...ACTIVITY_TYPES, lead_added: 'Lead added', stage_change: 'Stage change', client_won: 'Client won' };
+export const ACTIVITY_LABELS = { ...ACTIVITY_TYPES, lead_added: 'Lead added', stage_change: 'Stage change', client_won: 'Client won', demo_requested: 'Demo requested', demo_update: 'Demo update' };
+export const DEMO_STATUS = { pending: 'Pending', scheduled: 'Scheduled', completed: 'Completed', declined: 'Declined', cancelled: 'Cancelled' };
+export const DEMO_MODES = { online: 'Online (video call)', onsite: 'On-site visit' };

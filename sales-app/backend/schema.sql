@@ -61,3 +61,27 @@ CREATE TABLE IF NOT EXISTS activities (
     INDEX (lead_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS demo_requests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,                           -- requesting employee
+    lead_id INT NULL,
+    client_name VARCHAR(255) NOT NULL,              -- prospect (copied, so it survives a deleted lead)
+    contact_person VARCHAR(255) NULL,
+    phone VARCHAR(32) NULL,
+    state VARCHAR(64) NOT NULL,
+    city VARCHAR(128) NULL,
+    product_type VARCHAR(16) NOT NULL,              -- software | app | website
+    product_name VARCHAR(255) NULL,
+    mode VARCHAR(16) NOT NULL DEFAULT 'online',     -- online | onsite
+    preferred_date DATE NULL,
+    preferred_time VARCHAR(32) NULL,                -- free text, e.g. 'Morning', '4 PM'
+    notes TEXT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',  -- pending|scheduled|completed|declined|cancelled
+    scheduled_at DATETIME NULL,
+    admin_note TEXT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    INDEX (status, created_at),
+    INDEX (user_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+

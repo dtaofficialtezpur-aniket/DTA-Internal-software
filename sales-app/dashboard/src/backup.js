@@ -26,10 +26,15 @@ const LEAD_COLS = [['id', 'ID'], ['employee', 'Employee'], ['name', 'Lead / busi
 const ACT_COLS = [['id', 'ID'], ['createdAt', 'When'], ['employee', 'Employee'], ['state', 'State'], ['type', 'Type'], ['leadName', 'Lead'], ['note', 'Note']];
 const EMP_COLS = [['fullName', 'Name'], ['username', 'Username'], ['state', 'State'], ['status', 'Status'], ['createdAt', 'Added'], ['lastLoginAt', 'Last login'], ['lastActiveAt', 'Last active']];
 
+const DEMO_COLS = [['id', 'ID'], ['createdAt', 'Requested'], ['employee', 'Employee'], ['clientName', 'Client'], ['contactPerson', 'Contact person'], ['phone', 'Phone'],
+  ['state', 'State'], ['city', 'City'], ['productType', 'Product type'], ['productName', 'Product'], ['mode', 'Mode'], ['preferredDate', 'Preferred date'],
+  ['preferredTime', 'Preferred time'], ['status', 'Status'], ['scheduledAt', 'Scheduled'], ['notes', 'Notes'], ['adminNote', 'Admin note']];
+
 export function downloadBackup(kind, data){
   const d = stamp();
   if (kind === 'leads') save(`dta-sales-leads-${d}.csv`, toCsv(LEAD_COLS, data.leads), 'csv');
   else if (kind === 'activities') save(`dta-sales-activity-${d}.csv`, toCsv(ACT_COLS, data.activities), 'csv');
+  else if (kind === 'demos') save(`dta-sales-demo-requests-${d}.csv`, toCsv(DEMO_COLS, data.demoRequests), 'csv');
   else if (kind === 'employees') save(`dta-sales-employees-${d}.csv`, toCsv(EMP_COLS, data.employees), 'csv');
   else save(`dta-sales-full-backup-${d}.json`, JSON.stringify(data, null, 2), 'json');
 }

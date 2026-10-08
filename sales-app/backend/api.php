@@ -425,6 +425,124 @@ function a_listActivities(PDO $pdo, array $in): void
     ], $rows)]);
 }
 
+// ---------- demo requests ----------
+
+function demo_row(array $r): array
+{
+    return [
+        'id' => (int)$r['id'], 'userId' => (int)$r['user_id'], 'employee' => $r['employee_name'] ?? null, 'employeeState' => $r['employee_state'] ?? null,
+        'leadId' => $r['lead_id'] === null ? null : (int)$r['lead_id'],
+        'clientName' => $r['client_name'], 'contactPerson' => $r['contact_person'], 'phone' => $r['phone'],
+        'state' => $r['state'], 'city' => $r['city'], 'productType' => $r['product_type'], 'productName' => $r['product_name'],
+        'mode' => $r['mode'], 'preferredDate' => $r['preferred_date'], 'preferredTime' => $r['preferred_time'], 'notes' => $r['notes'],
+        'status' => $r['status'], 'scheduledAt' => $r['scheduled_at'] ? str_replace(' ', 'T', $r['scheduled_at']) : null, // IST wall-clock, no zone
+        'adminNote' => $r['admin_note'], 'createdAt' => iso($r['created_at']), 'updatedAt' => iso($r['updated_at']),
+    ];
+}
+
+function notify_admin_by_email(string $subject, string $body): void
+{
+    $to = (string)(get_config()['notify_email'] ?? '');
+    if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) return;
+    $clean = fn(string $s) => str_replace(["\r", "\n"], ' ', $s); // no header injection
+    @mail($to, $clean($subject), $body, 'Content-Type: text/plain; charset=UTF-8');
+}
+
+function a_addDemoRequest(PDO $pdo, array $in): void
+{
+    $u = current_user($pdo, $in);
+    if ($u['role'] !== 'employee') fail('Only sales employees request demos.', 403);
+    $lead = null;
+    if (!empty($in['leadId'])) $lead = load_lead($pdo, $u, (int)$in['leadId']);
+    $name = str_field($in, 'clientName', 255) ?? ($lead['name'] ?? null);
+    if ($name === null) fail('clientName is required.');
+    $product = str_field($in, 'productType', 16) ?? ($lead['product_type'] ?? null);
+    if (!in_array($product, PRODUCT_TYPES, true)) fail('productType must be software, app or website.');
+    $mode = str_field($in, 'mode', 16) ?? 'online';
+    if (!in_array($mode, DEMO_MODES, true)) fail('mode must be online or onsite.');
+    $state = check_state(str_field($in, 'state', 64) ?? ($lead['state'] ?? null), true);
+    $phone = str_field($in, 'phone', 32) ?? ($lead['phone'] ?? null);
+    if ($phone !== null && !preg_match('/^[0-9+\-() ]{6,32}$/', $phone)) fail('Phone looks invalid.');
+    $date = date_field($in, 'preferredDate');
+    if ($date !== null && $date < date('Y-m-d')) fail('Preferred date cannot be in the past.');
+    $contact = str_field($in, 'contactPerson', 255) ?? ($lead['contact_person'] ?? null);
+    $city = str_field($in, 'city', 128) ?? ($lead['city'] ?? null);
+    $pname = str_field($in, 'productName', 255) ?? ($lead['product_name'] ?? null);
+    $time = str_field($in, 'preferredTime', 32);
+    $notes = str_field($in, 'notes', 3000);
+
+    $pdo->prepare("INSERT INTO demo_requests (user_id, lead_id, client_name, contact_person, phone, state, city, product_type, product_name,
+                   mode, preferred_date, preferred_time, notes, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,?)")
+        ->execute([$u['id'], $lead['id'] ?? null, $name, $contact, $phone, $state, $city, $product, $pname, $mode, $date, $time, $notes, now(), now()]);
+    $id = (int)$pdo->lastInsertId();
+    log_activity($pdo, (int)$u['id'], $lead ? (int)$lead['id'] : null, $name, 'demo_requested', "Requested a demo ($mode, $product)" . ($date ? " for $date" : ''));
+    notify_admin_by_email("New demo request from {$u['full_name']} ({$u['state']})",
+        "{$u['full_name']} asked for a $mode $product demo.\n\nClient: $name\nState: $state" . ($city ? ", $city" : '') . ($phone ? "\nPhone: $phone" : '') .
+        ($date ? "\nPreferred: $date" . ($time ? " ($time)" : '') : '') . ($notes ? "\n\nNotes: $notes" : '') . "\n\nOpen DTA Sales -> Demo requests to schedule it.");
+    out(['id' => $id]);
+}
+
+function a_listDemoRequests(PDO $pdo, array $in): void
+{
+    $u = current_user($pdo, $in);
+    $where = []; $p = [];
+    if ($u['role'] !== 'admin') { $where[] = 'd.user_id = ?'; $p[] = $u['id']; }
+    elseif (!empty($in['userId'])) { $where[] = 'd.user_id = ?'; $p[] = (int)$in['userId']; }
+    if (!empty($in['status'])) {
+        if (!in_array($in['status'], DEMO_STATUSES, true)) fail('Bad status filter.');
+        $where[] = 'd.status = ?'; $p[] = $in['status'];
+    }
+    $w = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+    $st = $pdo->prepare("SELECT d.*, u.full_name AS employee_name, u.state AS employee_state FROM demo_requests d JOIN users u ON u.id = d.user_id
+                         $w ORDER BY (d.status = 'pending') DESC, d.created_at DESC LIMIT 300");
+    $st->execute($p);
+    // pending count in the viewer's own scope, ignoring filters -- drives the badge in the sidebar
+    $pc = $pdo->prepare("SELECT COUNT(*) FROM demo_requests WHERE status = 'pending'" . ($u['role'] === 'admin' ? '' : ' AND user_id = ?'));
+    $pc->execute($u['role'] === 'admin' ? [] : [$u['id']]);
+    out(['pending' => (int)$pc->fetchColumn(), 'requests' => array_map('demo_row', $st->fetchAll())]);
+}
+
+function a_updateDemoRequest(PDO $pdo, array $in): void
+{
+    require_admin(current_user($pdo, $in));
+    $st = $pdo->prepare("SELECT * FROM demo_requests WHERE id = ?");
+    $st->execute([(int)($in['id'] ?? 0)]);
+    $d = $st->fetch();
+    if (!$d) fail('Demo request not found.', 404);
+    if ($d['status'] === 'cancelled') fail('The employee cancelled this request.');
+    $status = str_field($in, 'status', 16, true);
+    if (!in_array($status, ['pending', 'scheduled', 'completed', 'declined'], true)) fail('Bad status.');
+    $sched = null;
+    if ($status === 'scheduled' || $status === 'completed') {
+        $raw = str_field($in, 'scheduledAt', 32);
+        if ($raw !== null) {
+            $dt = DateTime::createFromFormat('Y-m-d\TH:i', $raw) ?: DateTime::createFromFormat('Y-m-d\TH:i:s', $raw);
+            if (!$dt) fail('scheduledAt must look like 2026-10-20T15:30.');
+            $sched = $dt->format('Y-m-d H:i:s');
+        } else $sched = $d['scheduled_at'];
+        if ($status === 'scheduled' && $sched === null) fail('Pick the date and time of the demo.');
+    }
+    $pdo->prepare("UPDATE demo_requests SET status = ?, scheduled_at = ?, admin_note = ?, updated_at = ? WHERE id = ?")
+        ->execute([$status, $sched, str_field($in, 'adminNote', 3000), now(), $d['id']]);
+    if ($status !== $d['status']) {
+        $when = $sched ? ' on ' . date('d M Y, g:i A', strtotime($sched)) : '';
+        log_activity($pdo, (int)$d['user_id'], $d['lead_id'] === null ? null : (int)$d['lead_id'], $d['client_name'], 'demo_update', "Demo $status$when");
+    }
+    out(['ok' => true]);
+}
+
+function a_cancelDemoRequest(PDO $pdo, array $in): void
+{
+    $u = current_user($pdo, $in);
+    $st = $pdo->prepare("SELECT * FROM demo_requests WHERE id = ? AND user_id = ?");
+    $st->execute([(int)($in['id'] ?? 0), $u['id']]);
+    $d = $st->fetch();
+    if (!$d) fail('Demo request not found.', 404);
+    if ($d['status'] !== 'pending') fail('Only a pending request can be cancelled -- ask the DTA team.');
+    $pdo->prepare("UPDATE demo_requests SET status = 'cancelled', updated_at = ? WHERE id = ?")->execute([now(), $d['id']]);
+    out(['ok' => true]);
+}
+
 // ---------- stats ----------
 
 function a_stats(PDO $pdo, array $in): void
@@ -502,8 +620,10 @@ function a_exportAll(PDO $pdo, array $in): void
     $leads = $pdo->query("SELECT l.*, u.full_name AS employee_name FROM leads l JOIN users u ON u.id = l.user_id ORDER BY l.id")->fetchAll();
     $acts = $pdo->query("SELECT a.*, u.full_name AS employee_name, u.state AS employee_state FROM activities a JOIN users u ON u.id = a.user_id ORDER BY a.id")->fetchAll();
     $team = $pdo->query("SELECT id, username, full_name, state, status, created_at, last_login_at, last_active_at FROM users WHERE role = 'employee' ORDER BY id")->fetchAll();
+    $demos = $pdo->query("SELECT d.*, u.full_name AS employee_name, u.state AS employee_state FROM demo_requests d JOIN users u ON u.id = d.user_id ORDER BY d.id")->fetchAll();
     out([
         'exportedAt' => iso(now()),
+        'demoRequests' => array_map('demo_row', $demos),
         'leads' => array_map('lead_row', $leads),
         'activities' => array_map(fn($r) => [
             'id' => (int)$r['id'], 'userId' => (int)$r['user_id'], 'employee' => $r['employee_name'], 'state' => $r['employee_state'],

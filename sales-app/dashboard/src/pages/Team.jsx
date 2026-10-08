@@ -67,6 +67,7 @@ export default function Team({ onOpen }){
         <div className="filters">
           <button className="btn" disabled={exporting} onClick={() => backup('leads')}>Leads (CSV)</button>
           <button className="btn" disabled={exporting} onClick={() => backup('activities')}>Activity (CSV)</button>
+          <button className="btn" disabled={exporting} onClick={() => backup('demos')}>Demo requests (CSV)</button>
           <button className="btn" disabled={exporting} onClick={() => backup('employees')}>Employees (CSV)</button>
           <button className="btn primary" disabled={exporting} onClick={() => backup('full')}>Full backup (JSON)</button>
         </div>

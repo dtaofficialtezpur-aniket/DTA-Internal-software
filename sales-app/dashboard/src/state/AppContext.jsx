@@ -9,6 +9,7 @@ export const useApp = () => useContext(Ctx);
 export function AppProvider({ children }){
   const [user, setUser] = useState(null);
   const [toast, setToast] = useState(null);
+  const [pendingDemos, setPendingDemos] = useState(0);
   const tokenRef = useRef(null);
   const toastTimer = useRef(null);
 
@@ -18,8 +19,8 @@ export function AppProvider({ children }){
     toastTimer.current = setTimeout(() => setToast(null), 3500);
   }, []);
 
-  const login = useCallback((token, u) => { tokenRef.current = token; setUser(u); }, []);
-  const logout = useCallback(() => { tokenRef.current = null; setUser(null); }, []);
+  const login = useCallback((token, u) => { tokenRef.current = token; setPendingDemos(0); setUser(u); }, []);
+  const logout = useCallback(() => { tokenRef.current = null; setPendingDemos(0); setUser(null); }, []);
 
   const call = useCallback(async (action, payload) => {
     try {
@@ -35,6 +36,6 @@ export function AppProvider({ children }){
 
   const endSession = useCallback(() => { call('logout').catch(() => {}); logout(); }, [call, logout]);
 
-  const value = useMemo(() => ({ user, call, login, logout: endSession, toast, showToast }), [user, call, login, endSession, toast, showToast]);
+  const value = useMemo(() => ({ user, call, login, logout: endSession, toast, showToast, pendingDemos, setPendingDemos }), [user, call, login, endSession, toast, showToast, pendingDemos]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

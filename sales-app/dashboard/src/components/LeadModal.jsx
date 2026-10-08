@@ -3,6 +3,7 @@ import { useApp } from '../state/AppContext.jsx';
 import { ACTIVITY_LABELS, ACTIVITY_TYPES, PRODUCTS, STAGES, STATES } from '../constants.js';
 import { fmtDateTime } from '../utils.js';
 import { Modal } from './Bits.jsx';
+import DemoRequestModal from './DemoRequestModal.jsx';
 
 const blank = (state) => ({ name: '', contactPerson: '', phone: '', email: '', state: state || '', city: '', productType: 'software', productName: '', stage: 'new', estValue: '', dealValue: '', nextFollowup: '', notes: '' });
 
@@ -11,6 +12,7 @@ export default function LeadModal({ lead, readOnly, onClose, onSaved }){
   const [f, setF] = useState(lead ? { ...blank(), ...Object.fromEntries(Object.entries(lead).map(([k, v]) => [k, v ?? ''])) } : blank(user.state));
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState([]);
+  const [demoOpen, setDemoOpen] = useState(false);
   const [act, setAct] = useState({ type: 'call', note: '' });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
@@ -52,7 +54,7 @@ export default function LeadModal({ lead, readOnly, onClose, onSaved }){
 
       {lead && (
         <section className="lead-history">
-          <h3>Activity on this lead</h3>
+          <div className="split"><h3>Activity on this lead</h3>{!readOnly && <button className="btn" onClick={() => setDemoOpen(true)}>Request a demo</button>}</div>
           {!readOnly && (
             <form className="log-form" onSubmit={logActivity}>
               <select value={act.type} onChange={(e) => setAct({ ...act, type: e.target.value })}>{Object.entries(ACTIVITY_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
@@ -64,6 +66,7 @@ export default function LeadModal({ lead, readOnly, onClose, onSaved }){
             {!history.length && <li className="muted">Nothing logged yet.</li>}</ul>
         </section>
       )}
+          {demoOpen && <DemoRequestModal lead={lead} onClose={() => setDemoOpen(false)} onSaved={() => { setDemoOpen(false); loadHistory(); }} />}
     </Modal>
   );
 }

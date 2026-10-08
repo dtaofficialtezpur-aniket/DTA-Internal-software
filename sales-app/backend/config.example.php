@@ -11,5 +11,7 @@ return [
     'db_name'   => 'uXXXXXXXX_sales',
     'db_user'   => 'uXXXXXXXX_sales',
     'db_pass'   => 'change-me',
+    // Optional: get an email for every new demo request (uses the server's mail()). Leave '' to turn off.
+    'notify_email' => '',
     'admin_key' => 'change-me-to-a-long-random-string',
 ];

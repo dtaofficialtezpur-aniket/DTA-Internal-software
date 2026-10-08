@@ -56,6 +56,18 @@ users.filter((u) => u.role === 'employee').forEach((u) => {
 activities.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)).forEach((a, i) => { a.id = i + 1; });
 actId = activities.length;
 
+const demos = [];
+let demoId = 0;
+const addDemo = (u, l, status, extra = {}) => demos.push({ id: ++demoId, userId: u.id, employee: u.fullName, employeeState: u.state, leadId: l ? l.id : null,
+  clientName: l ? l.name : extra.clientName, contactPerson: l ? l.contactPerson : null, phone: l ? l.phone : null, state: l ? l.state : u.state, city: l ? l.city : null,
+  productType: l ? l.productType : 'software', productName: l ? l.productName : null, mode: 'online', preferredDate: dateStr(now + 3 * DAY), preferredTime: 'Morning',
+  notes: 'Client wants to see how billing and GST reports work.', status, scheduledAt: null, adminNote: null, createdAt: iso(now - 3600000 * (demoId + 2)), updatedAt: iso(now), ...extra });
+addDemo(users[2], leads.find((l) => l.userId === 3 && l.stage !== 'won'), 'pending');
+addDemo(users[4], leads.find((l) => l.userId === 5 && l.stage !== 'won'), 'pending', { mode: 'onsite' });
+addDemo(users[1], leads.find((l) => l.userId === 2), 'scheduled', { scheduledAt: dateStr(now + 2 * DAY) + 'T15:30', adminNote: 'Demo on Google Meet — link will be sent. Rahul will attend.' });
+addDemo(users[6], null, 'completed', { clientName: 'Sunrise Dental Clinic', scheduledAt: dateStr(now - 4 * DAY) + 'T11:00' });
+addDemo(users[3], null, 'declined', { clientName: 'Local Kirana Store', adminNote: 'Budget too low for a live demo — share the brochure instead.' });
+
 const tokens = new Map();
 const err = (m, status = 400) => Object.assign(new Error(m), { status });
 const userOf = (token) => { const u = tokens.get(token); if (!u) throw err('Session expired. Please log in again.', 401); return u; };
@@ -126,8 +138,36 @@ const handlers = {
 
   exportAll: (p, me) => {
     if (me.role !== 'admin') throw err('Admin only.', 403);
-    return { exportedAt: iso(Date.now()), leads, employees: users.filter((u) => u.role === 'employee'),
+    return { exportedAt: iso(Date.now()), demoRequests: demos, leads, employees: users.filter((u) => u.role === 'employee'),
       activities: activities.map((a) => ({ ...a, employee: nameOf(a.userId), state: users.find((u) => u.id === a.userId)?.state })) };
+  },
+
+  listDemoRequests: (p, me) => {
+    const mine = demos.filter((d) => me.role === 'admin' || d.userId === me.id);
+    return { pending: mine.filter((d) => d.status === 'pending').length,
+      requests: mine.filter((d) => (!p.status || d.status === p.status) && (!p.userId || d.userId === Number(p.userId)))
+        .sort((a, b) => (b.status === 'pending') - (a.status === 'pending') || b.createdAt.localeCompare(a.createdAt)) };
+  },
+  addDemoRequest: (p, me) => {
+    const l = p.leadId ? leads.find((x) => x.id === Number(p.leadId)) : null;
+    if (!p.clientName && !l) throw err('clientName is required.');
+    demos.push({ id: ++demoId, userId: me.id, employee: me.fullName, employeeState: me.state, leadId: l ? l.id : null, clientName: p.clientName || l.name,
+      contactPerson: p.contactPerson || null, phone: p.phone || null, state: p.state, city: p.city || null, productType: p.productType, productName: p.productName || null,
+      mode: p.mode, preferredDate: p.preferredDate || null, preferredTime: p.preferredTime || null, notes: p.notes || null, status: 'pending', scheduledAt: null, adminNote: null,
+      createdAt: iso(Date.now()), updatedAt: iso(Date.now()) });
+    addAct(me.id, l, 'demo_requested', `Requested a demo (${p.mode}, ${p.productType})`, Date.now()); return { id: demoId };
+  },
+  updateDemoRequest: (p, me) => {
+    if (me.role !== 'admin') throw err('Admin only.', 403);
+    const d = demos.find((x) => x.id === p.id); if (!d) throw err('Demo request not found.', 404);
+    if (p.status === 'scheduled' && !p.scheduledAt) throw err('Pick the date and time of the demo.');
+    Object.assign(d, { status: p.status, scheduledAt: ['scheduled', 'completed'].includes(p.status) ? (p.scheduledAt || d.scheduledAt) : null, adminNote: p.adminNote || null, updatedAt: iso(Date.now()) });
+    return { ok: true };
+  },
+  cancelDemoRequest: (p, me) => {
+    const d = demos.find((x) => x.id === p.id && x.userId === me.id); if (!d) throw err('Demo request not found.', 404);
+    if (d.status !== 'pending') throw err('Only a pending request can be cancelled -- ask the DTA team.');
+    d.status = 'cancelled'; return { ok: true };
   },
 
   stats: (p, me) => {

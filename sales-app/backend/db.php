@@ -13,6 +13,8 @@ const STATES = [
 ];
 const PRODUCT_TYPES = ['software', 'app', 'website'];
 const STAGES = ['new', 'contacted', 'demo', 'negotiation', 'won', 'lost'];
+const DEMO_STATUSES = ['pending', 'scheduled', 'completed', 'declined', 'cancelled'];
+const DEMO_MODES = ['online', 'onsite'];
 const ACTIVITY_TYPES = ['call', 'visit', 'meeting', 'follow_up', 'note'];
 
 function get_config(): array
@@ -105,6 +107,32 @@ function ensure_schema(PDO $pdo): void
             created_at DATETIME NOT NULL,
             INDEX (user_id, created_at),
             INDEX (lead_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+    // An employee asks the DTA team for a product demo for a prospect; the admin schedules / declines it.
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS demo_requests (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,                           -- requesting employee
+            lead_id INT NULL,
+            client_name VARCHAR(255) NOT NULL,              -- prospect (copied, so it survives a deleted lead)
+            contact_person VARCHAR(255) NULL,
+            phone VARCHAR(32) NULL,
+            state VARCHAR(64) NOT NULL,
+            city VARCHAR(128) NULL,
+            product_type VARCHAR(16) NOT NULL,              -- software | app | website
+            product_name VARCHAR(255) NULL,
+            mode VARCHAR(16) NOT NULL DEFAULT 'online',     -- online | onsite
+            preferred_date DATE NULL,
+            preferred_time VARCHAR(32) NULL,                -- free text, e.g. 'Morning', '4 PM'
+            notes TEXT NULL,
+            status VARCHAR(16) NOT NULL DEFAULT 'pending',  -- pending|scheduled|completed|declined|cancelled
+            scheduled_at DATETIME NULL,
+            admin_note TEXT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            INDEX (status, created_at),
+            INDEX (user_id, created_at)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 }

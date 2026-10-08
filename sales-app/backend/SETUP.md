@@ -13,6 +13,7 @@ Upload everything from this `backend/` folder into it: `api.php`, `db.php`, `set
 ## 3. Create `config.php`
 In File Manager, copy `config.example.php` → `config.php`, edit it:
 - `db_host` `'localhost'`, `db_name` / `db_user` / `db_pass` from step 1
+- `notify_email` (optional) — your email; you get a message whenever an employee requests a demo. Leave `''` to rely on the in-app badge only. (Uses the server's mail(); check spam the first time.)
 - **`admin_key`** — your main portal key. At least 16 characters, random, e.g. made with a password manager. Keep it private; it is the only thing that lets someone create the admin account. Don't share it with employees.
 
 ## 4. Run the setup check

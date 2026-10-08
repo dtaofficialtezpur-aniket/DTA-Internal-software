@@ -28,7 +28,7 @@ require __DIR__ . '/db.php';
 try {
     $pdo = get_pdo(); // connects and creates any missing tables
     line(true, 'connected to the database');
-    foreach (['users', 'sessions', 'leads', 'activities'] as $t) {
+    foreach (['users', 'sessions', 'leads', 'activities', 'demo_requests'] as $t) {
         $exists = $pdo->query("SHOW TABLES LIKE " . $pdo->quote($t))->fetchColumn();
         line((bool)$exists, "table '$t' is ready");
     }
