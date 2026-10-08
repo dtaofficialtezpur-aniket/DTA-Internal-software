@@ -56,7 +56,18 @@ function get_all_settings(PDO $pdo): array
         'agencyName' => $out['agencyName'] ?? 'DTA',
         'leadDays' => (int) ($out['leadDays'] ?? 7),
         'defaultGrace' => (int) ($out['defaultGrace'] ?? 5),
+        'idPrefix' => $out['idPrefix'] ?? 'DTA-D',
+        'idDigits' => (int) ($out['idDigits'] ?? 3),
     ];
+}
+
+// Builds a display id (client id or invoice number) from the admin's
+// configured prefix/digit-count -- e.g. prefix "DTA-D", digits 3, n=7
+// gives "DTA-D007". Changing the format only affects ids/numbers handed
+// out from then on; nothing existing is renamed.
+function format_display_id(array $settings, int $n): string
+{
+    return $settings['idPrefix'] . str_pad((string) $n, $settings['idDigits'], '0', STR_PAD_LEFT);
 }
 
 function set_setting(PDO $pdo, string $key, string $value): void
@@ -155,9 +166,10 @@ function require_admin_session(PDO $pdo, ?string $token): array
 // -- this only applies going forward.
 function peek_next_client_id(PDO $pdo): string
 {
+    $settings = get_all_settings($pdo);
     $stmt = $pdo->prepare('SELECT 1 FROM clients WHERE id = ? UNION SELECT 1 FROM normal_clients WHERE id = ?');
     for ($n = 1; ; $n++) {
-        $id = sprintf('DTA-D%03d', $n);
+        $id = format_display_id($settings, $n);
         $stmt->execute([$id, $id]);
         if (!$stmt->fetchColumn()) return $id;
     }
@@ -251,11 +263,11 @@ function normal_client_to_json(array $c): array
 
 /* ---------------- invoices ---------------- */
 
-function invoice_to_json(array $i): array
+function invoice_to_json(array $i, array $settings): array
 {
     return [
         'id' => (int) $i['id'],
-        'number' => sprintf('DTA-D%03d', $i['id']),
+        'number' => format_display_id($settings, (int) $i['id']),
         'clientType' => $i['client_type'],
         'clientId' => $i['client_id'],
         'client' => $i['client_name'],
@@ -295,11 +307,12 @@ function handle_create_invoice(PDO $pdo, array $body, array $user): void
     $stmt->execute([$clientType, $clientId, $clientName, $description, $amount, (int) $user['id']]);
     $id = (int) $pdo->lastInsertId();
 
-    log_event($pdo, $clientId, 'invoiced', 'Invoice ' . sprintf('DTA-D%03d', $id) . ' generated for ' . number_format($amount, 2));
+    $settings = get_all_settings($pdo);
+    log_event($pdo, $clientId, 'invoiced', 'Invoice ' . format_display_id($settings, $id) . ' generated for ' . number_format($amount, 2));
 
     $stmt = $pdo->prepare('SELECT * FROM invoices WHERE id = ?');
     $stmt->execute([$id]);
-    json_out(['ok' => true, 'invoice' => invoice_to_json($stmt->fetch())]);
+    json_out(['ok' => true, 'invoice' => invoice_to_json($stmt->fetch(), $settings)]);
 }
 
 function handle_list_invoices(PDO $pdo, array $body): void
@@ -308,7 +321,83 @@ function handle_list_invoices(PDO $pdo, array $body): void
     $clientId = (string) ($body['clientId'] ?? '');
     $stmt = $pdo->prepare('SELECT * FROM invoices WHERE client_type = ? AND client_id = ? ORDER BY issued_date DESC, id DESC');
     $stmt->execute([$clientType, $clientId]);
-    json_out(['ok' => true, 'invoices' => array_map('invoice_to_json', $stmt->fetchAll())]);
+    $settings = get_all_settings($pdo);
+    $rows = array_map(function ($i) use ($settings) { return invoice_to_json($i, $settings); }, $stmt->fetchAll());
+    json_out(['ok' => true, 'invoices' => $rows]);
+}
+
+/* ---------------- admin: id format + direct id edits ---------------- */
+
+// Admin-only: changes the prefix/digit-count used for ids handed out to
+// NEW clients and invoices from now on. Never renames anything that
+// already exists -- see handle_update_client_id() for that.
+function handle_update_id_format(PDO $pdo, array $body): void
+{
+    $prefix = trim((string) ($body['idPrefix'] ?? ''));
+    $digits = (int) ($body['idDigits'] ?? 3);
+
+    if ($prefix === '' || strlen($prefix) > 20 || !preg_match('/^[A-Za-z0-9_-]+$/', $prefix)) {
+        json_out(['error' => 'ID prefix must be 1-20 letters, numbers, - or _ only.']);
+    }
+    if ($digits < 1 || $digits > 6) {
+        json_out(['error' => 'Digit count must be between 1 and 6.']);
+    }
+
+    set_setting($pdo, 'idPrefix', $prefix);
+    set_setting($pdo, 'idDigits', (string) $digits);
+    json_out(['ok' => true, 'settings' => get_all_settings($pdo)]);
+}
+
+// Admin-only: directly renames one existing client's id (either type).
+// The id is a shared primary key across 'clients'/'normal_clients' plus
+// a plain string reference in 'history' and 'invoices' (no real FK
+// constraints), so this updates all three under one transaction. For a
+// subscription client the api_key is untouched -- but its deployed
+// software authenticates with client_id + api_key together, so changing
+// the id breaks that connection until the software is reconfigured with
+// the new id. The frontend warns about this before calling in.
+function handle_update_client_id(PDO $pdo, array $body): void
+{
+    $clientType = ($body['clientType'] ?? '') === 'normal' ? 'normal' : 'subscription';
+    $oldId = trim((string) ($body['id'] ?? ''));
+    $newId = trim((string) ($body['newId'] ?? ''));
+
+    if ($newId === '' || strlen($newId) > 32 || !preg_match('/^[A-Za-z0-9_-]+$/', $newId)) {
+        json_out(['error' => 'Client ID must be 1-32 letters, numbers, - or _ only.']);
+    }
+
+    $table = $clientType === 'normal' ? 'normal_clients' : 'clients';
+    $existing = $clientType === 'normal' ? find_normal_client($pdo, $oldId) : find_client($pdo, $oldId);
+    if (!$existing) {
+        json_out(['error' => 'Client not found: ' . $oldId]);
+    }
+
+    if ($newId === $oldId) {
+        json_out(['ok' => true, 'client' => $clientType === 'normal' ? normal_client_to_json($existing) : client_to_json($existing)]);
+    }
+
+    // Shared id namespace across both tables -- the new id must be free everywhere.
+    $check = $pdo->prepare('SELECT 1 FROM clients WHERE id = ? UNION SELECT 1 FROM normal_clients WHERE id = ?');
+    $check->execute([$newId, $newId]);
+    if ($check->fetchColumn()) {
+        json_out(['error' => 'That ID is already in use: ' . $newId]);
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("UPDATE {$table} SET id = ? WHERE id = ?")->execute([$newId, $oldId]);
+        $pdo->prepare('UPDATE history SET client_id = ? WHERE client_id = ?')->execute([$newId, $oldId]);
+        $pdo->prepare('UPDATE invoices SET client_id = ? WHERE client_id = ? AND client_type = ?')->execute([$newId, $oldId, $clientType]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        json_out(['error' => 'Could not change the ID: ' . $e->getMessage()]);
+    }
+
+    log_event($pdo, $newId, 'id_changed', 'Client ID changed from ' . $oldId . ' to ' . $newId . ' by admin');
+
+    $updated = $clientType === 'normal' ? find_normal_client($pdo, $newId) : find_client($pdo, $newId);
+    json_out(['ok' => true, 'client' => $clientType === 'normal' ? normal_client_to_json($updated) : client_to_json($updated)]);
 }
 
 /* ---------------- request handling ---------------- */
@@ -455,6 +544,14 @@ if ($method === 'GET') {
         case 'approvePinReset':
             require_admin_session($pdo, $body['token'] ?? null);
             handle_approve_pin_reset($pdo, $body);
+            break;
+        case 'updateIdFormat':
+            require_admin_session($pdo, $body['token'] ?? null);
+            handle_update_id_format($pdo, $body);
+            break;
+        case 'updateClientId':
+            require_admin_session($pdo, $body['token'] ?? null);
+            handle_update_client_id($pdo, $body);
             break;
 
         // File library. listFiles/downloadFile: any logged-in user, but
