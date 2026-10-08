@@ -34,7 +34,7 @@ export function AppProvider({ children }){
   const [normalClients, setNormalClients] = useState([]);
   const [folders, setFolders] = useState([]);
   const [files, setFiles] = useState([]);
-  const [settings, setSettings] = useState({ name: 'DTA', lead: 7, grace: 5 });
+  const [settings, setSettings] = useState({ name: 'DTA', lead: 7, grace: 5, idPrefix: 'DTA-D', idDigits: 3 });
   const [pendingCount, setPendingCount] = useState(0);
   const syncingRef = useRef(false);
 
@@ -129,6 +129,8 @@ export function AppProvider({ children }){
         name: data.settings.agencyName || 'DTA',
         lead: Number(data.settings.leadDays) || 7,
         grace: Number(data.settings.defaultGrace) || 5,
+        idPrefix: data.settings.idPrefix || 'DTA-D',
+        idDigits: Number(data.settings.idDigits) || 3,
       };
       const nextClients = data.clients.map((c) => ({
         ...c,
@@ -177,6 +179,8 @@ export function AppProvider({ children }){
           name: cached.settings.agencyName || 'DTA',
           lead: Number(cached.settings.leadDays) || 7,
           grace: Number(cached.settings.defaultGrace) || 5,
+          idPrefix: cached.settings.idPrefix || 'DTA-D',
+          idDigits: Number(cached.settings.idDigits) || 3,
         });
         setClients(cached.clients.map((c) => ({
           ...c,

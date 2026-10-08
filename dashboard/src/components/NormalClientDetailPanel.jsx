@@ -3,6 +3,7 @@ import { useApp } from '../state/AppContext.jsx';
 import { actionColor, fmtDateTime, fmtMoney } from '../utils.js';
 import InvoiceSection from './InvoiceSection.jsx';
 import ConvertClientSection from './ConvertClientSection.jsx';
+import EditClientIdButton from './EditClientIdButton.jsx';
 
 export default function NormalClientDetailPanel(){
   const { normalClients, selectedNormalClientId, setSelectedNormalClientId, call, refreshFromBackend, showToast } = useApp();
@@ -81,6 +82,12 @@ export default function NormalClientDetailPanel(){
       <div className="panel-body">
         {!editing && (
           <>
+            <div>
+              <div style={{fontSize:'.78rem', fontWeight:700, color:'var(--ink-muted)', marginBottom:'6px'}}>Client ID</div>
+              <div className="key-box"><code>{c.id}</code></div>
+              <EditClientIdButton c={c} clientType="normal" />
+            </div>
+
             <div>
               <div className="field-row"><span>Address</span><span>{c.address || '—'}</span></div>
               <div className="field-row"><span>Contact</span><span>{c.contact || '—'}</span></div>

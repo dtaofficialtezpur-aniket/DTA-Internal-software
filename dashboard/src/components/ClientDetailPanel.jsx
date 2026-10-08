@@ -4,6 +4,7 @@ import { actionColor, computeStatus, fmtDate, fmtDateTime, fmtMoney, maskKey } f
 import StatusPill from './StatusPill.jsx';
 import InvoiceSection from './InvoiceSection.jsx';
 import ConvertClientSection from './ConvertClientSection.jsx';
+import EditClientIdButton from './EditClientIdButton.jsx';
 
 export default function ClientDetailPanel(){
   const { clients, settings, selectedClientId, setSelectedClientId, call, refreshFromBackend, showToast } = useApp();
@@ -66,6 +67,7 @@ export default function ClientDetailPanel(){
             <div>
               <div style={{fontSize:'.78rem', fontWeight:700, color:'var(--ink-muted)', marginBottom:'6px'}}>Client ID</div>
               <div className="key-box"><code>{c.id}</code></div>
+              <EditClientIdButton c={c} clientType="subscription" />
               <div style={{fontSize:'.78rem', fontWeight:700, color:'var(--ink-muted)', margin:'12px 0 6px'}}>API key</div>
               <div className="key-box">
                 <code>{revealed ? c.apiKey : maskKey(c.apiKey)}</code>
