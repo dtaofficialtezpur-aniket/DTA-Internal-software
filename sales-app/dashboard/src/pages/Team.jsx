@@ -5,65 +5,93 @@ import { ago, fmtDateTime } from '../utils.js';
 import { Modal } from '../components/Bits.jsx';
 import { downloadBackup } from '../backup.js';
 
+// Easy-to-read password: no 0/O, 1/l/I. 12 chars from a secure random source.
+function generatePassword(){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  const buf = new Uint32Array(12);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, (n) => chars[n % chars.length]).join('');
+}
+
+const STATUS = { active: ['Active', 'good'], locked: ['Locked', 'crit'], removed: ['Removed', ''] };
+
 export default function Team({ onOpen }){
   const { call, showToast } = useApp();
   const [team, setTeam] = useState([]);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [f, setF] = useState({ fullName: '', username: '', state: '' });
-  const [code, setCode] = useState(null); // { username, setupCode }
+  const [pwFor, setPwFor] = useState(null);
+  const [f, setF] = useState({ fullName: '', username: '', state: '', password: '' });
+  const [creds, setCreds] = useState(null); // { username, password } shown once, to hand to the employee
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(() => { call('listTeam').then((d) => setTeam(d.team)).catch((e) => showToast(e.message, 'err')); }, [call, showToast]);
   useEffect(load, [load]);
 
+  const openAdd = () => { setF({ fullName: '', username: '', state: '', password: generatePassword() }); setAdding(true); };
   function create(e){
     e.preventDefault();
-    call('createEmployee', f).then((d) => { setAdding(false); setF({ fullName: '', username: '', state: '' }); setCode(d); load(); }).catch((err) => showToast(err.message, 'err'));
+    call('createEmployee', f).then((d) => { setAdding(false); setCreds({ username: d.username, password: f.password, fullName: f.fullName }); load(); }).catch((err) => showToast(err.message, 'err'));
   }
   function saveEdit(e){
     e.preventDefault();
     call('updateEmployee', { userId: editing.id, fullName: editing.fullName, state: editing.state }).then(() => { setEditing(null); load(); }).catch((err) => showToast(err.message, 'err'));
   }
-  const [exporting, setExporting] = useState(false);
+  function savePassword(e){
+    e.preventDefault();
+    call('setEmployeePassword', { userId: pwFor.id, password: pwFor.password }).then(() => { setCreds({ username: pwFor.username, password: pwFor.password, fullName: pwFor.fullName }); setPwFor(null); load(); }).catch((err) => showToast(err.message, 'err'));
+  }
+  const lock = (t) => confirm(`Lock ${t.fullName}? They are logged out right away and cannot log in until you unlock them. Their data is kept.`) &&
+    call('lockEmployee', { userId: t.id }).then(() => { showToast(`${t.fullName} is locked.`); load(); }).catch((e) => showToast(e.message, 'err'));
+  const unlock = (t) => call('unlockEmployee', { userId: t.id }).then(() => { showToast(`${t.fullName} can log in again.`); load(); }).catch((e) => showToast(e.message, 'err'));
+  const remove = (t) => confirm(`Remove ${t.fullName} permanently? They lose access for good. Their leads and history stay visible to you. (To block someone temporarily, use Lock instead.)`) &&
+    call('removeEmployee', { userId: t.id }).then(() => { showToast('Employee removed.'); load(); }).catch((e) => showToast(e.message, 'err'));
   const backup = (kind) => {
     setExporting(true);
     call('exportAll').then((d) => { downloadBackup(kind, d); showToast('Backup downloaded.'); }).catch((e) => showToast(e.message, 'err')).finally(() => setExporting(false));
   };
-  const resetPin = (t) => confirm(`Reset ${t.fullName}'s PIN? They'll be logged out and need a new setup code.`) &&
-    call('resetEmployeePin', { userId: t.id }).then((d) => { setCode({ username: t.username, setupCode: d.setupCode }); load(); }).catch((e) => showToast(e.message, 'err'));
-  const remove = (t) => confirm(`Remove ${t.fullName}? They lose access immediately. Their leads and history stay visible to you.`) &&
-    call('removeEmployee', { userId: t.id }).then(() => { showToast('Access removed.'); load(); }).catch((e) => showToast(e.message, 'err'));
+  const copy = (text) => navigator.clipboard?.writeText(text).then(() => showToast('Copied.')).catch(() => {});
+
+  const pwField = (value, onChange) => (
+    <label className="span2">Password (at least 8 characters)
+      <div className="row-gap"><input required minLength={8} maxLength={64} className="mono" autoComplete="off" value={value} onChange={onChange} />
+        <button type="button" className="btn" onClick={() => onChange({ target: { value: generatePassword() } })}>Generate</button></div>
+    </label>);
 
   return (
     <div className="page">
-      <header className="page-head"><h1>Sales team</h1><button className="btn primary" onClick={() => setAdding(true)}>+ Add employee</button></header>
+      <header className="page-head"><h1>Sales team</h1><button className="btn primary" onClick={openAdd}>+ Create employee login</button></header>
+      <p className="muted" style={{ margin: 0 }}>Only you can create logins. Give each employee their login ID and password; use <b>Lock</b> to block someone instantly and <b>Unlock</b> to let them back in.</p>
       <div className="card table-wrap">
         <table className="table">
-          <thead><tr><th>Employee</th><th>Username</th><th>State</th><th>Status</th><th>Last login</th><th>Last active</th><th /></tr></thead>
+          <thead><tr><th>Employee</th><th>Login ID</th><th>State</th><th>Access</th><th>Last login</th><th>Last active</th><th /></tr></thead>
           <tbody>
-            {team.map((t) => (
-              <tr key={t.id} className={t.status !== 'active' ? 'dim' : ''}>
-                <td><b>{t.fullName}</b></td><td className="mono">{t.username}</td><td>{t.state}</td>
-                <td>{t.status !== 'active' ? 'Removed' : t.awaitingPin ? <span className="pill warn">Awaiting PIN setup</span> : <span className="pill good">Active</span>}</td>
-                <td>{fmtDateTime(t.lastLoginAt)}</td><td>{ago(t.lastActiveAt)}</td>
-                <td className="num actions-cell">
-                  <button className="link" onClick={() => onOpen('leads', t.id)}>Leads</button>
-                  <button className="link" onClick={() => onOpen('activity', t.id)}>Activity</button>
-                  {t.status === 'active' && <>
-                    <button className="link" onClick={() => setEditing({ ...t })}>Edit</button>
-                    <button className="link" onClick={() => resetPin(t)}>Reset PIN</button>
-                    <button className="link danger" onClick={() => remove(t)}>Remove</button></>}
-                </td>
-              </tr>
-            ))}
-            {!team.length && <tr><td colSpan="7" className="muted">No employees yet. Add one per state to get started.</td></tr>}
+            {team.map((t) => {
+              const [label, tone] = STATUS[t.status] || [t.status, ''];
+              return (
+                <tr key={t.id} className={t.status === 'removed' ? 'dim' : ''}>
+                  <td><b>{t.fullName}</b></td><td className="mono">{t.username}</td><td>{t.state}</td>
+                  <td><span className={'pill ' + tone}>{label}</span>{t.status === 'locked' && t.lockedAt && <div className="muted small">since {fmtDateTime(t.lockedAt)}</div>}</td>
+                  <td>{fmtDateTime(t.lastLoginAt)}</td><td>{ago(t.lastActiveAt)}</td>
+                  <td className="num actions-cell">
+                    <button className="link" onClick={() => onOpen('leads', t.id)}>Leads</button>
+                    <button className="link" onClick={() => onOpen('activity', t.id)}>Activity</button>
+                    {t.status !== 'removed' && <>
+                      <button className="link" onClick={() => setEditing({ ...t })}>Edit</button>
+                      <button className="link" onClick={() => setPwFor({ ...t, password: generatePassword() })}>Set password</button>
+                      {t.status === 'active' ? <button className="link danger" onClick={() => lock(t)}>Lock</button> : <button className="link" onClick={() => unlock(t)}><b>Unlock</b></button>}
+                      <button className="link danger" onClick={() => remove(t)}>Remove</button></>}
+                  </td>
+                </tr>);
+            })}
+            {!team.length && <tr><td colSpan="7" className="muted">No employees yet. Create one login per salesperson to get started.</td></tr>}
           </tbody>
         </table>
       </div>
 
       <section className="card">
         <h3>Backup to this computer</h3>
-        <p className="muted">Downloads a copy of all sales data to your computer. CSV files open in Excel; the full backup (JSON) holds everything in one file. PINs are never included.</p>
+        <p className="muted">Downloads a copy of all sales data to your computer. CSV files open in Excel; the full backup (JSON) holds everything in one file. Passwords are never included.</p>
         <div className="filters">
           <button className="btn" disabled={exporting} onClick={() => backup('leads')}>Leads (CSV)</button>
           <button className="btn" disabled={exporting} onClick={() => backup('activities')}>Activity (CSV)</button>
@@ -74,12 +102,13 @@ export default function Team({ onOpen }){
       </section>
 
       {adding && (
-        <Modal title="Add sales employee" onClose={() => setAdding(false)}>
+        <Modal title="Create employee login" onClose={() => setAdding(false)}>
           <form className="form-grid" onSubmit={create}>
             <label className="span2">Full name<input required value={f.fullName} onChange={(e) => setF({ ...f, fullName: e.target.value })} /></label>
-            <label>Username<input required autoCapitalize="none" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} /></label>
+            <label>Login ID<input required autoCapitalize="none" autoComplete="off" placeholder="e.g. ravi.assam" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} /></label>
             <label>State<select required value={f.state} onChange={(e) => setF({ ...f, state: e.target.value })}><option value="">Select…</option>{STATES.map((s) => <option key={s}>{s}</option>)}</select></label>
-            <div className="span2 actions"><button type="button" className="btn ghost" onClick={() => setAdding(false)}>Cancel</button><button className="btn primary">Create</button></div>
+            {pwField(f.password, (e) => setF({ ...f, password: e.target.value }))}
+            <div className="span2 actions"><button type="button" className="btn ghost" onClick={() => setAdding(false)}>Cancel</button><button className="btn primary">Create login</button></div>
           </form>
         </Modal>
       )}
@@ -92,12 +121,24 @@ export default function Team({ onOpen }){
           </form>
         </Modal>
       )}
-      {code && (
-        <Modal title="Share this with the employee" onClose={() => setCode(null)}>
-          <p>Username <b className="mono">{code.username}</b></p>
-          <p className="setup-code mono">{code.setupCode}</p>
-          <p className="muted">On first launch they tap <b>“First time? Set your PIN”</b>, enter their username and this one-time code, and choose a 6-digit PIN. <b>This code is shown only once.</b></p>
-          <div className="actions"><button className="btn primary" onClick={() => setCode(null)}>Done</button></div>
+      {pwFor && (
+        <Modal title={`Set a new password for ${pwFor.fullName}`} onClose={() => setPwFor(null)}>
+          <form className="form-grid" onSubmit={savePassword}>
+            {pwField(pwFor.password, (e) => setPwFor({ ...pwFor, password: e.target.value }))}
+            <p className="span2 muted small" style={{ margin: 0 }}>Their old password stops working and they are logged out.</p>
+            <div className="span2 actions"><button type="button" className="btn ghost" onClick={() => setPwFor(null)}>Cancel</button><button className="btn primary">Save password</button></div>
+          </form>
+        </Modal>
+      )}
+      {creds && (
+        <Modal title="Login details — give these to the employee" onClose={() => setCreds(null)}>
+          <dl className="kv">
+            <dt>Employee</dt><dd>{creds.fullName}</dd>
+            <dt>Login ID</dt><dd className="mono">{creds.username}</dd>
+            <dt>Password</dt><dd className="mono">{creds.password}</dd>
+          </dl>
+          <p className="muted small">This password is shown <b>only now</b> — it is stored scrambled and cannot be looked up later. If it is lost, use <b>Set password</b> to make a new one.</p>
+          <div className="actions"><button className="btn" onClick={() => copy(`Login ID: ${creds.username}\nPassword: ${creds.password}`)}>Copy both</button><button className="btn primary" onClick={() => setCreds(null)}>Done</button></div>
         </Modal>
       )}
     </div>

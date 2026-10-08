@@ -7,7 +7,7 @@ Websites → your site → **Databases → MySQL Databases** → create a databa
 
 ## 2. Upload the backend files
 hPanel → **File Manager** → `public_html` → create a folder named **`DTA_Sales`** (the app expects `https://dtaonline.in/DTA_Sales/api.php`).
-Upload everything from this `backend/` folder into it: `api.php`, `db.php`, `setup.php`, `reset-admin-pin.php`, `config.example.php`, `.htaccess`.
+Upload everything from this `backend/` folder into it: `api.php`, `db.php`, `setup.php`, `reset-admin-password.php`, `config.example.php`, `.htaccess`.
 (Tip: download this repo as a ZIP from GitHub, unzip it, and upload the files from `sales-app/backend/`.)
 
 ## 3. Create `config.php`
@@ -22,16 +22,20 @@ Open `https://dtaonline.in/DTA_Sales/setup.php`. It checks PHP, the database and
 Also open `https://dtaonline.in/DTA_Sales/api.php` — you should see `{"ok":true,"service":"dta-sales-api"}`.
 
 ## 5. Create your admin account
-Open the DTA Sales app → **Create admin account** → enter the admin key, your name, a username and a 6-digit PIN. This works only once; afterwards nobody can create another admin.
+Open the DTA Sales app → **First-time setup: create admin account** → enter the admin key, your name, a login ID and a password (8+ characters). This works only once; afterwards nobody can create another admin.
 
-## 6. Add employees
-Sales team → **Add employee** (name, username, state). Send each employee the app installer plus their **one-time setup code**; they tap “First time? Set your PIN”.
+## 6. Create employee logins
+Sales team → **+ Create employee login** (name, login ID, state, password — or press **Generate**). **Only you can create logins**; employees cannot sign themselves up or change their own password. After creating, a box shows the login ID and password once — copy them and send them to the employee.
+
+- **Lock / Unlock:** blocks that employee at once (even if they are logged in) and lets them back in when you unlock. Their data is kept.
+- **Set password:** gives an employee a new password (ends their current login).
+- **Remove:** permanent; use Lock for a temporary block.
 
 ## If something goes wrong
-- **Admin forgot PIN:** open `https://dtaonline.in/DTA_Sales/reset-admin-pin.php`, enter the admin key and a new PIN, then delete that file.
-- **Employee forgot PIN:** Sales team → Reset PIN (gives a new setup code).
+- **Admin forgot password:** open `https://dtaonline.in/DTA_Sales/reset-admin-password.php`, enter the admin key and a new password, then delete that file.
+- **Employee forgot password:** Sales team → Set password (gives them a new one).
 - **App says “Could not reach the server”:** check the URL in `dashboard/src/constants.js`, that the files are in the `DTA_Sales` folder, and that the site uses HTTPS.
 - **Server error:** check the PHP error log in hPanel; the most common cause is a wrong value in `config.php`.
 
 ## Security notes
-PINs are stored hashed; 5 wrong attempts lock an account for 15 minutes; sessions last 12 hours and are not kept after the app closes; removing an employee logs them out immediately; `.htaccess` blocks `config.php` and internals from being downloaded. Keep **`reset-admin-pin.php` deleted** when you're not using it, and take backups from the Sales team page regularly. Also enable hPanel's automatic database backups if your plan has them.
+Passwords are stored hashed (never readable, not even by you); 5 wrong attempts pause an account for 15 minutes; sessions last 12 hours and are not kept after the app closes; locking or removing an employee blocks them immediately; `.htaccess` blocks `config.php` and internals from being downloaded. Keep **`reset-admin-password.php` deleted** when you're not using it, and take backups from the Sales team page regularly. Also enable hPanel's automatic database backups if your plan has them.

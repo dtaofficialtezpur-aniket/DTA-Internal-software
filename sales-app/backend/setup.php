@@ -37,7 +37,7 @@ try {
 }
 
 $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
-line($https, 'page was opened over HTTPS (PINs must never travel over plain http)');
+line($https, 'page was opened over HTTPS (passwords must never travel over plain http)');
 
 echo "\n";
 if (!$ok) { echo "Some checks failed. Fix them and reload this page.\n"; exit; }

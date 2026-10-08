@@ -52,9 +52,9 @@ function ensure_schema(PDO $pdo): void
             full_name VARCHAR(255) NOT NULL,
             role VARCHAR(16) NOT NULL DEFAULT 'employee',   -- 'admin' | 'employee'
             state VARCHAR(64) NULL,                         -- the state this employee covers
-            status VARCHAR(16) NOT NULL DEFAULT 'active',   -- 'active' | 'removed'
-            pin_hash VARCHAR(255) NULL,                     -- NULL = waiting for the employee to set a PIN
-            setup_code_hash VARCHAR(255) NULL,              -- one-time code the admin hands over for first PIN setup
+            status VARCHAR(16) NOT NULL DEFAULT 'active',   -- 'active' | 'locked' (admin blocked access) | 'removed'
+            password_hash VARCHAR(255) NULL,                -- set by the admin; employees cannot change it themselves
+            locked_at DATETIME NULL,                        -- when the admin locked the account
             failed_attempts INT NOT NULL DEFAULT 0,
             locked_until DATETIME NULL,
             created_at DATETIME NOT NULL,

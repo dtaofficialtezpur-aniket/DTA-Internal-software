@@ -46,6 +46,9 @@ function date_field(array $in, string $k): ?string
 }
 
 // ---------- auth ----------
+// Accounts are created ONLY by the admin (who sets the username + password and hands them over).
+// There is no self-registration and no self-service password change for employees.
+// Status: 'active' can log in; 'locked' is blocked by the admin until unlocked; 'removed' is gone for good.
 
 function current_user(PDO $pdo, array $in): array
 {
@@ -56,6 +59,7 @@ function current_user(PDO $pdo, array $in): array
     $st->execute([hash('sha256', $token), now()]);
     $u = $st->fetch();
     if (!$u) fail('Session expired. Please log in again.', 401);
+    if ($u['status'] === 'locked') fail('Your access has been locked by the admin.', 401);
     if ($u['status'] !== 'active') fail('Your access has been removed.', 401);
     // "last active" is refreshed at most once a minute
     if (!$u['last_active_at'] || strtotime($u['last_active_at']) < time() - 60) {
@@ -96,19 +100,16 @@ function register_failure(PDO $pdo, array $u): void
         ->execute([$lock ? 0 : $n, $lock, $u['id']]);
 }
 
-function valid_pin(string $pin): void { if (!preg_match('/^\d{6}$/', $pin)) fail('PIN must be exactly 6 digits.'); }
+function valid_password(string $pw): void
+{
+    if (strlen($pw) < 8) fail('Password must be at least 8 characters.');
+    if (strlen($pw) > 64) fail('Password must be at most 64 characters.');
+}
 function valid_username(string $name): string
 {
-    $name = strtolower($name);
+    $name = strtolower(trim($name));
     if (!preg_match('/^[a-z0-9._-]{3,32}$/', $name)) fail('Username must be 3-32 characters: letters, numbers, dot, dash, underscore.');
     return $name;
-}
-function new_setup_code(): string
-{
-    $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    $code = '';
-    for ($i = 0; $i < 8; $i++) $code .= $chars[random_int(0, strlen($chars) - 1)];
-    return $code;
 }
 
 function a_setupStatus(PDO $pdo, array $in): void
@@ -125,12 +126,12 @@ function a_register(PDO $pdo, array $in): void
     if (!hash_equals($key, (string)($in['adminKey'] ?? ''))) fail('Wrong admin key.', 403);
     $name = str_field($in, 'fullName', 255, true);
     $username = valid_username((string)($in['username'] ?? ''));
-    $pin = (string)($in['pin'] ?? '');
-    valid_pin($pin);
-    $st = $pdo->prepare("INSERT INTO users (username, full_name, role, status, pin_hash, created_at)
+    $pw = (string)($in['password'] ?? '');
+    valid_password($pw);
+    $st = $pdo->prepare("INSERT INTO users (username, full_name, role, status, password_hash, created_at)
                          SELECT ?, ?, 'admin', 'active', ?, ? FROM DUAL
                          WHERE NOT EXISTS (SELECT 1 FROM users WHERE role = 'admin')");
-    $st->execute([$username, $name, password_hash($pin, PASSWORD_DEFAULT), now()]);
+    $st->execute([$username, $name, password_hash($pw, PASSWORD_DEFAULT), now()]);
     if ($st->rowCount() === 0) fail('An admin account already exists.', 403);
     $u = $pdo->query("SELECT * FROM users WHERE role = 'admin' LIMIT 1")->fetch();
     out(start_session($pdo, $u));
@@ -141,26 +142,12 @@ function a_login(PDO $pdo, array $in): void
     $st = $pdo->prepare("SELECT * FROM users WHERE username = ?");
     $st->execute([strtolower(trim((string)($in['username'] ?? '')))]);
     $u = $st->fetch();
-    $bad = 'Invalid username or PIN.';
-    if (!$u || $u['status'] !== 'active' || !$u['pin_hash']) fail($bad, 401);
+    $bad = 'Invalid username or password.';
+    if (!$u || $u['status'] === 'removed' || !$u['password_hash']) fail($bad, 401);
     check_lock($u);
-    if (!password_verify((string)($in['pin'] ?? ''), $u['pin_hash'])) { register_failure($pdo, $u); fail($bad, 401); }
-    out(start_session($pdo, $u));
-}
-
-function a_setPin(PDO $pdo, array $in): void
-{
-    $st = $pdo->prepare("SELECT * FROM users WHERE username = ?");
-    $st->execute([strtolower(trim((string)($in['username'] ?? '')))]);
-    $u = $st->fetch();
-    $bad = 'Wrong username or setup code.';
-    if (!$u || $u['status'] !== 'active' || !$u['setup_code_hash']) fail($bad, 401);
-    check_lock($u);
-    if (!password_verify(strtoupper(trim((string)($in['setupCode'] ?? ''))), $u['setup_code_hash'])) { register_failure($pdo, $u); fail($bad, 401); }
-    $pin = (string)($in['pin'] ?? '');
-    valid_pin($pin);
-    $pdo->prepare("UPDATE users SET pin_hash = ?, setup_code_hash = NULL WHERE id = ?")
-        ->execute([password_hash($pin, PASSWORD_DEFAULT), $u['id']]);
+    if (!password_verify((string)($in['password'] ?? ''), $u['password_hash'])) { register_failure($pdo, $u); fail($bad, 401); }
+    // Only someone who knows the right password learns the account is locked.
+    if ($u['status'] === 'locked') fail('Your access has been locked by the admin. Please contact them.', 403);
     out(start_session($pdo, $u));
 }
 
@@ -172,7 +159,7 @@ function a_logout(PDO $pdo, array $in): void
     out(['ok' => true]);
 }
 
-// ---------- team (admin) ----------
+// ---------- team (admin only) ----------
 
 function check_state(?string $s, bool $required): ?string
 {
@@ -181,69 +168,95 @@ function check_state(?string $s, bool $required): ?string
     return $s;
 }
 
+function load_employee(PDO $pdo, int $id): array
+{
+    $st = $pdo->prepare("SELECT * FROM users WHERE id = ? AND role = 'employee'");
+    $st->execute([$id]);
+    $u = $st->fetch();
+    if (!$u) fail('Employee not found.', 404);
+    return $u;
+}
+
 function a_createEmployee(PDO $pdo, array $in): void
 {
     require_admin(current_user($pdo, $in));
     $name = str_field($in, 'fullName', 255, true);
     $username = valid_username((string)($in['username'] ?? ''));
+    $pw = (string)($in['password'] ?? '');
+    valid_password($pw);
     $state = check_state(str_field($in, 'state', 64), true);
-    $code = new_setup_code();
     try {
-        $pdo->prepare("INSERT INTO users (username, full_name, role, state, status, setup_code_hash, created_at)
+        $pdo->prepare("INSERT INTO users (username, full_name, role, state, status, password_hash, created_at)
                        VALUES (?,?,'employee',?,'active',?,?)")
-            ->execute([$username, $name, $state, password_hash($code, PASSWORD_DEFAULT), now()]);
+            ->execute([$username, $name, $state, password_hash($pw, PASSWORD_DEFAULT), now()]);
     } catch (PDOException $e) {
         if (($e->errorInfo[1] ?? 0) === 1062) fail('That username is already taken.');
         throw $e;
     }
-    out(['username' => $username, 'setupCode' => $code]); // shown to the admin once
+    out(['username' => $username]);
 }
 
-function a_resetEmployeePin(PDO $pdo, array $in): void
+function a_setEmployeePassword(PDO $pdo, array $in): void
 {
     require_admin(current_user($pdo, $in));
-    $id = (int)($in['userId'] ?? 0);
-    $code = new_setup_code();
-    $st = $pdo->prepare("UPDATE users SET pin_hash = NULL, setup_code_hash = ?, failed_attempts = 0, locked_until = NULL
-                         WHERE id = ? AND role = 'employee' AND status = 'active'");
-    $st->execute([password_hash($code, PASSWORD_DEFAULT), $id]);
-    if ($st->rowCount() === 0) fail('Employee not found.', 404);
-    $pdo->prepare("DELETE FROM sessions WHERE user_id = ?")->execute([$id]);
-    out(['setupCode' => $code]);
+    $u = load_employee($pdo, (int)($in['userId'] ?? 0));
+    if ($u['status'] === 'removed') fail('This employee was removed.');
+    $pw = (string)($in['password'] ?? '');
+    valid_password($pw);
+    $pdo->prepare("UPDATE users SET password_hash = ?, failed_attempts = 0, locked_until = NULL WHERE id = ?")
+        ->execute([password_hash($pw, PASSWORD_DEFAULT), $u['id']]);
+    $pdo->prepare("DELETE FROM sessions WHERE user_id = ?")->execute([$u['id']]); // old password's sessions end
+    out(['ok' => true]);
 }
 
 function a_updateEmployee(PDO $pdo, array $in): void
 {
     require_admin(current_user($pdo, $in));
-    $id = (int)($in['userId'] ?? 0);
+    $u = load_employee($pdo, (int)($in['userId'] ?? 0));
     $name = str_field($in, 'fullName', 255, true);
     $state = check_state(str_field($in, 'state', 64), true);
-    $st = $pdo->prepare("UPDATE users SET full_name = ?, state = ? WHERE id = ? AND role = 'employee'");
-    $st->execute([$name, $state, $id]);
+    $pdo->prepare("UPDATE users SET full_name = ?, state = ? WHERE id = ?")->execute([$name, $state, $u['id']]);
+    out(['ok' => true]);
+}
+
+// Lock = block login and every request right away; unlock restores access (after a fresh login). Data is untouched.
+function a_lockEmployee(PDO $pdo, array $in): void
+{
+    require_admin(current_user($pdo, $in));
+    $u = load_employee($pdo, (int)($in['userId'] ?? 0));
+    if ($u['status'] === 'removed') fail('This employee was removed.');
+    // Sessions are kept on purpose: current_user() refuses every request from a locked account, and tells them why.
+    $pdo->prepare("UPDATE users SET status = 'locked', locked_at = ? WHERE id = ?")->execute([now(), $u['id']]);
+    out(['ok' => true]);
+}
+
+function a_unlockEmployee(PDO $pdo, array $in): void
+{
+    require_admin(current_user($pdo, $in));
+    $u = load_employee($pdo, (int)($in['userId'] ?? 0));
+    if ($u['status'] === 'removed') fail('This employee was removed.');
+    $pdo->prepare("UPDATE users SET status = 'active', locked_at = NULL, failed_attempts = 0, locked_until = NULL WHERE id = ?")->execute([$u['id']]);
+    $pdo->prepare("DELETE FROM sessions WHERE user_id = ?")->execute([$u['id']]); // must log in fresh after being unlocked
     out(['ok' => true]);
 }
 
 function a_removeEmployee(PDO $pdo, array $in): void
 {
     require_admin(current_user($pdo, $in));
-    $id = (int)($in['userId'] ?? 0);
-    $st = $pdo->prepare("UPDATE users SET status = 'removed', pin_hash = NULL, setup_code_hash = NULL WHERE id = ? AND role = 'employee'");
-    $st->execute([$id]);
-    if ($st->rowCount() === 0) fail('Employee not found.', 404);
-    $pdo->prepare("DELETE FROM sessions WHERE user_id = ?")->execute([$id]); // kicks them out immediately
+    $u = load_employee($pdo, (int)($in['userId'] ?? 0));
+    $pdo->prepare("UPDATE users SET status = 'removed', password_hash = NULL WHERE id = ?")->execute([$u['id']]);
+    $pdo->prepare("DELETE FROM sessions WHERE user_id = ?")->execute([$u['id']]); // kicks them out immediately
     out(['ok' => true]);
 }
 
 function a_listTeam(PDO $pdo, array $in): void
 {
     require_admin(current_user($pdo, $in));
-    $rows = $pdo->query("SELECT id, username, full_name, state, status, pin_hash IS NULL AS awaiting_pin,
-                                created_at, last_login_at, last_active_at
-                         FROM users WHERE role = 'employee' ORDER BY status, full_name")->fetchAll();
+    $rows = $pdo->query("SELECT id, username, full_name, state, status, created_at, locked_at, last_login_at, last_active_at
+                         FROM users WHERE role = 'employee' ORDER BY FIELD(status, 'active', 'locked', 'removed'), full_name")->fetchAll();
     out(['team' => array_map(fn($r) => [
-        'id' => (int)$r['id'], 'username' => $r['username'], 'fullName' => $r['full_name'], 'state' => $r['state'],
-        'status' => $r['status'], 'awaitingPin' => (bool)$r['awaiting_pin'],
-        'createdAt' => iso($r['created_at']), 'lastLoginAt' => iso($r['last_login_at']), 'lastActiveAt' => iso($r['last_active_at']),
+        'id' => (int)$r['id'], 'username' => $r['username'], 'fullName' => $r['full_name'], 'state' => $r['state'], 'status' => $r['status'],
+        'createdAt' => iso($r['created_at']), 'lockedAt' => iso($r['locked_at']), 'lastLoginAt' => iso($r['last_login_at']), 'lastActiveAt' => iso($r['last_active_at']),
     ], $rows)]);
 }
 
@@ -685,7 +698,7 @@ function a_exportAll(PDO $pdo, array $in): void
             'id' => (int)$r['id'], 'username' => $r['username'], 'fullName' => $r['full_name'], 'state' => $r['state'], 'status' => $r['status'],
             'createdAt' => iso($r['created_at']), 'lastLoginAt' => iso($r['last_login_at']), 'lastActiveAt' => iso($r['last_active_at']),
         ], $team),
-    ]); // never includes PIN hashes, setup codes or sessions
+    ]); // never includes password hashes or sessions
 }
 
 // ---------- dispatch ----------

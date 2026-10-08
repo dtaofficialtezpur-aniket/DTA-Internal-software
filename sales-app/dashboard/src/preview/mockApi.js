@@ -17,7 +17,7 @@ const users = [
     ['Sneha Patil', 'sneha', 'Maharashtra'], ['Gurpreet Singh', 'gurpreet', 'Punjab'], ['Lakshmi Iyer', 'lakshmi', 'Tamil Nadu'],
     ['Amit Shah', 'amit', 'Gujarat'], ['Rohit Sen', 'rohit', 'West Bengal'],
   ].map(([fullName, username, state], i) => ({
-    id: i + 2, username, fullName, role: 'employee', state, status: 'active', awaitingPin: false,
+    id: i + 2, username, fullName, role: 'employee', state, status: 'active', lockedAt: null,
     createdAt: iso(now - 60 * DAY), lastLoginAt: iso(now - (i * 7 + 1) * 3600000), lastActiveAt: iso(now - (i * 5 + 2) * 3600000),
   })),
 ];
@@ -85,7 +85,7 @@ addDemo(users[3], null, 'declined', { clientName: 'Local Kirana Store', adminNot
 
 const tokens = new Map();
 const err = (m, status = 400) => Object.assign(new Error(m), { status });
-const userOf = (token) => { const u = tokens.get(token); if (!u) throw err('Session expired. Please log in again.', 401); return u; };
+const userOf = (token) => { const u = tokens.get(token); if (!u) throw err('Session expired. Please log in again.', 401); if (u.status === 'locked') throw err('Your access has been locked by the admin.', 401); return u; };
 const inRange = (ts, p) => (!p.from || ts >= p.from + 'T00:00:00') && (!p.to || ts.slice(0, 10) <= p.to);
 const scopeUser = (me, p) => (me.role === 'admin' ? (p.userId ? Number(p.userId) : null) : me.id);
 const pub = (u) => ({ id: u.id, username: u.username, fullName: u.fullName, role: u.role, state: u.state });
@@ -94,8 +94,9 @@ const nameOf = (id) => users.find((u) => u.id === id)?.fullName;
 const handlers = {
   setupStatus: () => ({ adminExists: true }),
   login: (p) => {
-    const u = users.find((x) => x.username === String(p.username).toLowerCase() && x.status === 'active');
-    if (!u) throw err('Invalid username or PIN.', 401);
+    const u = users.find((x) => x.username === String(p.username).toLowerCase() && x.status !== 'removed');
+    if (!u) throw err('Invalid username or password.', 401);
+    if (u.status === 'locked') throw err('Your access has been locked by the admin. Please contact them.', 403);
     const t = 'preview-' + u.id; tokens.set(t, u); return { token: t, user: pub(u) };
   },
   logout: () => ({ ok: true }),
@@ -105,12 +106,15 @@ const handlers = {
   createEmployee: (p) => {
     const username = String(p.username).toLowerCase();
     if (users.some((u) => u.username === username)) throw err('That username is already taken.');
-    users.push({ id: users.length + 1, username, fullName: p.fullName, role: 'employee', state: p.state, status: 'active', awaitingPin: true, createdAt: iso(Date.now()), lastLoginAt: null, lastActiveAt: null });
-    return { username, setupCode: 'PREV1EW9' };
+    if (String(p.password || '').length < 8) throw err('Password must be at least 8 characters.');
+    users.push({ id: users.length + 1, username, fullName: p.fullName, role: 'employee', state: p.state, status: 'active', createdAt: iso(Date.now()), lockedAt: null, lastLoginAt: null, lastActiveAt: null });
+    return { username };
   },
   updateEmployee: (p) => { const u = users.find((x) => x.id === p.userId); Object.assign(u, { fullName: p.fullName, state: p.state }); return { ok: true }; },
-  resetEmployeePin: (p) => { users.find((x) => x.id === p.userId).awaitingPin = true; return { setupCode: 'PREV1EW9' }; },
-  removeEmployee: (p) => { users.find((x) => x.id === p.userId).status = 'removed'; return { ok: true }; },
+  setEmployeePassword: (p) => { if (String(p.password || '').length < 8) throw err('Password must be at least 8 characters.'); return { ok: true }; },
+  lockEmployee: (p) => { const u = users.find((x) => x.id === p.userId); u.status = 'locked'; u.lockedAt = iso(Date.now()); return { ok: true }; },
+  unlockEmployee: (p) => { const u = users.find((x) => x.id === p.userId); u.status = 'active'; u.lockedAt = null; for (const [t, usr] of tokens) if (usr.id === u.id) tokens.delete(t); return { ok: true }; },
+  removeEmployee: (p) => { const u = users.find((x) => x.id === p.userId); u.status = 'removed'; for (const [t, usr] of tokens) if (usr.id === u.id) tokens.delete(t); return { ok: true }; },
 
   listLeads: (p, me) => {
     const uid = scopeUser(me, p);

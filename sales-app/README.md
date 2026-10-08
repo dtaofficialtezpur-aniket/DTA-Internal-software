@@ -2,8 +2,8 @@
 
 Standalone sales-team app: one sales employee per state logs leads and activity; the admin (holder of the portal key) sees everything.
 
-- **Employees** (username + 6-digit PIN): add leads (software / application / website), move them through New → Contacted → Demo → Negotiation → Won/Lost, log calls/visits/meetings, set follow-ups, see their own totals.
-- **Admin**: overview with leads, clients won, sales value and activity — by employee, by state and by product, filterable by date; full lead list and activity feed per employee; login times and last-active; add / edit / reset PIN / remove employees.
+- **Employees** (login ID + password given to them by the admin): add leads (software / application / website), move them through New → Contacted → Demo → Negotiation → Won/Lost, log calls/visits/meetings, set follow-ups, see their own totals.
+- **Admin**: overview with leads, clients won, sales value and activity — by employee, by state and by product, filterable by date; full lead list and activity feed per employee; login times and last-active; create employee logins (ID + password), lock / unlock access at any time, set new passwords, edit, remove.
 - **Monthly business**: clients won and business value per month, with year totals, a bar chart, a per-product split and a CSV download. Counted in the month a deal was marked Won. Calendar year or financial year (Apr–Mar). Employees see their own numbers; the admin sees everyone, can filter by employee, and gets a by-employee table.
 - **Demo requests**: an employee asks the DTA team for a demo (from a lead, or for a new client) with product, online/on-site, preferred date and notes. It appears on the admin's **Demo requests** page with a red count badge in the sidebar. The admin schedules it (date/time + message), declines it, or marks it completed; the employee sees the status and message. Optional email alert: set `notify_email` in `config.php`.
 - "Client" = a lead marked **Won** (with its deal value).
@@ -16,7 +16,7 @@ Layout: `desktop/` (Electron app employees install — see `desktop/README.md`),
 
 ## Backup on the admin's computer
 
-Sales team page → **Backup to this computer** (admin only): Leads / Activity / Employees as Excel-friendly CSV, or one full JSON backup. The live data stays on the server so employees can work any time; this is your own copy. PINs and setup codes are never included.
+Sales team page → **Backup to this computer** (admin only): Leads / Activity / Employees as Excel-friendly CSV, or one full JSON backup. The live data stays on the server so employees can work any time; this is your own copy. Passwords are never included.
 
 ## Single-file preview
 

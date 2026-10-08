@@ -3,13 +3,15 @@ import { useApp } from '../state/AppContext.jsx';
 import { PREVIEW_LOGINS } from '../preview/logins.js';
 import logo from '../assets/dta-logo.png';
 
+// Employees cannot create or change their own login -- the admin does that (Sales team page).
+// The only sign-up here is the one-time owner account, protected by the admin key from config.php.
 export default function AuthScreen(){
   const { call, login } = useApp();
   const [panel, setPanel] = useState('login');
   const [adminExists, setAdminExists] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [f, setF] = useState({ username: '', pin: '', pin2: '', fullName: '', adminKey: '', setupCode: '' });
+  const [f, setF] = useState({ username: '', password: '', password2: '', fullName: '', adminKey: '' });
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
 
   useEffect(() => { call('setupStatus').then((d) => setAdminExists(d.adminExists)).catch(() => {}); }, [call]);
@@ -17,46 +19,36 @@ export default function AuthScreen(){
   function submit(e){
     e.preventDefault();
     setError('');
-    if (panel !== 'login' && f.pin !== f.pin2) { setError('The two PINs do not match.'); return; }
-    const req = panel === 'login' ? call('login', { username: f.username, pin: f.pin })
-      : panel === 'setpin' ? call('setPin', { username: f.username, setupCode: f.setupCode, pin: f.pin })
-      : call('register', { adminKey: f.adminKey, fullName: f.fullName, username: f.username, pin: f.pin });
+    if (panel === 'register' && f.password !== f.password2) { setError('The two passwords do not match.'); return; }
+    const req = panel === 'login' ? call('login', { username: f.username, password: f.password })
+      : call('register', { adminKey: f.adminKey, fullName: f.fullName, username: f.username, password: f.password });
     setBusy(true);
     req.then((d) => login(d.token, d.user)).catch((err) => { setError(err.message); setBusy(false); });
   }
-
-  const pinInput = (k, label, auto) => (
-    <label>{label}
-      <input type="password" inputMode="numeric" pattern="\d{6}" maxLength={6} required className="pin-input" autoComplete={auto} value={f[k]} onChange={set(k)} />
-    </label>
-  );
-
-  const quick = (username) => { setBusy(true); call('login', { username, pin: '' }).then((d) => login(d.token, d.user)); };
+  const quick = (username) => { setBusy(true); call('login', { username, password: '' }).then((d) => login(d.token, d.user)).catch((err) => { setError(err.message); setBusy(false); }); };
 
   return (
     <div className="auth-shell">
       <form className="card auth-card" onSubmit={submit}>
         <div className="brand" style={{ marginBottom: 18 }}><img src={logo} alt="" width="34" height="34" /><div><div className="brand-name">DTA</div><div className="brand-sub">Sales</div></div></div>
-        <h2>{panel === 'login' ? 'Log in' : panel === 'setpin' ? 'Set your PIN' : 'Create the admin account'}</h2>
-        {panel === 'setpin' && <p className="muted">Enter the setup code your admin gave you, then choose a 6-digit PIN.</p>}
+        <h2>{panel === 'login' ? 'Log in' : 'Create the admin account'}</h2>
         {panel === 'register' && <label>Admin key<input type="password" required value={f.adminKey} onChange={set('adminKey')} autoComplete="off" /></label>}
         {panel === 'register' && <label>Your name<input required value={f.fullName} onChange={set('fullName')} /></label>}
-        <label>Username<input required autoComplete="username" autoCapitalize="none" value={f.username} onChange={set('username')} /></label>
-        {panel === 'setpin' && <label>Setup code<input required className="mono" autoCapitalize="characters" autoComplete="off" value={f.setupCode} onChange={set('setupCode')} /></label>}
-        {pinInput('pin', panel === 'login' ? '6-digit PIN' : 'New 6-digit PIN', panel === 'login' ? 'current-password' : 'new-password')}
-        {panel !== 'login' && pinInput('pin2', 'Repeat PIN', 'new-password')}
+        <label>Login ID<input required autoComplete="username" autoCapitalize="none" value={f.username} onChange={set('username')} /></label>
+        <label>Password<input type="password" required minLength={panel === 'register' ? 8 : undefined} autoComplete={panel === 'login' ? 'current-password' : 'new-password'} value={f.password} onChange={set('password')} /></label>
+        {panel === 'register' && <label>Repeat password<input type="password" required autoComplete="new-password" value={f.password2} onChange={set('password2')} /></label>}
         {error && <div className="form-error" role="alert">{error}</div>}
-        <button className="btn primary" disabled={busy}>{busy ? 'Please wait…' : panel === 'login' ? 'Log in' : 'Continue'}</button>
+        <button className="btn primary" disabled={busy}>{busy ? 'Please wait…' : panel === 'login' ? 'Log in' : 'Create account'}</button>
         <div className="auth-links">
-          {panel !== 'login' && <button type="button" className="link" onClick={() => { setPanel('login'); setError(''); }}>Back to log in</button>}
-          {panel === 'login' && <button type="button" className="link" onClick={() => { setPanel('setpin'); setError(''); }}>First time? Set your PIN</button>}
-          {panel === 'login' && !adminExists && <button type="button" className="link" onClick={() => { setPanel('register'); setError(''); }}>Create admin account</button>}
+          {panel === 'login' && <span className="muted small">Your login ID and password are given to you by the DTA admin.</span>}
+          {panel === 'register' && <button type="button" className="link" onClick={() => { setPanel('login'); setError(''); }}>Back to log in</button>}
+          {panel === 'login' && !adminExists && <button type="button" className="link" onClick={() => { setPanel('register'); setError(''); }}>First-time setup: create admin account</button>}
         </div>
       </form>
       {import.meta.env.VITE_PREVIEW && (
         <div className="card auth-card preview-box">
           <strong>Preview mode — sample data, nothing is saved</strong>
-          {(PREVIEW_LOGINS).map(([label, u]) => <button key={u} className="btn" onClick={() => quick(u)}>{label}</button>)}
+          {(PREVIEW_LOGINS).map(([label, u]) => <button key={u} type="button" className="btn" onClick={() => quick(u)}>{label}</button>)}
         </div>
       )}
     </div>

@@ -137,3 +137,5 @@ td .tag:first-child,.feed .tag:first-child{margin-left:0;}
 .mbar-val{font-size:.68rem;height:14px;white-space:nowrap;color:var(--ink-muted);} .mbar-lbl{font-size:.75rem;font-weight:600;}
 .row-on td{background:var(--accent-soft);} .total-row td{border-top:2px solid var(--border-strong);background:var(--surface-sunken);}
 @media (max-width:760px){.mbar-val{display:none;}}
+.row-gap{display:flex;gap:8px;} .row-gap input{flex:1;min-width:0;}
+.pill.crit{background:var(--crit-soft);color:var(--crit);}
