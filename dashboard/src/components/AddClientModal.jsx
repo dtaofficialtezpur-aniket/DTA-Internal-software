@@ -4,6 +4,26 @@ import { BACKEND_URL } from '../constants.js';
 import { recognizeDocumentText } from '../ocr/runOcr.js';
 import { extractClientFieldsFromText } from '../ocr/extractFields.js';
 
+// Shows what ID the new client will get, read-only -- it's only a
+// preview (the real ID is assigned when the client is actually created),
+// but in practice it's accurate unless someone else adds a client in the
+// same instant.
+function NextIdPreview(){
+  const { call } = useApp();
+  const [id, setId] = useState(null);
+
+  useEffect(() => {
+    call('peekNextClientId').then((data) => setId(data.id)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <label className="full">Client ID (assigned automatically)
+      <input type="text" disabled value={id || 'Loading…'} />
+    </label>
+  );
+}
+
 export default function AddClientModal(){
   const { addClientOpen, setAddClientOpen, addClientType, setAddClientType } = useApp();
 
@@ -157,6 +177,7 @@ function SubscriptionClientForm({ onBack, onDone }){
       }} />
       <form id="add-form" onSubmit={submit}>
         <div className="form-grid">
+          <NextIdPreview />
           <label className="full">Client company name
             <input id="a-client" type="text" autoComplete="off" required maxLength={255} placeholder="e.g. Coastal Traders LLP" value={client} onChange={(e) => setClient(e.target.value)} />
           </label>
@@ -233,6 +254,7 @@ function NormalClientForm({ onBack, onDone }){
       }} />
       <form id="add-normal-form" onSubmit={submit}>
         <div className="form-grid">
+          <NextIdPreview />
           <label className="full">Client name
             <input id="an-client" type="text" autoComplete="off" required maxLength={255} placeholder="e.g. Ravi Kumar" value={client} onChange={(e) => setClient(e.target.value)} />
           </label>

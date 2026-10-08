@@ -215,4 +215,25 @@ function ensure_schema(PDO $pdo): void
         $insert->execute(['leadDays', '7']);
         $insert->execute(['defaultGrace', '5']);
     }
+
+    // Holds whichever fields don't exist on a client's current type,
+    // saved off when it's converted to the other type -- see
+    // handle_convert_to_subscription()/handle_convert_to_normal() in
+    // api.php. Added here (rather than in the CREATE TABLE above) because
+    // CREATE TABLE IF NOT EXISTS doesn't touch a table that already
+    // exists from before this column existed.
+    ensure_column($pdo, 'clients', 'archived_data', 'JSON NULL');
+    ensure_column($pdo, 'normal_clients', 'archived_data', 'JSON NULL');
+}
+
+function ensure_column(PDO $pdo, string $table, string $column, string $definition): void
+{
+    $stmt = $pdo->prepare('
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?
+    ');
+    $stmt->execute([$table, $column]);
+    if (!$stmt->fetchColumn()) {
+        $pdo->exec("ALTER TABLE {$table} ADD COLUMN {$column} {$definition}");
+    }
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { actionColor, fmtDateTime, fmtMoney } from '../utils.js';
 import InvoiceSection from './InvoiceSection.jsx';
+import ConvertClientSection from './ConvertClientSection.jsx';
 
 export default function NormalClientDetailPanel(){
   const { normalClients, selectedNormalClientId, setSelectedNormalClientId, call, refreshFromBackend, showToast } = useApp();
@@ -111,6 +112,8 @@ export default function NormalClientDetailPanel(){
               defaultDescription={c.notes || ''}
               billTo={{ name: c.client, extraLines: [c.address, c.contact].filter(Boolean) }}
             />
+
+            <ConvertClientSection c={c} direction="toSubscription" />
           </>
         )}
 
