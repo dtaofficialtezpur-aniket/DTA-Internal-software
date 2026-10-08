@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { BACKEND_URL } from '../constants.js';
 import { rawApiCall } from '../api.js';
 
@@ -33,6 +33,15 @@ export function AppProvider({ children }){
       throw err;
     }
   }, [showToast]);
+
+  // Heartbeat: tells the server this person has the app open, so the admin can see who is online.
+  useEffect(() => {
+    if (!user) return undefined;
+    const beat = () => { call('ping').catch(() => {}); };
+    const id = setInterval(beat, 45000);
+    window.addEventListener('focus', beat);
+    return () => { clearInterval(id); window.removeEventListener('focus', beat); };
+  }, [user, call]);
 
   const endSession = useCallback(() => { call('logout').catch(() => {}); logout(); }, [call, logout]);
 

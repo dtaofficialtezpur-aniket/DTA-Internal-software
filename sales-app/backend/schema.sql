@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
     locked_until DATETIME NULL,
     created_at DATETIME NOT NULL,
     last_login_at DATETIME NULL,
+    last_logout_at DATETIME NULL,                   -- set on logout so the person shows offline immediately
     last_active_at DATETIME NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

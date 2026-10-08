@@ -21,6 +21,7 @@ const users = [
     createdAt: iso(now - 60 * DAY), lastLoginAt: iso(now - (i * 7 + 1) * 3600000), lastActiveAt: iso(now - (i * 5 + 2) * 3600000),
   })),
 ];
+users[1].simOnline = users[3].simOnline = users[5].simOnline = true; // preview: these three have the app open
 users[8].lastActiveAt = iso(now - 9 * DAY); users[8].lastLoginAt = iso(now - 9 * DAY); // one quiet employee
 
 const businesses = ['Sharma Traders', 'Green Valley School', 'City Hospital', 'Royal Jewellers', 'Metro Pharmacy', 'Sunrise Hotel', 'Bharat Motors', 'Kisan Agro', 'Style Studio', 'Om Logistics', 'Fresh Mart', 'Dream Homes Realty', 'Tech Coaching Centre', 'Annapurna Foods', 'Blue Star Electricals'];
@@ -71,6 +72,8 @@ users.filter((u) => u.role === 'employee').forEach((u) => {
 activities.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)).forEach((a, i) => { a.id = i + 1; });
 actId = activities.length;
 
+const isOnline = (u) => u.status === 'active' && (u.simOnline || (u.lastActiveAt && Date.now() - Date.parse(u.lastActiveAt) < 120000));
+const withPresence = (u) => ({ ...u, online: isOnline(u), lastActiveAt: u.simOnline ? iso(Date.now() - 20000) : u.lastActiveAt });
 const demos = [];
 let demoId = 0;
 const addDemo = (u, l, status, extra = {}) => demos.push({ id: ++demoId, userId: u.id, employee: u.fullName, employeeState: u.state, leadId: l ? l.id : null,
@@ -97,12 +100,13 @@ const handlers = {
     const u = users.find((x) => x.username === String(p.username).toLowerCase() && x.status !== 'removed');
     if (!u) throw err('Invalid username or password.', 401);
     if (u.status === 'locked') throw err('Your access has been locked by the admin. Please contact them.', 403);
-    const t = 'preview-' + u.id; tokens.set(t, u); return { token: t, user: pub(u) };
+    const t = 'preview-' + u.id; tokens.set(t, u); u.simOnline = true; u.lastLoginAt = iso(Date.now()); return { token: t, user: pub(u) };
   },
-  logout: () => ({ ok: true }),
+  logout: (p, me) => { if (me) me.simOnline = false; return { ok: true }; },
+  ping: () => ({ ok: true }),
   me: (p, me) => ({ user: pub(me) }),
 
-  listTeam: (p, me) => { if (me.role !== 'admin') throw err('Admin only.', 403); return { team: users.filter((u) => u.role === 'employee') }; },
+  listTeam: (p, me) => { if (me.role !== 'admin') throw err('Admin only.', 403); return { team: users.filter((u) => u.role === 'employee').map(withPresence) }; },
   createEmployee: (p) => {
     const username = String(p.username).toLowerCase();
     if (users.some((u) => u.username === username)) throw err('That username is already taken.');
@@ -214,7 +218,7 @@ const handlers = {
     const emps = users.filter((u) => u.role === 'employee' && (me.role === 'admin' || u.id === me.id)).map((u) => {
       const mine = leads.filter((l) => l.userId === u.id);
       const won = mine.filter((l) => l.stage === 'won' && inRange(l.wonAt, p));
-      return { id: u.id, fullName: u.fullName, username: u.username, state: u.state, status: u.status, lastLoginAt: u.lastLoginAt, lastActiveAt: u.lastActiveAt,
+      return { id: u.id, fullName: u.fullName, username: u.username, state: u.state, status: u.status, online: isOnline(u), lastLoginAt: u.lastLoginAt, lastActiveAt: withPresence(u).lastActiveAt,
         leads: mine.filter((l) => inRange(l.createdAt, p)).length, clients: won.length, revenue: won.reduce((s, l) => s + l.dealValue, 0),
         activities: activities.filter((a) => a.userId === u.id && ['call', 'visit', 'meeting', 'follow_up', 'note'].includes(a.type) && inRange(a.createdAt, p)).length };
     });
@@ -239,6 +243,6 @@ export async function mockCall(token, action, payload = {}) {
   await new Promise((r) => setTimeout(r, 120));
   const h = handlers[action];
   if (!h) throw err('Unknown action.', 404);
-  const open = ['setupStatus', 'login', 'logout'];
+  const open = ['setupStatus', 'login'];
   return h(payload, open.includes(action) ? null : userOf(token));
 }

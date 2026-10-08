@@ -3,6 +3,7 @@ import { useApp } from '../state/AppContext.jsx';
 import { PRODUCTS, STAGES } from '../constants.js';
 import { ago, fmtINR, rangePreset } from '../utils.js';
 import { RangeFilter, Stat } from '../components/Bits.jsx';
+import PresenceCard from '../components/PresenceCard.jsx';
 
 const PRESETS = [['all', 'All time', rangePreset('all')], ['today', 'Today', rangePreset('today')], ['7d', '7 days', rangePreset('7d')], ['30d', '30 days', rangePreset('30d')], ['month', 'This month', rangePreset('month')]];
 
@@ -53,6 +54,7 @@ export default function Overview({ onOpenEmployee }){
 
       {isAdmin && (
         <>
+          <PresenceCard onOpenEmployee={onOpenEmployee} />
           <section className="card">
             <h3>By state</h3>
             <div className="table-wrap"><table className="table"><thead><tr><th>State</th><th className="num">Employees</th><th className="num">Leads</th><th className="num">Clients</th><th className="num">Value</th></tr></thead>

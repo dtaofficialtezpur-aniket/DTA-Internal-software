@@ -15,6 +15,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') { http_response_code(204);
 const MAX_FAILED = 5;
 const LOCK_MINUTES = 15;
 const SESSION_HOURS = 12;
+const ONLINE_SECONDS = 120; // no heartbeat for this long = offline (the app pings every 45 s)
 
 class ApiError extends Exception {}
 
@@ -62,8 +63,9 @@ function current_user(PDO $pdo, array $in): array
     if ($u['status'] === 'locked') fail('Your access has been locked by the admin.', 401);
     if ($u['status'] !== 'active') fail('Your access has been removed.', 401);
     // "last active" is refreshed at most once a minute
-    if (!$u['last_active_at'] || strtotime($u['last_active_at']) < time() - 60) {
-        $pdo->prepare("UPDATE users SET last_active_at = ? WHERE id = ?")->execute([now(), $u['id']]);
+    if (!$u['last_active_at'] || strtotime($u['last_active_at']) < time() - 15) {
+        // any live request also clears a logout mark left by another device's logout
+        $pdo->prepare("UPDATE users SET last_active_at = ?, last_logout_at = NULL WHERE id = ?")->execute([now(), $u['id']]);
     }
     return $u;
 }
@@ -80,7 +82,7 @@ function start_session(PDO $pdo, array $u): array
     $token = bin2hex(random_bytes(32));
     $pdo->prepare("INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?,?,?,?)")
         ->execute([hash('sha256', $token), $u['id'], now(), date('Y-m-d H:i:s', time() + SESSION_HOURS * 3600)]);
-    $pdo->prepare("UPDATE users SET last_login_at = ?, last_active_at = ?, failed_attempts = 0, locked_until = NULL WHERE id = ?")
+    $pdo->prepare("UPDATE users SET last_login_at = ?, last_active_at = ?, last_logout_at = NULL, failed_attempts = 0, locked_until = NULL WHERE id = ?")
         ->execute([now(), now(), $u['id']]);
     $pdo->prepare("DELETE FROM sessions WHERE expires_at < ?")->execute([now()]);
     return ['token' => $token, 'user' => public_user($u)];
@@ -155,8 +157,21 @@ function a_me(PDO $pdo, array $in): void { out(['user' => public_user(current_us
 
 function a_logout(PDO $pdo, array $in): void
 {
-    $pdo->prepare("DELETE FROM sessions WHERE token_hash = ?")->execute([hash('sha256', (string)($in['token'] ?? ''))]);
+    $hash = hash('sha256', (string)($in['token'] ?? ''));
+    // Logging out marks the person offline right away instead of waiting for the heartbeat to time out.
+    $pdo->prepare("UPDATE users SET last_logout_at = ? WHERE id = (SELECT user_id FROM sessions WHERE token_hash = ?)")->execute([now(), $hash]);
+    $pdo->prepare("DELETE FROM sessions WHERE token_hash = ?")->execute([$hash]);
     out(['ok' => true]);
+}
+
+// Heartbeat: the open app calls this every ~45 s. current_user() records the activity time.
+function a_ping(PDO $pdo, array $in): void { current_user($pdo, $in); out(['ok' => true]); }
+
+// Online = active account, heard from within ONLINE_SECONDS, and not logged out (login / any live request clears the mark).
+function is_online(array $r): bool
+{
+    if (($r['status'] ?? '') !== 'active' || empty($r['last_active_at']) || !empty($r['last_logout_at'])) return false;
+    return strtotime($r['last_active_at']) >= time() - ONLINE_SECONDS;
 }
 
 // ---------- team (admin only) ----------
@@ -252,11 +267,11 @@ function a_removeEmployee(PDO $pdo, array $in): void
 function a_listTeam(PDO $pdo, array $in): void
 {
     require_admin(current_user($pdo, $in));
-    $rows = $pdo->query("SELECT id, username, full_name, state, status, created_at, locked_at, last_login_at, last_active_at
+    $rows = $pdo->query("SELECT id, username, full_name, state, status, created_at, locked_at, last_login_at, last_active_at, last_logout_at
                          FROM users WHERE role = 'employee' ORDER BY FIELD(status, 'active', 'locked', 'removed'), full_name")->fetchAll();
     out(['team' => array_map(fn($r) => [
         'id' => (int)$r['id'], 'username' => $r['username'], 'fullName' => $r['full_name'], 'state' => $r['state'], 'status' => $r['status'],
-        'createdAt' => iso($r['created_at']), 'lockedAt' => iso($r['locked_at']), 'lastLoginAt' => iso($r['last_login_at']), 'lastActiveAt' => iso($r['last_active_at']),
+        'online' => is_online($r), 'createdAt' => iso($r['created_at']), 'lockedAt' => iso($r['locked_at']), 'lastLoginAt' => iso($r['last_login_at']), 'lastActiveAt' => iso($r['last_active_at']),
     ], $rows)]);
 }
 
@@ -618,12 +633,12 @@ function a_stats(PDO $pdo, array $in): void
 
     $userSql = "role = 'employee'"; $up = [];
     if ($u['role'] !== 'admin') { $userSql .= ' AND id = ?'; $up[] = $u['id']; }
-    $st = $pdo->prepare("SELECT id, full_name, username, state, status, last_login_at, last_active_at FROM users WHERE $userSql ORDER BY full_name");
+    $st = $pdo->prepare("SELECT id, full_name, username, state, status, last_login_at, last_active_at, last_logout_at FROM users WHERE $userSql ORDER BY full_name");
     $st->execute($up);
     $emps = [];
     foreach ($st->fetchAll() as $r) {
         $emps[(int)$r['id']] = ['id' => (int)$r['id'], 'fullName' => $r['full_name'], 'username' => $r['username'],
-            'state' => $r['state'], 'status' => $r['status'], 'lastLoginAt' => iso($r['last_login_at']), 'lastActiveAt' => iso($r['last_active_at']),
+            'state' => $r['state'], 'status' => $r['status'], 'online' => is_online($r), 'lastLoginAt' => iso($r['last_login_at']), 'lastActiveAt' => iso($r['last_active_at']),
             'leads' => 0, 'clients' => 0, 'revenue' => 0.0, 'activities' => 0];
     }
     $scope = $u['role'] === 'admin' ? '' : ' AND user_id = ' . (int)$u['id'];

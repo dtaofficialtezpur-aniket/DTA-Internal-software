@@ -27,6 +27,7 @@ export default function Team({ onOpen }){
 
   const load = useCallback(() => { call('listTeam').then((d) => setTeam(d.team)).catch((e) => showToast(e.message, 'err')); }, [call, showToast]);
   useEffect(load, [load]);
+  useEffect(() => { const id = setInterval(load, 30000); return () => clearInterval(id); }, [load]); // keep Online / Offline fresh
 
   const openAdd = () => { setF({ fullName: '', username: '', state: '', password: generatePassword() }); setAdding(true); };
   function create(e){
@@ -64,15 +65,16 @@ export default function Team({ onOpen }){
       <p className="muted" style={{ margin: 0 }}>Only you can create logins. Give each employee their login ID and password; use <b>Lock</b> to block someone instantly and <b>Unlock</b> to let them back in.</p>
       <div className="card table-wrap">
         <table className="table">
-          <thead><tr><th>Employee</th><th>Login ID</th><th>State</th><th>Access</th><th>Last login</th><th>Last active</th><th /></tr></thead>
+          <thead><tr><th>Employee</th><th>Login ID</th><th>State</th><th>Online</th><th>Access</th><th>Last login</th><th>Last seen</th><th /></tr></thead>
           <tbody>
             {team.map((t) => {
               const [label, tone] = STATUS[t.status] || [t.status, ''];
               return (
                 <tr key={t.id} className={t.status === 'removed' ? 'dim' : ''}>
                   <td><b>{t.fullName}</b></td><td className="mono">{t.username}</td><td>{t.state}</td>
+                  <td>{t.status === 'active' ? <span className={'presence ' + (t.online ? 'on' : 'off')}>{t.online ? 'Online' : 'Offline'}</span> : <span className="muted">—</span>}</td>
                   <td><span className={'pill ' + tone}>{label}</span>{t.status === 'locked' && t.lockedAt && <div className="muted small">since {fmtDateTime(t.lockedAt)}</div>}</td>
-                  <td>{fmtDateTime(t.lastLoginAt)}</td><td>{ago(t.lastActiveAt)}</td>
+                  <td>{fmtDateTime(t.lastLoginAt)}</td><td>{t.online ? 'now' : ago(t.lastActiveAt)}</td>
                   <td className="num actions-cell">
                     <button className="link" onClick={() => onOpen('leads', t.id)}>Leads</button>
                     <button className="link" onClick={() => onOpen('activity', t.id)}>Activity</button>
@@ -84,7 +86,7 @@ export default function Team({ onOpen }){
                   </td>
                 </tr>);
             })}
-            {!team.length && <tr><td colSpan="7" className="muted">No employees yet. Create one login per salesperson to get started.</td></tr>}
+            {!team.length && <tr><td colSpan="8" className="muted">No employees yet. Create one login per salesperson to get started.</td></tr>}
           </tbody>
         </table>
       </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { PREVIEW_LOGINS } from '../preview/logins.js';
-import logo from '../assets/dta-logo.png';
+import Logo from './Logo.jsx';
 
 // Employees cannot create or change their own login -- the admin does that (Sales team page).
 // The only sign-up here is the one-time owner account, protected by the admin key from config.php.
@@ -30,7 +30,7 @@ export default function AuthScreen(){
   return (
     <div className="auth-shell">
       <form className="card auth-card" onSubmit={submit}>
-        <div className="brand" style={{ marginBottom: 18 }}><img src={logo} alt="" width="34" height="34" /><div><div className="brand-name">DTA</div><div className="brand-sub">Sales</div></div></div>
+        <div className="auth-logo"><Logo variant="full" width={210} /></div>
         <h2>{panel === 'login' ? 'Log in' : 'Create the admin account'}</h2>
         {panel === 'register' && <label>Admin key<input type="password" required value={f.adminKey} onChange={set('adminKey')} autoComplete="off" /></label>}
         {panel === 'register' && <label>Your name<input required value={f.fullName} onChange={set('fullName')} /></label>}
