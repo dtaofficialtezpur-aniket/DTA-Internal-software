@@ -2,6 +2,8 @@ name: Build sales desktop app
 
 on:
   push:
+    branches:
+      - claude/ecstatic-rubin-05pt7w # TEMPORARY: lets this branch build before the workflow reaches the default branch
     tags:
       - 'sales-v*.*.*'
   # Trigger a build+publish manually (Actions tab, or the actions_run_trigger tool) --
@@ -55,7 +57,7 @@ jobs:
 
       - name: Build installers
         working-directory: sales-app/desktop
-        run: npx electron-builder --publish ${{ (github.event_name == 'push' || inputs.publish) && 'always' || 'never' }}
+        run: npx electron-builder --publish ${{ (startsWith(github.ref, 'refs/tags/') || inputs.publish) && 'always' || 'never' }}
         env:
           # Publishing goes to a separate repo (DTA-Sales-Releases); the default GITHUB_TOKEN can only
           # write to this repo, so it needs a PAT scoped to that one. Repo secret: RELEASES_REPO_TOKEN.
