@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
-import { DEMO_MODES, PRODUCTS, STATES } from '../constants.js';
+import { DEMO_MODES, PRODUCTS, STAGES, STATES } from '../constants.js';
 import { todayStr } from '../utils.js';
 import { Modal } from './Bits.jsx';
 
@@ -29,7 +29,7 @@ export default function DemoRequestModal({ lead, leads = [], onClose, onSaved })
       <form className="form-grid" onSubmit={submit}>
         {!lead && leads.length > 0 && (
           <label className="span2">For one of my leads (optional)
-            <select value={f.leadId} onChange={pickLead}><option value="">— new / not in my leads —</option>{leads.filter((l) => l.stage !== 'lost').map((l) => <option key={l.id} value={l.id}>{l.name} · {l.state}</option>)}</select>
+            <select value={f.leadId} onChange={pickLead}><option value="">— new / not in my leads —</option>{leads.filter((l) => l.stage !== 'lost').map((l) => <option key={l.id} value={l.id}>{l.name}{l.city ? ' · ' + l.city : ''} · {STAGES[l.stage]}</option>)}</select>
           </label>
         )}
         <label className="span2">Client / business name *<input required value={f.clientName} onChange={set('clientName')} /></label>

@@ -29,7 +29,7 @@ const stages = ['new', 'contacted', 'demo', 'negotiation', 'won', 'lost'];
 
 const leads = [];
 const activities = [];
-let actId = 0, leadId = 0;
+let actId = 0, leadId = 0, nameCounter = 0;
 const addAct = (userId, lead, type, note, ts) => activities.push({ id: ++actId, userId, leadId: lead ? lead.id : null, leadName: lead ? lead.name : null, type, note, createdAt: iso(ts) });
 
 users.filter((u) => u.role === 'employee').forEach((u) => {
@@ -40,13 +40,14 @@ users.filter((u) => u.role === 'employee').forEach((u) => {
     const created = now - Math.floor(rnd() * 40) * DAY - Math.floor(rnd() * DAY);
     const est = Math.round((15 + rnd() * 185) / 5) * 1000;
     const lead = {
-      id: ++leadId, userId: u.id, employee: u.fullName, name: pick(businesses), contactPerson: pick(['Mr. Verma', 'Ms. Joshi', 'Mr. Reddy', 'Ms. Bose']),
+      id: ++leadId, userId: u.id, employee: u.fullName, name: businesses[nameCounter % businesses.length] + (nameCounter >= businesses.length ? ' ' + (Math.floor(nameCounter / businesses.length) + 1) : ''), contactPerson: pick(['Mr. Verma', 'Ms. Joshi', 'Mr. Reddy', 'Ms. Bose']),
       phone: '9' + String(Math.floor(100000000 + rnd() * 899999999)), email: null, state: u.state, city: pick(['Tezpur', 'Guwahati', 'Kochi', 'Lucknow', 'Pune', 'Ludhiana', 'Chennai', 'Surat', 'Kolkata']),
       productType, productName: pick(products[productType]), stage, estValue: est, dealValue: null,
       nextFollowup: ['won', 'lost'].includes(stage) ? null : dateStr(now + Math.floor(rnd() * 9 - 3) * DAY), notes: 'Interested; asked for a quote.',
       createdAt: iso(created), updatedAt: iso(created + 2 * DAY), wonAt: null,
     };
     if (stage === 'won') { lead.dealValue = Math.round(est * (0.85 + rnd() * 0.2) / 500) * 500; lead.wonAt = iso(Math.min(now - 3600000, created + (3 + rnd() * 10) * DAY)); }
+    nameCounter++;
     leads.push(lead);
     addAct(u.id, lead, 'lead_added', `New ${productType} lead in ${u.state}`, created);
     if (stage !== 'new') addAct(u.id, lead, pick(['call', 'visit', 'meeting']), pick(['Discussed requirements', 'Showed a demo', 'Shared the price quote']), created + DAY);
