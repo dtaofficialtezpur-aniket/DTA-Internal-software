@@ -7,7 +7,12 @@ on:
   # Trigger a build+publish manually (Actions tab, or the actions_run_trigger tool) --
   # electron-builder creates the git tag and the GitHub Release itself, from the version
   # already in desktop/package.json, so nothing needs to push a tag first.
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to the releases repo (needs RELEASES_REPO_TOKEN). Leave off to just build downloadable installers.'
+        type: boolean
+        default: false
 
 permissions:
   contents: write # needed so electron-builder can publish to GitHub Releases
@@ -21,6 +26,7 @@ jobs:
       # the assets across two separate draft releases instead of one. A job
       # running after the first has a real release to find and attach to.
       max-parallel: 1
+      fail-fast: false
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
@@ -47,12 +53,21 @@ jobs:
         working-directory: sales-app/dashboard
         run: npm run build
 
-      - name: Build and publish
+      - name: Build installers
         working-directory: sales-app/desktop
-        run: npx electron-builder --publish always
+        run: npx electron-builder --publish ${{ (github.event_name == 'push' || inputs.publish) && 'always' || 'never' }}
         env:
-          # Releases now go to a separate repo (DTA-Sales-Releases),
-          # not this one -- the default GITHUB_TOKEN only has write access to the
-          # repo the workflow itself runs in, so publishing needs a PAT scoped to
-          # that other repo instead. Set as a repo secret here named RELEASES_REPO_TOKEN.
+          # Publishing goes to a separate repo (DTA-Sales-Releases); the default GITHUB_TOKEN can only
+          # write to this repo, so it needs a PAT scoped to that one. Repo secret: RELEASES_REPO_TOKEN.
           GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+
+      - name: Upload installers (download from the run page)
+        uses: actions/upload-artifact@v4
+        with:
+          name: dta-sales-${{ matrix.os }}
+          path: |
+            sales-app/desktop/release/*.exe
+            sales-app/desktop/release/*.dmg
+            sales-app/desktop/release/*.AppImage
+          if-no-files-found: error
+          retention-days: 30

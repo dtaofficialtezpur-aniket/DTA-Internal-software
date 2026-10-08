@@ -24,12 +24,39 @@
   "build": {
     "appId": "in.dtaonline.sales",
     "productName": "DTA Sales",
-    "files": ["main.js", "preload.js"],
-    "extraResources": [{ "from": "../dashboard/dist", "to": "dashboard" }],
-    "directories": { "output": "release" },
-    "publish": [{ "provider": "github", "owner": "dtaofficialtezpur-aniket", "repo": "DTA-Sales-Releases" }],
-    "win": { "target": "nsis" },
-    "mac": { "target": "dmg", "category": "public.app-category.business" },
-    "linux": { "target": "AppImage" }
+    "files": [
+      "main.js",
+      "preload.js"
+    ],
+    "extraResources": [
+      {
+        "from": "../dashboard/dist",
+        "to": "dashboard"
+      }
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "dtaofficialtezpur-aniket",
+        "repo": "DTA-Sales-Releases"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "../dashboard/public/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.business",
+      "icon": "../dashboard/public/icon.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "../dashboard/public/icon.png"
+    },
+    "artifactName": "DTA-Sales-${version}-${os}-${arch}.${ext}"
   }
 }
