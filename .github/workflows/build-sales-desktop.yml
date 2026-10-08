@@ -2,6 +2,8 @@ name: Build sales desktop app
 
 on:
   push:
+    branches:
+      - claude/ecstatic-rubin-05pt7w # TEMPORARY: lets this branch build before the workflow reaches the default branch
     tags:
       - 'sales-v*.*.*'
   # Trigger a build+publish manually (Actions tab, or the actions_run_trigger tool) --
