@@ -494,6 +494,29 @@ function a_stats(PDO $pdo, array $in): void
          'byProduct' => array_values($byProduct), 'pipeline' => $pipeline, 'followupsDue' => $due]);
 }
 
+// ---------- backup (admin) ----------
+
+function a_exportAll(PDO $pdo, array $in): void
+{
+    require_admin(current_user($pdo, $in));
+    $leads = $pdo->query("SELECT l.*, u.full_name AS employee_name FROM leads l JOIN users u ON u.id = l.user_id ORDER BY l.id")->fetchAll();
+    $acts = $pdo->query("SELECT a.*, u.full_name AS employee_name, u.state AS employee_state FROM activities a JOIN users u ON u.id = a.user_id ORDER BY a.id")->fetchAll();
+    $team = $pdo->query("SELECT id, username, full_name, state, status, created_at, last_login_at, last_active_at FROM users WHERE role = 'employee' ORDER BY id")->fetchAll();
+    out([
+        'exportedAt' => iso(now()),
+        'leads' => array_map('lead_row', $leads),
+        'activities' => array_map(fn($r) => [
+            'id' => (int)$r['id'], 'userId' => (int)$r['user_id'], 'employee' => $r['employee_name'], 'state' => $r['employee_state'],
+            'leadId' => $r['lead_id'] === null ? null : (int)$r['lead_id'], 'leadName' => $r['lead_name'],
+            'type' => $r['type'], 'note' => $r['note'], 'createdAt' => iso($r['created_at']),
+        ], $acts),
+        'employees' => array_map(fn($r) => [
+            'id' => (int)$r['id'], 'username' => $r['username'], 'fullName' => $r['full_name'], 'state' => $r['state'], 'status' => $r['status'],
+            'createdAt' => iso($r['created_at']), 'lastLoginAt' => iso($r['last_login_at']), 'lastActiveAt' => iso($r['last_active_at']),
+        ], $team),
+    ]); // never includes PIN hashes, setup codes or sessions
+}
+
 // ---------- dispatch ----------
 
 try {

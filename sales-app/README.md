@@ -11,3 +11,7 @@ Layout: `desktop/` (Electron app employees install — see `desktop/README.md`),
 ## Preview mode (no backend needed)
 
 `cd dashboard && npm install && npm run preview:dev` opens the app on sample data (switch between Admin and two employees on the login screen). Nothing is saved. `npm run build:preview` makes a static copy in `dist-preview/`. The normal `npm run build` contains none of this code.
+
+## Backup on the admin's computer
+
+Sales team page → **Backup to this computer** (admin only): Leads / Activity / Employees as Excel-friendly CSV, or one full JSON backup. The live data stays on the server so employees can work any time; this is your own copy. PINs and setup codes are never included.

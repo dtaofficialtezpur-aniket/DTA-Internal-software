@@ -3,6 +3,7 @@ import { useApp } from '../state/AppContext.jsx';
 import { STATES } from '../constants.js';
 import { ago, fmtDateTime } from '../utils.js';
 import { Modal } from '../components/Bits.jsx';
+import { downloadBackup } from '../backup.js';
 
 export default function Team({ onOpen }){
   const { call, showToast } = useApp();
@@ -23,6 +24,11 @@ export default function Team({ onOpen }){
     e.preventDefault();
     call('updateEmployee', { userId: editing.id, fullName: editing.fullName, state: editing.state }).then(() => { setEditing(null); load(); }).catch((err) => showToast(err.message, 'err'));
   }
+  const [exporting, setExporting] = useState(false);
+  const backup = (kind) => {
+    setExporting(true);
+    call('exportAll').then((d) => { downloadBackup(kind, d); showToast('Backup downloaded.'); }).catch((e) => showToast(e.message, 'err')).finally(() => setExporting(false));
+  };
   const resetPin = (t) => confirm(`Reset ${t.fullName}'s PIN? They'll be logged out and need a new setup code.`) &&
     call('resetEmployeePin', { userId: t.id }).then((d) => { setCode({ username: t.username, setupCode: d.setupCode }); load(); }).catch((e) => showToast(e.message, 'err'));
   const remove = (t) => confirm(`Remove ${t.fullName}? They lose access immediately. Their leads and history stay visible to you.`) &&
@@ -54,6 +60,17 @@ export default function Team({ onOpen }){
           </tbody>
         </table>
       </div>
+
+      <section className="card">
+        <h3>Backup to this computer</h3>
+        <p className="muted">Downloads a copy of all sales data to your computer. CSV files open in Excel; the full backup (JSON) holds everything in one file. PINs are never included.</p>
+        <div className="filters">
+          <button className="btn" disabled={exporting} onClick={() => backup('leads')}>Leads (CSV)</button>
+          <button className="btn" disabled={exporting} onClick={() => backup('activities')}>Activity (CSV)</button>
+          <button className="btn" disabled={exporting} onClick={() => backup('employees')}>Employees (CSV)</button>
+          <button className="btn primary" disabled={exporting} onClick={() => backup('full')}>Full backup (JSON)</button>
+        </div>
+      </section>
 
       {adding && (
         <Modal title="Add sales employee" onClose={() => setAdding(false)}>

@@ -124,6 +124,12 @@ const handlers = {
     addAct(me.id, l, p.type, p.note, Date.now()); return { ok: true };
   },
 
+  exportAll: (p, me) => {
+    if (me.role !== 'admin') throw err('Admin only.', 403);
+    return { exportedAt: iso(Date.now()), leads, employees: users.filter((u) => u.role === 'employee'),
+      activities: activities.map((a) => ({ ...a, employee: nameOf(a.userId), state: users.find((u) => u.id === a.userId)?.state })) };
+  },
+
   stats: (p, me) => {
     const emps = users.filter((u) => u.role === 'employee' && (me.role === 'admin' || u.id === me.id)).map((u) => {
       const mine = leads.filter((l) => l.userId === u.id);
