@@ -1,0 +1,5 @@
+# Apache (Hostinger): never serve secrets or internals, no directory listings.
+Options -Indexes
+<FilesMatch "^(config\.php|config\.example\.php|db\.php|schema\.sql|SETUP\.md)$">
+    Require all denied
+</FilesMatch>

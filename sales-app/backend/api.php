@@ -121,7 +121,7 @@ function a_register(PDO $pdo, array $in): void
 {
     $cfg = get_config();
     $key = (string)($cfg['admin_key'] ?? '');
-    if ($key === '' || $key === 'change-me-to-a-long-random-string') fail('Set admin_key in config.php first.', 500);
+    if (strlen($key) < 16 || $key === 'change-me-to-a-long-random-string') fail('Set a long admin_key (16+ characters) in config.php first.', 500);
     if (!hash_equals($key, (string)($in['adminKey'] ?? ''))) fail('Wrong admin key.', 403);
     $name = str_field($in, 'fullName', 255, true);
     $username = valid_username((string)($in['username'] ?? ''));
@@ -520,6 +520,8 @@ function a_exportAll(PDO $pdo, array $in): void
 // ---------- dispatch ----------
 
 try {
+    // Opening api.php in a browser (GET) answers without touching the database -- handy for checking the URL.
+    if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET') out(['ok' => true, 'service' => 'dta-sales-api']);
     $raw = file_get_contents('php://input');
     $in = json_decode($raw ?: '', true);
     if (!is_array($in)) fail('Invalid request.');
