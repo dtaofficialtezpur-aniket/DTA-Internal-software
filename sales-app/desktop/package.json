@@ -1,0 +1,35 @@
+{
+  "name": "dta-sales",
+  "productName": "DTA Sales",
+  "version": "1.0.0",
+  "description": "DTA sales team desktop app: leads, clients and activity per state.",
+  "private": true,
+  "author": "DTA",
+  "main": "main.js",
+  "scripts": {
+    "build:dashboard": "npm --prefix ../dashboard install && npm --prefix ../dashboard run build",
+    "start": "npm run build:dashboard && electron .",
+    "dist": "npm run build:dashboard && electron-builder",
+    "dist:win": "npm run build:dashboard && electron-builder --win",
+    "dist:mac": "npm run build:dashboard && electron-builder --mac",
+    "dist:linux": "npm run build:dashboard && electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "build": {
+    "appId": "in.dtaonline.sales",
+    "productName": "DTA Sales",
+    "files": ["main.js", "preload.js"],
+    "extraResources": [{ "from": "../dashboard/dist", "to": "dashboard" }],
+    "directories": { "output": "release" },
+    "publish": [{ "provider": "github", "owner": "dtaofficialtezpur-aniket", "repo": "DTA-Sales-Releases" }],
+    "win": { "target": "nsis" },
+    "mac": { "target": "dmg", "category": "public.app-category.business" },
+    "linux": { "target": "AppImage" }
+  }
+}

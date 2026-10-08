@@ -1,0 +1,58 @@
+name: Build sales desktop app
+
+on:
+  push:
+    tags:
+      - 'sales-v*.*.*'
+  # Trigger a build+publish manually (Actions tab, or the actions_run_trigger tool) --
+  # electron-builder creates the git tag and the GitHub Release itself, from the version
+  # already in desktop/package.json, so nothing needs to push a tag first.
+  workflow_dispatch: {}
+
+permissions:
+  contents: write # needed so electron-builder can publish to GitHub Releases
+
+jobs:
+  build:
+    strategy:
+      # One at a time, not in parallel. When the release for this tag doesn't
+      # exist yet, each electron-builder run that finds no existing release
+      # creates its own -- running all 3 platforms at once raced and split
+      # the assets across two separate draft releases instead of one. A job
+      # running after the first has a real release to find and attach to.
+      max-parallel: 1
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            sales-app/desktop/package-lock.json
+            sales-app/dashboard/package-lock.json
+
+      - name: Install desktop dependencies
+        working-directory: sales-app/desktop
+        run: npm ci
+
+      - name: Install dashboard dependencies
+        working-directory: sales-app/dashboard
+        run: npm ci
+
+      - name: Build dashboard (React app electron-builder packages)
+        working-directory: sales-app/dashboard
+        run: npm run build
+
+      - name: Build and publish
+        working-directory: sales-app/desktop
+        run: npx electron-builder --publish always
+        env:
+          # Releases now go to a separate repo (DTA-Sales-Releases),
+          # not this one -- the default GITHUB_TOKEN only has write access to the
+          # repo the workflow itself runs in, so publishing needs a PAT scoped to
+          # that other repo instead. Set as a repo secret here named RELEASES_REPO_TOKEN.
+          GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}

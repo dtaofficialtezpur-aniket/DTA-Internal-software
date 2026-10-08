@@ -1,8 +1,12 @@
+import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import logo from '../assets/dta-logo.png';
 
 export default function Sidebar({ page, onNavigate }){
   const { user, logout } = useApp();
+  // Only present inside the desktop app: shows a button once an update has finished downloading.
+  const [update, setUpdate] = useState(null);
+  useEffect(() => { window.electronAPI?.onUpdateReady?.((info) => setUpdate(info)); }, []);
   const items = [
     ['overview', user.role === 'admin' ? 'Overview' : 'My dashboard'],
     ['leads', user.role === 'admin' ? 'All leads' : 'My leads'],
@@ -18,6 +22,7 @@ export default function Sidebar({ page, onNavigate }){
         ))}
       </nav>
       <div className="sidebar-foot">
+        {update && <button className="btn primary" onClick={() => window.electronAPI.installUpdate()}>Restart to update ({update.version})</button>}
         <div className="who"><strong>{user.fullName}</strong><span>{user.role === 'admin' ? 'Admin' : user.state}</span></div>
         <button className="btn ghost" onClick={logout}>Log out</button>
       </div>
