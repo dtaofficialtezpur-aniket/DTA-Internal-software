@@ -153,7 +153,7 @@ function require_admin_session(PDO $pdo, ?string $token): array
 // rather than climbing forever. Finds the lowest free number across both
 // tables. Existing clients keep their older DTA-CL-xxxx/DTA-NC-xxxx ids
 // -- this only applies going forward.
-function gen_shared_client_id(PDO $pdo): string
+function peek_next_client_id(PDO $pdo): string
 {
     $stmt = $pdo->prepare('SELECT 1 FROM clients WHERE id = ? UNION SELECT 1 FROM normal_clients WHERE id = ?');
     for ($n = 1; ; $n++) {
@@ -161,6 +161,16 @@ function gen_shared_client_id(PDO $pdo): string
         $stmt->execute([$id, $id]);
         if (!$stmt->fetchColumn()) return $id;
     }
+}
+
+// Same lookup as peek_next_client_id() -- there's no separate reservation
+// step, so two people adding a client in the same instant could in theory
+// race for the same number, in which case the second INSERT just fails on
+// the primary key and that person retries. Not worth more machinery for a
+// small team's usage pattern.
+function gen_shared_client_id(PDO $pdo): string
+{
+    return peek_next_client_id($pdo);
 }
 
 function gen_api_key(): string
@@ -187,6 +197,14 @@ function find_client(PDO $pdo, string $id): ?array
     return $row ?: null;
 }
 
+// Decodes the archived_data column -- the other type's fields, saved off
+// when a client was converted away from that type, so converting back
+// restores them exactly. Null if this client has never been converted.
+function decode_archived_data(array $c): ?array
+{
+    return !empty($c['archived_data']) ? json_decode($c['archived_data'], true) : null;
+}
+
 function client_to_json(array $c): array
 {
     return [
@@ -201,6 +219,7 @@ function client_to_json(array $c): array
         'grace' => (int) $c['grace_days'],
         'status' => $c['status'],
         'pausedAt' => $c['paused_at'],
+        'archivedNormalData' => decode_archived_data($c),
     ];
 }
 
@@ -226,6 +245,7 @@ function normal_client_to_json(array $c): array
         'remainingPayment' => (float) $c['remaining_payment'],
         'notes' => $c['notes'],
         'createdAt' => $c['created_at'],
+        'archivedSubscriptionData' => decode_archived_data($c),
     ];
 }
 
@@ -374,6 +394,18 @@ if ($method === 'GET') {
         case 'deleteClient':
             require_session($pdo, $body['token'] ?? null);
             handle_delete_client($pdo, $body);
+            break;
+        case 'peekNextClientId':
+            require_session($pdo, $body['token'] ?? null);
+            json_out(['ok' => true, 'id' => peek_next_client_id($pdo)]);
+            break;
+        case 'convertToSubscription':
+            require_session($pdo, $body['token'] ?? null);
+            handle_convert_to_subscription($pdo, $body);
+            break;
+        case 'convertToNormal':
+            require_session($pdo, $body['token'] ?? null);
+            handle_convert_to_normal($pdo, $body);
             break;
         case 'addNormalClient':
             require_session($pdo, $body['token'] ?? null);
@@ -926,6 +958,122 @@ function handle_delete_client(PDO $pdo, array $body): void
     $del->execute([$id]);
 
     json_out(['ok' => true]);
+}
+
+/* ---------------- converting between client types ----------------
+ * Moves a client's row from one table to the other, keeping its id and
+ * name. Whatever fields don't exist on the new type get saved into the
+ * row's own archived_data column, so converting back restores them
+ * exactly -- including, for subscription clients, the original API key,
+ * so a license that depended on it keeps working again after an undo.
+ * History rows aren't touched at all: they're keyed by this same id, so
+ * they stay attached regardless of which table currently owns it.
+ */
+
+function handle_convert_to_subscription(PDO $pdo, array $body): void
+{
+    $id = (string) ($body['id'] ?? '');
+    $c = find_normal_client($pdo, $id);
+    if (!$c) json_out(['error' => 'Normal client not found: ' . $id]);
+
+    $archived = decode_archived_data($c);
+    if ($archived && ($archived['_type'] ?? '') === 'subscription') {
+        // Undoing a previous subscription->normal conversion: restore
+        // everything exactly, API key included.
+        $apiKey = $archived['apiKey'];
+        $software = $archived['software'];
+        $cycle = $archived['cycle'];
+        $amount = (float) $archived['amount'];
+        $start = $archived['start'];
+        $nextDue = $archived['nextDue'];
+        $grace = (int) $archived['grace'];
+        $status = $archived['status'];
+        $pausedAt = $archived['pausedAt'];
+    } else {
+        $software = trim((string) ($body['software'] ?? ''));
+        if ($software === '') {
+            json_out(['error' => 'Software name is required.']);
+        }
+        $amount = (float) ($body['amount'] ?? $c['total_amount']);
+        if ($amount <= 0) {
+            json_out(['error' => 'Plan amount must be greater than zero.']);
+        }
+        $apiKey = gen_api_key();
+        $cycle = ($body['cycle'] ?? '') === 'Annual' ? 'Annual' : 'Monthly';
+        $start = !empty($body['start']) ? $body['start'] : date('Y-m-d');
+        $settings = get_all_settings($pdo);
+        $grace = isset($body['grace']) ? (int) $body['grace'] : $settings['defaultGrace'];
+        $days = $cycle === 'Annual' ? 365 : 30;
+        $nextDue = date('Y-m-d', strtotime("{$start} +{$days} days"));
+        $status = 'active';
+        $pausedAt = null;
+    }
+
+    $archiveNormal = json_encode([
+        '_type' => 'normal',
+        'address' => $c['address'], 'contact' => $c['contact'],
+        'totalAmount' => (float) $c['total_amount'], 'advancePayment' => (float) $c['advance_payment'],
+        'notes' => $c['notes'], 'createdAt' => $c['created_at'],
+    ]);
+
+    $pdo->beginTransaction();
+    $pdo->prepare('DELETE FROM normal_clients WHERE id = ?')->execute([$id]);
+    $stmt = $pdo->prepare('
+        INSERT INTO clients (id, api_key, client_name, software, cycle, amount, start_date, next_due, grace_days, status, paused_at, archived_data)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ');
+    $stmt->execute([$id, $apiKey, $c['client_name'], $software, $cycle, $amount, $start, $nextDue, $grace, $status, $pausedAt, $archiveNormal]);
+    $pdo->commit();
+
+    log_event($pdo, $id, 'converted', 'Converted from normal client to subscription client');
+    json_out(['ok' => true, 'client' => client_to_json(find_client($pdo, $id))]);
+}
+
+function handle_convert_to_normal(PDO $pdo, array $body): void
+{
+    $id = (string) ($body['id'] ?? '');
+    $c = find_client($pdo, $id);
+    if (!$c) json_out(['error' => 'Subscription client not found: ' . $id]);
+
+    $archived = decode_archived_data($c);
+    if ($archived && ($archived['_type'] ?? '') === 'normal') {
+        $address = $archived['address'];
+        $contact = $archived['contact'];
+        $totalAmount = (float) $archived['totalAmount'];
+        $advancePayment = (float) $archived['advancePayment'];
+        $notes = $archived['notes'];
+        $createdAt = $archived['createdAt'] ?? null;
+    } else {
+        $address = substr((string) ($body['address'] ?? ''), 0, 2000);
+        $contact = substr((string) ($body['contact'] ?? ''), 0, 255);
+        $totalAmount = max(0, (float) ($body['totalAmount'] ?? $c['amount']));
+        $advancePayment = max(0, (float) ($body['advancePayment'] ?? 0));
+        if ($advancePayment > $totalAmount) {
+            json_out(['error' => 'Advance payment cannot be more than the total amount.']);
+        }
+        $notes = substr((string) ($body['notes'] ?? ''), 0, 2000);
+        $createdAt = null;
+    }
+    $remainingPayment = max(0, $totalAmount - $advancePayment);
+
+    $archiveSub = json_encode([
+        '_type' => 'subscription',
+        'apiKey' => $c['api_key'], 'software' => $c['software'], 'cycle' => $c['cycle'],
+        'amount' => (float) $c['amount'], 'start' => $c['start_date'], 'nextDue' => $c['next_due'],
+        'grace' => (int) $c['grace_days'], 'status' => $c['status'], 'pausedAt' => $c['paused_at'],
+    ]);
+
+    $pdo->beginTransaction();
+    $pdo->prepare('DELETE FROM clients WHERE id = ?')->execute([$id]);
+    $stmt = $pdo->prepare('
+        INSERT INTO normal_clients (id, client_name, address, contact, total_amount, advance_payment, remaining_payment, notes, created_at, archived_data)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ');
+    $stmt->execute([$id, $c['client_name'], $address, $contact, $totalAmount, $advancePayment, $remainingPayment, $notes, $createdAt ?? date('Y-m-d H:i:s'), $archiveSub]);
+    $pdo->commit();
+
+    log_event($pdo, $id, 'converted', 'Converted from subscription client to normal client');
+    json_out(['ok' => true, 'client' => normal_client_to_json(find_normal_client($pdo, $id))]);
 }
 
 function handle_update_settings(PDO $pdo, array $body): void
