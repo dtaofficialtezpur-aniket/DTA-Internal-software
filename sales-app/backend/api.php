@@ -1,0 +1,514 @@
+<?php
+/**
+ * DTA Sales API. One endpoint: POST JSON {action, token?, ...payload}.
+ * Employees only ever see their own leads/activity; the admin sees all.
+ */
+require __DIR__ . '/db.php';
+
+header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('X-Content-Type-Options: nosniff');
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') { http_response_code(204); exit; }
+
+const MAX_FAILED = 5;
+const LOCK_MINUTES = 15;
+const SESSION_HOURS = 12;
+
+class ApiError extends Exception {}
+
+function fail(string $msg, int $code = 400): void { throw new ApiError($msg, $code); }
+function out(array $data): void { echo json_encode($data); exit; }
+function now(): string { return date('Y-m-d H:i:s'); }
+function iso(?string $dt): ?string { return $dt ? str_replace(' ', 'T', $dt) . '+05:30' : null; }
+
+function str_field(array $in, string $k, int $max, bool $required = false): ?string
+{
+    $v = isset($in[$k]) && is_scalar($in[$k]) ? trim((string)$in[$k]) : '';
+    if ($v === '') { if ($required) fail("$k is required."); return null; }
+    if (mb_strlen($v) > $max) fail("$k is too long (max $max characters).");
+    return $v;
+}
+function money_field(array $in, string $k): ?float
+{
+    if (!isset($in[$k]) || $in[$k] === '' || $in[$k] === null) return null;
+    if (!is_numeric($in[$k]) || $in[$k] < 0 || $in[$k] > 9999999999) fail("$k must be a valid amount.");
+    return round((float)$in[$k], 2);
+}
+function date_field(array $in, string $k): ?string
+{
+    $v = isset($in[$k]) ? trim((string)$in[$k]) : '';
+    if ($v === '') return null;
+    $d = DateTime::createFromFormat('Y-m-d', $v);
+    if (!$d || $d->format('Y-m-d') !== $v) fail("$k must be a date (YYYY-MM-DD).");
+    return $v;
+}
+
+// ---------- auth ----------
+
+function current_user(PDO $pdo, array $in): array
+{
+    $token = $in['token'] ?? '';
+    if (!is_string($token) || $token === '') fail('Not logged in.', 401);
+    $st = $pdo->prepare("SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id
+                         WHERE s.token_hash = ? AND s.expires_at > ?");
+    $st->execute([hash('sha256', $token), now()]);
+    $u = $st->fetch();
+    if (!$u) fail('Session expired. Please log in again.', 401);
+    if ($u['status'] !== 'active') fail('Your access has been removed.', 401);
+    // "last active" is refreshed at most once a minute
+    if (!$u['last_active_at'] || strtotime($u['last_active_at']) < time() - 60) {
+        $pdo->prepare("UPDATE users SET last_active_at = ? WHERE id = ?")->execute([now(), $u['id']]);
+    }
+    return $u;
+}
+function require_admin(array $u): void { if ($u['role'] !== 'admin') fail('Admin only.', 403); }
+
+function public_user(array $u): array
+{
+    return ['id' => (int)$u['id'], 'username' => $u['username'], 'fullName' => $u['full_name'],
+            'role' => $u['role'], 'state' => $u['state']];
+}
+
+function start_session(PDO $pdo, array $u): array
+{
+    $token = bin2hex(random_bytes(32));
+    $pdo->prepare("INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?,?,?,?)")
+        ->execute([hash('sha256', $token), $u['id'], now(), date('Y-m-d H:i:s', time() + SESSION_HOURS * 3600)]);
+    $pdo->prepare("UPDATE users SET last_login_at = ?, last_active_at = ?, failed_attempts = 0, locked_until = NULL WHERE id = ?")
+        ->execute([now(), now(), $u['id']]);
+    $pdo->prepare("DELETE FROM sessions WHERE expires_at < ?")->execute([now()]);
+    return ['token' => $token, 'user' => public_user($u)];
+}
+
+function check_lock(array $u): void
+{
+    if ($u['locked_until'] && strtotime($u['locked_until']) > time()) {
+        fail('Too many wrong attempts. Try again in a few minutes.', 429);
+    }
+}
+function register_failure(PDO $pdo, array $u): void
+{
+    $n = (int)$u['failed_attempts'] + 1;
+    $lock = $n >= MAX_FAILED ? date('Y-m-d H:i:s', time() + LOCK_MINUTES * 60) : null;
+    $pdo->prepare("UPDATE users SET failed_attempts = ?, locked_until = ? WHERE id = ?")
+        ->execute([$lock ? 0 : $n, $lock, $u['id']]);
+}
+
+function valid_pin(string $pin): void { if (!preg_match('/^\d{6}$/', $pin)) fail('PIN must be exactly 6 digits.'); }
+function valid_username(string $name): string
+{
+    $name = strtolower($name);
+    if (!preg_match('/^[a-z0-9._-]{3,32}$/', $name)) fail('Username must be 3-32 characters: letters, numbers, dot, dash, underscore.');
+    return $name;
+}
+function new_setup_code(): string
+{
+    $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    $code = '';
+    for ($i = 0; $i < 8; $i++) $code .= $chars[random_int(0, strlen($chars) - 1)];
+    return $code;
+}
+
+function a_setupStatus(PDO $pdo, array $in): void
+{
+    $n = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")->fetchColumn();
+    out(['adminExists' => $n > 0]);
+}
+
+function a_register(PDO $pdo, array $in): void
+{
+    $cfg = get_config();
+    $key = (string)($cfg['admin_key'] ?? '');
+    if ($key === '' || $key === 'change-me-to-a-long-random-string') fail('Set admin_key in config.php first.', 500);
+    if (!hash_equals($key, (string)($in['adminKey'] ?? ''))) fail('Wrong admin key.', 403);
+    $name = str_field($in, 'fullName', 255, true);
+    $username = valid_username((string)($in['username'] ?? ''));
+    $pin = (string)($in['pin'] ?? '');
+    valid_pin($pin);
+    $st = $pdo->prepare("INSERT INTO users (username, full_name, role, status, pin_hash, created_at)
+                         SELECT ?, ?, 'admin', 'active', ?, ? FROM DUAL
+                         WHERE NOT EXISTS (SELECT 1 FROM users WHERE role = 'admin')");
+    $st->execute([$username, $name, password_hash($pin, PASSWORD_DEFAULT), now()]);
+    if ($st->rowCount() === 0) fail('An admin account already exists.', 403);
+    $u = $pdo->query("SELECT * FROM users WHERE role = 'admin' LIMIT 1")->fetch();
+    out(start_session($pdo, $u));
+}
+
+function a_login(PDO $pdo, array $in): void
+{
+    $st = $pdo->prepare("SELECT * FROM users WHERE username = ?");
+    $st->execute([strtolower(trim((string)($in['username'] ?? '')))]);
+    $u = $st->fetch();
+    $bad = 'Invalid username or PIN.';
+    if (!$u || $u['status'] !== 'active' || !$u['pin_hash']) fail($bad, 401);
+    check_lock($u);
+    if (!password_verify((string)($in['pin'] ?? ''), $u['pin_hash'])) { register_failure($pdo, $u); fail($bad, 401); }
+    out(start_session($pdo, $u));
+}
+
+function a_setPin(PDO $pdo, array $in): void
+{
+    $st = $pdo->prepare("SELECT * FROM users WHERE username = ?");
+    $st->execute([strtolower(trim((string)($in['username'] ?? '')))]);
+    $u = $st->fetch();
+    $bad = 'Wrong username or setup code.';
+    if (!$u || $u['status'] !== 'active' || !$u['setup_code_hash']) fail($bad, 401);
+    check_lock($u);
+    if (!password_verify(strtoupper(trim((string)($in['setupCode'] ?? ''))), $u['setup_code_hash'])) { register_failure($pdo, $u); fail($bad, 401); }
+    $pin = (string)($in['pin'] ?? '');
+    valid_pin($pin);
+    $pdo->prepare("UPDATE users SET pin_hash = ?, setup_code_hash = NULL WHERE id = ?")
+        ->execute([password_hash($pin, PASSWORD_DEFAULT), $u['id']]);
+    out(start_session($pdo, $u));
+}
+
+function a_me(PDO $pdo, array $in): void { out(['user' => public_user(current_user($pdo, $in))]); }
+
+function a_logout(PDO $pdo, array $in): void
+{
+    $pdo->prepare("DELETE FROM sessions WHERE token_hash = ?")->execute([hash('sha256', (string)($in['token'] ?? ''))]);
+    out(['ok' => true]);
+}
+
+// ---------- team (admin) ----------
+
+function check_state(?string $s, bool $required): ?string
+{
+    if ($s === null) { if ($required) fail('state is required.'); return null; }
+    if (!in_array($s, STATES, true)) fail('Unknown state.');
+    return $s;
+}
+
+function a_createEmployee(PDO $pdo, array $in): void
+{
+    require_admin(current_user($pdo, $in));
+    $name = str_field($in, 'fullName', 255, true);
+    $username = valid_username((string)($in['username'] ?? ''));
+    $state = check_state(str_field($in, 'state', 64), true);
+    $code = new_setup_code();
+    try {
+        $pdo->prepare("INSERT INTO users (username, full_name, role, state, status, setup_code_hash, created_at)
+                       VALUES (?,?,'employee',?,'active',?,?)")
+            ->execute([$username, $name, $state, password_hash($code, PASSWORD_DEFAULT), now()]);
+    } catch (PDOException $e) {
+        if (($e->errorInfo[1] ?? 0) === 1062) fail('That username is already taken.');
+        throw $e;
+    }
+    out(['username' => $username, 'setupCode' => $code]); // shown to the admin once
+}
+
+function a_resetEmployeePin(PDO $pdo, array $in): void
+{
+    require_admin(current_user($pdo, $in));
+    $id = (int)($in['userId'] ?? 0);
+    $code = new_setup_code();
+    $st = $pdo->prepare("UPDATE users SET pin_hash = NULL, setup_code_hash = ?, failed_attempts = 0, locked_until = NULL
+                         WHERE id = ? AND role = 'employee' AND status = 'active'");
+    $st->execute([password_hash($code, PASSWORD_DEFAULT), $id]);
+    if ($st->rowCount() === 0) fail('Employee not found.', 404);
+    $pdo->prepare("DELETE FROM sessions WHERE user_id = ?")->execute([$id]);
+    out(['setupCode' => $code]);
+}
+
+function a_updateEmployee(PDO $pdo, array $in): void
+{
+    require_admin(current_user($pdo, $in));
+    $id = (int)($in['userId'] ?? 0);
+    $name = str_field($in, 'fullName', 255, true);
+    $state = check_state(str_field($in, 'state', 64), true);
+    $st = $pdo->prepare("UPDATE users SET full_name = ?, state = ? WHERE id = ? AND role = 'employee'");
+    $st->execute([$name, $state, $id]);
+    out(['ok' => true]);
+}
+
+function a_removeEmployee(PDO $pdo, array $in): void
+{
+    require_admin(current_user($pdo, $in));
+    $id = (int)($in['userId'] ?? 0);
+    $st = $pdo->prepare("UPDATE users SET status = 'removed', pin_hash = NULL, setup_code_hash = NULL WHERE id = ? AND role = 'employee'");
+    $st->execute([$id]);
+    if ($st->rowCount() === 0) fail('Employee not found.', 404);
+    $pdo->prepare("DELETE FROM sessions WHERE user_id = ?")->execute([$id]); // kicks them out immediately
+    out(['ok' => true]);
+}
+
+function a_listTeam(PDO $pdo, array $in): void
+{
+    require_admin(current_user($pdo, $in));
+    $rows = $pdo->query("SELECT id, username, full_name, state, status, pin_hash IS NULL AS awaiting_pin,
+                                created_at, last_login_at, last_active_at
+                         FROM users WHERE role = 'employee' ORDER BY status, full_name")->fetchAll();
+    out(['team' => array_map(fn($r) => [
+        'id' => (int)$r['id'], 'username' => $r['username'], 'fullName' => $r['full_name'], 'state' => $r['state'],
+        'status' => $r['status'], 'awaitingPin' => (bool)$r['awaiting_pin'],
+        'createdAt' => iso($r['created_at']), 'lastLoginAt' => iso($r['last_login_at']), 'lastActiveAt' => iso($r['last_active_at']),
+    ], $rows)]);
+}
+
+// ---------- leads ----------
+
+function lead_row(array $r): array
+{
+    return [
+        'id' => (int)$r['id'], 'userId' => (int)$r['user_id'], 'employee' => $r['employee_name'] ?? null,
+        'name' => $r['name'], 'contactPerson' => $r['contact_person'], 'phone' => $r['phone'], 'email' => $r['email'],
+        'state' => $r['state'], 'city' => $r['city'], 'productType' => $r['product_type'], 'productName' => $r['product_name'],
+        'stage' => $r['stage'], 'estValue' => (float)$r['est_value'],
+        'dealValue' => $r['deal_value'] === null ? null : (float)$r['deal_value'],
+        'nextFollowup' => $r['next_followup'], 'notes' => $r['notes'],
+        'createdAt' => iso($r['created_at']), 'updatedAt' => iso($r['updated_at']), 'wonAt' => iso($r['won_at']),
+    ];
+}
+
+function log_activity(PDO $pdo, int $userId, ?int $leadId, ?string $leadName, string $type, ?string $note): void
+{
+    $pdo->prepare("INSERT INTO activities (user_id, lead_id, lead_name, type, note, created_at) VALUES (?,?,?,?,?,?)")
+        ->execute([$userId, $leadId, $leadName, $type, $note, now()]);
+}
+
+function lead_fields(array $in): array
+{
+    $product = str_field($in, 'productType', 16, true);
+    if (!in_array($product, PRODUCT_TYPES, true)) fail('productType must be software, app or website.');
+    $email = str_field($in, 'email', 255);
+    if ($email !== null && !filter_var($email, FILTER_VALIDATE_EMAIL)) fail('Email looks invalid.');
+    $phone = str_field($in, 'phone', 32);
+    if ($phone !== null && !preg_match('/^[0-9+\-() ]{6,32}$/', $phone)) fail('Phone looks invalid.');
+    return [
+        'name' => str_field($in, 'name', 255, true),
+        'contact_person' => str_field($in, 'contactPerson', 255),
+        'phone' => $phone, 'email' => $email,
+        'state' => check_state(str_field($in, 'state', 64), true),
+        'city' => str_field($in, 'city', 128),
+        'product_type' => $product,
+        'product_name' => str_field($in, 'productName', 255),
+        'est_value' => money_field($in, 'estValue') ?? 0,
+        'next_followup' => date_field($in, 'nextFollowup'),
+        'notes' => str_field($in, 'notes', 5000),
+    ];
+}
+
+function a_addLead(PDO $pdo, array $in): void
+{
+    $u = current_user($pdo, $in);
+    if ($u['role'] !== 'employee') fail('Only sales employees add leads.', 403);
+    $f = lead_fields($in);
+    $pdo->prepare("INSERT INTO leads (user_id, name, contact_person, phone, email, state, city, product_type, product_name,
+                                      stage, est_value, next_followup, notes, created_at, updated_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,'new',?,?,?,?,?)")
+        ->execute([$u['id'], $f['name'], $f['contact_person'], $f['phone'], $f['email'], $f['state'], $f['city'],
+                   $f['product_type'], $f['product_name'], $f['est_value'], $f['next_followup'], $f['notes'], now(), now()]);
+    $id = (int)$pdo->lastInsertId();
+    log_activity($pdo, (int)$u['id'], $id, $f['name'], 'lead_added', "New {$f['product_type']} lead in {$f['state']}");
+    out(['id' => $id]);
+}
+
+function load_lead(PDO $pdo, array $u, int $id): array
+{
+    $st = $pdo->prepare("SELECT * FROM leads WHERE id = ?");
+    $st->execute([$id]);
+    $l = $st->fetch();
+    if (!$l || ($u['role'] !== 'admin' && (int)$l['user_id'] !== (int)$u['id'])) fail('Lead not found.', 404);
+    return $l;
+}
+
+function a_updateLead(PDO $pdo, array $in): void
+{
+    $u = current_user($pdo, $in);
+    if ($u['role'] !== 'employee') fail('Only the owning employee edits a lead.', 403);
+    $old = load_lead($pdo, $u, (int)($in['id'] ?? 0));
+    $f = lead_fields($in);
+    $stage = str_field($in, 'stage', 16) ?? $old['stage'];
+    if (!in_array($stage, STAGES, true)) fail('Unknown stage.');
+
+    $deal = $old['deal_value']; $wonAt = $old['won_at'];
+    if ($stage === 'won') {
+        $deal = money_field($in, 'dealValue');
+        if ($deal === null) $deal = $old['deal_value'] !== null ? (float)$old['deal_value'] : $f['est_value'];
+        if ($old['stage'] !== 'won') $wonAt = now();
+    } else { $deal = null; $wonAt = null; }
+
+    $pdo->prepare("UPDATE leads SET name=?, contact_person=?, phone=?, email=?, state=?, city=?, product_type=?, product_name=?,
+                   stage=?, est_value=?, deal_value=?, next_followup=?, notes=?, updated_at=?, won_at=? WHERE id=?")
+        ->execute([$f['name'], $f['contact_person'], $f['phone'], $f['email'], $f['state'], $f['city'], $f['product_type'],
+                   $f['product_name'], $stage, $f['est_value'], $deal, $f['next_followup'], $f['notes'], now(), $wonAt, $old['id']]);
+
+    if ($stage !== $old['stage']) {
+        log_activity($pdo, (int)$u['id'], (int)$old['id'], $f['name'], 'stage_change', "{$old['stage']} → $stage");
+        if ($stage === 'won') log_activity($pdo, (int)$u['id'], (int)$old['id'], $f['name'], 'client_won', 'Deal value ₹' . number_format((float)$deal, 2));
+    }
+    out(['ok' => true]);
+}
+
+function a_deleteLead(PDO $pdo, array $in): void
+{
+    $u = current_user($pdo, $in);
+    $l = load_lead($pdo, $u, (int)($in['id'] ?? 0));
+    if ($u['role'] !== 'admin' && $l['stage'] === 'won') fail('A won deal can only be removed by the admin.', 403);
+    $pdo->prepare("DELETE FROM leads WHERE id = ?")->execute([$l['id']]);
+    log_activity($pdo, (int)$u['id'], null, $l['name'], 'note', 'Deleted lead' . ($u['role'] === 'admin' ? ' (by admin)' : ''));
+    out(['ok' => true]);
+}
+
+function a_listLeads(PDO $pdo, array $in): void
+{
+    $u = current_user($pdo, $in);
+    $where = []; $p = [];
+    if ($u['role'] !== 'admin') { $where[] = 'l.user_id = ?'; $p[] = $u['id']; }
+    elseif (!empty($in['userId'])) { $where[] = 'l.user_id = ?'; $p[] = (int)$in['userId']; }
+    foreach (['stage' => STAGES, 'productType' => PRODUCT_TYPES, 'state' => STATES] as $k => $allowed) {
+        if (!empty($in[$k])) {
+            if (!in_array($in[$k], $allowed, true)) fail("Bad $k filter.");
+            $where[] = 'l.' . ($k === 'productType' ? 'product_type' : $k) . ' = ?'; $p[] = $in[$k];
+        }
+    }
+    if (!empty($in['q'])) {
+        $like = '%' . str_replace(['%', '_'], ['\%', '\_'], trim((string)$in['q'])) . '%';
+        $where[] = '(l.name LIKE ? OR l.contact_person LIKE ? OR l.phone LIKE ? OR l.city LIKE ?)';
+        array_push($p, $like, $like, $like, $like);
+    }
+    if (!empty($in['dueOnly'])) { $where[] = "l.next_followup IS NOT NULL AND l.next_followup <= CURDATE() AND l.stage NOT IN ('won','lost')"; }
+    $w = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+
+    $limit = min(max((int)($in['limit'] ?? 200), 1), 500);
+    $offset = max((int)($in['offset'] ?? 0), 0);
+    $c = $pdo->prepare("SELECT COUNT(*) FROM leads l $w"); $c->execute($p);
+    $total = (int)$c->fetchColumn();
+    $st = $pdo->prepare("SELECT l.*, u.full_name AS employee_name FROM leads l JOIN users u ON u.id = l.user_id
+                         $w ORDER BY l.updated_at DESC, l.id DESC LIMIT $limit OFFSET $offset");
+    $st->execute($p);
+    out(['total' => $total, 'leads' => array_map('lead_row', $st->fetchAll())]);
+}
+
+// ---------- activity ----------
+
+function a_addActivity(PDO $pdo, array $in): void
+{
+    $u = current_user($pdo, $in);
+    if ($u['role'] !== 'employee') fail('Only sales employees log activity.', 403);
+    $type = str_field($in, 'type', 16, true);
+    if (!in_array($type, ACTIVITY_TYPES, true)) fail('Unknown activity type.');
+    $note = str_field($in, 'note', 2000);
+    $leadId = null; $leadName = null;
+    if (!empty($in['leadId'])) { $l = load_lead($pdo, $u, (int)$in['leadId']); $leadId = (int)$l['id']; $leadName = $l['name']; }
+    if ($note === null && $leadId === null) fail('Add a note or pick a lead.');
+    log_activity($pdo, (int)$u['id'], $leadId, $leadName, $type, $note);
+    if ($leadId) $pdo->prepare("UPDATE leads SET updated_at = ? WHERE id = ?")->execute([now(), $leadId]);
+    out(['ok' => true]);
+}
+
+function a_listActivities(PDO $pdo, array $in): void
+{
+    $u = current_user($pdo, $in);
+    $where = []; $p = [];
+    if ($u['role'] !== 'admin') { $where[] = 'a.user_id = ?'; $p[] = $u['id']; }
+    elseif (!empty($in['userId'])) { $where[] = 'a.user_id = ?'; $p[] = (int)$in['userId']; }
+    if (!empty($in['leadId'])) { $where[] = 'a.lead_id = ?'; $p[] = (int)$in['leadId']; }
+    if (!empty($in['type'])) { $where[] = 'a.type = ?'; $p[] = (string)$in['type']; }
+    if ($f = date_field($in, 'from')) { $where[] = 'a.created_at >= ?'; $p[] = "$f 00:00:00"; }
+    if ($t = date_field($in, 'to')) { $where[] = 'a.created_at <= ?'; $p[] = "$t 23:59:59"; }
+    if (!empty($in['beforeId'])) { $where[] = 'a.id < ?'; $p[] = (int)$in['beforeId']; }
+    $w = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+    $limit = min(max((int)($in['limit'] ?? 50), 1), 200);
+    $st = $pdo->prepare("SELECT a.*, u.full_name AS employee_name, u.state AS employee_state FROM activities a
+                         JOIN users u ON u.id = a.user_id $w ORDER BY a.id DESC LIMIT " . ($limit + 1));
+    $st->execute($p);
+    $rows = $st->fetchAll();
+    $more = count($rows) > $limit;
+    $rows = array_slice($rows, 0, $limit);
+    out(['hasMore' => $more, 'activities' => array_map(fn($r) => [
+        'id' => (int)$r['id'], 'userId' => (int)$r['user_id'], 'employee' => $r['employee_name'], 'state' => $r['employee_state'],
+        'leadId' => $r['lead_id'] === null ? null : (int)$r['lead_id'], 'leadName' => $r['lead_name'],
+        'type' => $r['type'], 'note' => $r['note'], 'createdAt' => iso($r['created_at']),
+    ], $rows)]);
+}
+
+// ---------- stats ----------
+
+function a_stats(PDO $pdo, array $in): void
+{
+    $u = current_user($pdo, $in);
+    $from = date_field($in, 'from'); $to = date_field($in, 'to');
+    $fromDt = $from ? "$from 00:00:00" : '1970-01-01 00:00:00';
+    $toDt = $to ? "$to 23:59:59" : '2999-12-31 23:59:59';
+
+    $userSql = "role = 'employee'"; $up = [];
+    if ($u['role'] !== 'admin') { $userSql .= ' AND id = ?'; $up[] = $u['id']; }
+    $st = $pdo->prepare("SELECT id, full_name, username, state, status, last_login_at, last_active_at FROM users WHERE $userSql ORDER BY full_name");
+    $st->execute($up);
+    $emps = [];
+    foreach ($st->fetchAll() as $r) {
+        $emps[(int)$r['id']] = ['id' => (int)$r['id'], 'fullName' => $r['full_name'], 'username' => $r['username'],
+            'state' => $r['state'], 'status' => $r['status'], 'lastLoginAt' => iso($r['last_login_at']), 'lastActiveAt' => iso($r['last_active_at']),
+            'leads' => 0, 'clients' => 0, 'revenue' => 0.0, 'activities' => 0];
+    }
+    $scope = $u['role'] === 'admin' ? '' : ' AND user_id = ' . (int)$u['id'];
+
+    $q = $pdo->prepare("SELECT user_id, COUNT(*) n FROM leads WHERE created_at BETWEEN ? AND ? $scope GROUP BY user_id");
+    $q->execute([$fromDt, $toDt]);
+    foreach ($q->fetchAll() as $r) if (isset($emps[$r['user_id']])) $emps[$r['user_id']]['leads'] = (int)$r['n'];
+
+    $q = $pdo->prepare("SELECT user_id, COUNT(*) n, COALESCE(SUM(deal_value),0) rev FROM leads
+                        WHERE stage = 'won' AND won_at BETWEEN ? AND ? $scope GROUP BY user_id");
+    $q->execute([$fromDt, $toDt]);
+    foreach ($q->fetchAll() as $r) if (isset($emps[$r['user_id']])) { $emps[$r['user_id']]['clients'] = (int)$r['n']; $emps[$r['user_id']]['revenue'] = (float)$r['rev']; }
+
+    $q = $pdo->prepare("SELECT user_id, COUNT(*) n FROM activities
+                        WHERE type IN ('call','visit','meeting','follow_up','note') AND created_at BETWEEN ? AND ? $scope GROUP BY user_id");
+    $q->execute([$fromDt, $toDt]);
+    foreach ($q->fetchAll() as $r) if (isset($emps[$r['user_id']])) $emps[$r['user_id']]['activities'] = (int)$r['n'];
+
+    // by product: leads created in range, and wins in range
+    $byProduct = [];
+    foreach (PRODUCT_TYPES as $t) $byProduct[$t] = ['productType' => $t, 'leads' => 0, 'clients' => 0, 'revenue' => 0.0];
+    $q = $pdo->prepare("SELECT product_type, COUNT(*) n FROM leads WHERE created_at BETWEEN ? AND ? $scope GROUP BY product_type");
+    $q->execute([$fromDt, $toDt]);
+    foreach ($q->fetchAll() as $r) if (isset($byProduct[$r['product_type']])) $byProduct[$r['product_type']]['leads'] = (int)$r['n'];
+    $q = $pdo->prepare("SELECT product_type, COUNT(*) n, COALESCE(SUM(deal_value),0) rev FROM leads
+                        WHERE stage = 'won' AND won_at BETWEEN ? AND ? $scope GROUP BY product_type");
+    $q->execute([$fromDt, $toDt]);
+    foreach ($q->fetchAll() as $r) if (isset($byProduct[$r['product_type']])) { $byProduct[$r['product_type']]['clients'] = (int)$r['n']; $byProduct[$r['product_type']]['revenue'] = (float)$r['rev']; }
+
+    // current pipeline (all-time, not date filtered): open leads per stage + overdue follow-ups
+    $q = $pdo->query("SELECT stage, COUNT(*) n FROM leads WHERE 1=1 $scope GROUP BY stage");
+    $pipeline = array_fill_keys(STAGES, 0);
+    foreach ($q->fetchAll() as $r) $pipeline[$r['stage']] = (int)$r['n'];
+    $due = (int)$pdo->query("SELECT COUNT(*) FROM leads WHERE next_followup IS NOT NULL AND next_followup <= CURDATE()
+                             AND stage NOT IN ('won','lost') $scope")->fetchColumn();
+
+    $byState = [];
+    foreach ($emps as $e) {
+        $s = $e['state'] ?: 'Unassigned';
+        $byState[$s] ??= ['state' => $s, 'employees' => 0, 'leads' => 0, 'clients' => 0, 'revenue' => 0.0];
+        $byState[$s]['employees']++;
+        foreach (['leads', 'clients', 'revenue'] as $k) $byState[$s][$k] += $e[$k];
+    }
+    $totals = ['leads' => 0, 'clients' => 0, 'revenue' => 0.0, 'activities' => 0, 'employees' => 0];
+    foreach ($emps as $e) {
+        foreach (['leads', 'clients', 'revenue', 'activities'] as $k) $totals[$k] += $e[$k];
+        if ($e['status'] === 'active') $totals['employees']++;
+    }
+    out(['totals' => $totals, 'employees' => array_values($emps), 'byState' => array_values($byState),
+         'byProduct' => array_values($byProduct), 'pipeline' => $pipeline, 'followupsDue' => $due]);
+}
+
+// ---------- dispatch ----------
+
+try {
+    $raw = file_get_contents('php://input');
+    $in = json_decode($raw ?: '', true);
+    if (!is_array($in)) fail('Invalid request.');
+    $action = (string)($in['action'] ?? '');
+    $fn = 'a_' . $action;
+    if (!preg_match('/^[A-Za-z]+$/', $action) || !function_exists($fn)) fail('Unknown action.', 404);
+    $fn(get_pdo(), $in);
+} catch (ApiError $e) {
+    http_response_code($e->getCode() ?: 400);
+    out(['error' => $e->getMessage()]);
+} catch (Throwable $e) {
+    error_log('sales api: ' . $e);
+    http_response_code(500);
+    out(['error' => 'Server error.']);
+}
