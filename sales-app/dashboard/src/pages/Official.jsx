@@ -11,7 +11,7 @@ const ITEMS = [
 
 function Qr({ url }){
   const [svg, setSvg] = useState('');
-  useEffect(() => { QRCode.toString(url, { type: 'svg', margin: 1, width: 150 }).then(setSvg).catch(() => setSvg('')); }, [url]);
+  useEffect(() => { QRCode.toString(url, { type: 'svg', margin: 1, width: 150, errorCorrectionLevel: 'L' }).then(setSvg).catch(() => setSvg('')); }, [url]);
   return svg ? <div className="qr" aria-label="QR code" dangerouslySetInnerHTML={{ __html: svg }} /> : null;
 }
 
@@ -40,7 +40,6 @@ export default function Official(){
         </div>
       </header>
       <p className="muted" style={{ margin: 0 }}>Our official website, office locations and Instagram profile. Open one to show it to a customer on a video call, share the link, or let them scan the QR code.</p>
-      {import.meta.env.VITE_PREVIEW && <div className="box warn" style={{ margin: 0 }}><b>Preview:</b> the website is real. The office map links and Instagram link shown here are <b>samples</b> — the admin pastes the real ones with “Edit links”.</div>}
       <div className="grid2">
         {ITEMS.map((i) => {
           const url = links[i.key];

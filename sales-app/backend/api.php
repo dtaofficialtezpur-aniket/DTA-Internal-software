@@ -642,7 +642,7 @@ function a_monthlyWon(PDO $pdo, array $in): void
 // Shown to every employee so they can share DTA's official details with customers; only the admin edits them.
 
 const OFFICIAL_KEYS = ['website', 'mapTezpur', 'mapBangalore', 'instagram'];
-const OFFICIAL_DEFAULTS = ['website' => 'https://dtaonline.in', 'mapTezpur' => '', 'mapBangalore' => '', 'instagram' => ''];
+const OFFICIAL_DEFAULTS = ['website' => 'https://dtaonline.in', 'mapTezpur' => 'https://www.google.com/maps/place/DTA/@26.6209962,92.7955764,674m/data=!3m2!1e3!4b1!4m6!3m5!1s0x3744e9a2e06b93ed:0xf3ca2155af2699b0!8m2!3d26.6209962!4d92.7981513!16s%2Fg%2F11njz4v61p?entry=ttu&g_ep=EgoyMDI2MTAwNi4wIKXMDSoASAFQAw%3D%3D', 'mapBangalore' => 'https://www.google.com/maps/place/DTA/@13.0321014,77.5552546,735m/data=!3m2!1e3!4b1!4m6!3m5!1s0x3bae3d12ddf2f6e9:0x34dc1a3db5883f7d!8m2!3d13.0321014!4d77.5578295!16s%2Fg%2F11nw2zd5h_?entry=ttu&g_ep=EgoyMDI2MTAwNi4wIKXMDSoASAFQAw%3D%3D', 'instagram' => 'https://www.instagram.com/dtaofficialtezpur/'];
 
 function load_official_links(PDO $pdo): array
 {

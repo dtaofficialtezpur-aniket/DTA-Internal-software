@@ -74,8 +74,13 @@ actId = activities.length;
 
 const isOnline = (u) => u.status === 'active' && (u.simOnline || (u.lastActiveAt && Date.now() - Date.parse(u.lastActiveAt) < 120000));
 const withPresence = (u) => ({ ...u, online: isOnline(u), lastActiveAt: u.simOnline ? iso(Date.now() - 20000) : u.lastActiveAt });
-// Preview only: the website is real; the map and Instagram links are SAMPLES until the admin pastes the real ones.
-let officialLinks = { website: 'https://dtaonline.in', mapTezpur: 'https://www.google.com/maps/search/?api=1&query=Tezpur+Assam', mapBangalore: 'https://www.google.com/maps/search/?api=1&query=Bengaluru+Karnataka', instagram: 'https://www.instagram.com/' };
+// Official DTA links (same defaults as backend/api.php; the admin can change them with Edit links).
+let officialLinks = {
+  "website": "https://dtaonline.in",
+  "mapTezpur": "https://www.google.com/maps/place/DTA/@26.6209962,92.7955764,674m/data=!3m2!1e3!4b1!4m6!3m5!1s0x3744e9a2e06b93ed:0xf3ca2155af2699b0!8m2!3d26.6209962!4d92.7981513!16s%2Fg%2F11njz4v61p?entry=ttu&g_ep=EgoyMDI2MTAwNi4wIKXMDSoASAFQAw%3D%3D",
+  "mapBangalore": "https://www.google.com/maps/place/DTA/@13.0321014,77.5552546,735m/data=!3m2!1e3!4b1!4m6!3m5!1s0x3bae3d12ddf2f6e9:0x34dc1a3db5883f7d!8m2!3d13.0321014!4d77.5578295!16s%2Fg%2F11nw2zd5h_?entry=ttu&g_ep=EgoyMDI2MTAwNi4wIKXMDSoASAFQAw%3D%3D",
+  "instagram": "https://www.instagram.com/dtaofficialtezpur/"
+};
 const demos = [];
 let demoId = 0;
 const addDemo = (u, l, status, extra = {}) => demos.push({ id: ++demoId, userId: u.id, employee: u.fullName, employeeState: u.state, leadId: l ? l.id : null,
