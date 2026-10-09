@@ -151,3 +151,6 @@ td .tag:first-child,.feed .tag:first-child{margin-left:0;}
 .logo svg{display:block;}
 .auth-logo{display:flex;justify-content:center;margin-bottom:18px;}
 .brand .logo-tile{padding:6px;border-radius:10px;}
+
+.auth-dept{text-align:center;margin:-4px 0 6px;} .auth-dept-name{font:800 1.05rem Manrope,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);}
+.auth-dept-scope{display:inline-block;margin-top:6px;padding:3px 14px;border-radius:99px;background:var(--accent-soft);color:var(--accent);font-size:.75rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;}

@@ -31,6 +31,7 @@ export default function AuthScreen(){
     <div className="auth-shell">
       <form className="card auth-card" onSubmit={submit}>
         <div className="auth-logo"><Logo variant="full" width={210} /></div>
+        <div className="auth-dept"><div className="auth-dept-name">DTA Sales Team Department</div><div className="auth-dept-scope">Pan India Level</div></div>
         <h2>{panel === 'login' ? 'Log in' : 'Create the admin account'}</h2>
         {panel === 'register' && <label>Admin key<input type="password" required value={f.adminKey} onChange={set('adminKey')} autoComplete="off" /></label>}
         {panel === 'register' && <label>Your name<input required value={f.fullName} onChange={set('fullName')} /></label>}
