@@ -6,7 +6,7 @@ import howToSell from '../assets/plans/how-to-sell-dta.pdf?b64';
 // The official sales plans are built into the app, so every employee always reads the same, current version.
 const PLANS = [
   { id: 'online', label: 'Online Sales Plan', file: 'DTA-Online-Sales-Plan.pdf', data: onlinePlan, blurb: 'How to collect leads online, answer enquiries, run online demos and close clients.' },
-  { id: 'howto', label: 'How to Sell DTA', file: 'DTA-How-To-Sell.pdf', data: howToSell, blurb: 'How to communicate, deal with customers and help them see why they need DTA.' },
+  { id: 'howto', label: 'How to Sell Project DTA', file: 'DTA-How-To-Sell-Project-DTA.pdf', data: howToSell, blurb: 'How to communicate, deal with customers and help them see why they need DTA.' },
 ];
 
 export default function Plan(){
