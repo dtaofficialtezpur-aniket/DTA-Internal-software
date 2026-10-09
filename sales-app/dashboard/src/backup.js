@@ -28,7 +28,7 @@ const EMP_COLS = [['fullName', 'Name'], ['username', 'Username'], ['state', 'Sta
 
 const DEMO_COLS = [['id', 'ID'], ['createdAt', 'Requested'], ['employee', 'Employee'], ['clientName', 'Client'], ['contactPerson', 'Contact person'], ['phone', 'Phone'],
   ['state', 'State'], ['city', 'City'], ['productType', 'Product type'], ['productName', 'Product'], ['mode', 'Mode'], ['preferredDate', 'Preferred date'],
-  ['preferredTime', 'Preferred time'], ['status', 'Status'], ['scheduledAt', 'Scheduled'], ['notes', 'Notes'], ['adminNote', 'Admin note']];
+  ['preferredTime', 'Preferred time'], ['status', 'Status'], ['scheduledAt', 'Scheduled'], ['meetingUrl', 'Demo link'], ['notes', 'Notes'], ['adminNote', 'Admin note']];
 
 export function downloadBackup(kind, data){
   const d = stamp();

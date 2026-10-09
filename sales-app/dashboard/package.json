@@ -11,6 +11,8 @@
     "build:single": "VITE_PREVIEW=1 vite build --config vite.preview.config.js"
   },
   "dependencies": {
+    "pdfjs-dist": "^6.4.299",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

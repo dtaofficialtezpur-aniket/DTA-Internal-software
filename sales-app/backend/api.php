@@ -37,6 +37,18 @@ function money_field(array $in, string $k): ?float
     if (!is_numeric($in[$k]) || $in[$k] < 0 || $in[$k] > 9999999999) fail("$k must be a valid amount.");
     return round((float)$in[$k], 2);
 }
+// Only https links are accepted anywhere a URL is stored (they open in the user's browser from the app).
+function url_field(array $in, string $k): ?string
+{
+    $v = isset($in[$k]) && is_scalar($in[$k]) ? trim((string)$in[$k]) : '';
+    if ($v === '') return null;
+    if (strlen($v) > 1000) fail("$k is too long.");
+    $p = parse_url($v);
+    $bad = preg_match('/[^\x21-\x7e]/', $v) === 1          // spaces, control or non-ASCII characters (links must be percent-encoded)
+        || strpbrk($v, "<>\"'\\") !== false;                // characters that could break out of an attribute
+    if ($bad || !$p || strtolower($p['scheme'] ?? '') !== 'https' || empty($p['host'])) fail("$k must be a valid https:// link.");
+    return $v;
+}
 function date_field(array $in, string $k): ?string
 {
     $v = isset($in[$k]) ? trim((string)$in[$k]) : '';
@@ -464,6 +476,7 @@ function demo_row(array $r): array
         'state' => $r['state'], 'city' => $r['city'], 'productType' => $r['product_type'], 'productName' => $r['product_name'],
         'mode' => $r['mode'], 'preferredDate' => $r['preferred_date'], 'preferredTime' => $r['preferred_time'], 'notes' => $r['notes'],
         'status' => $r['status'], 'scheduledAt' => $r['scheduled_at'] ? str_replace(' ', 'T', $r['scheduled_at']) : null, // IST wall-clock, no zone
+        'meetingUrl' => $r['meeting_url'],
         'adminNote' => $r['admin_note'], 'createdAt' => iso($r['created_at']), 'updatedAt' => iso($r['updated_at']),
     ];
 }
@@ -527,7 +540,9 @@ function a_listDemoRequests(PDO $pdo, array $in): void
     // pending count in the viewer's own scope, ignoring filters -- drives the badge in the sidebar
     $pc = $pdo->prepare("SELECT COUNT(*) FROM demo_requests WHERE status = 'pending'" . ($u['role'] === 'admin' ? '' : ' AND user_id = ?'));
     $pc->execute($u['role'] === 'admin' ? [] : [$u['id']]);
-    out(['pending' => (int)$pc->fetchColumn(), 'requests' => array_map('demo_row', $st->fetchAll())]);
+    $sc = $pdo->prepare("SELECT COUNT(*) FROM demo_requests WHERE status = 'scheduled'" . ($u['role'] === 'admin' ? '' : ' AND user_id = ?'));
+    $sc->execute($u['role'] === 'admin' ? [] : [$u['id']]);
+    out(['pending' => (int)$pc->fetchColumn(), 'scheduled' => (int)$sc->fetchColumn(), 'requests' => array_map('demo_row', $st->fetchAll())]);
 }
 
 function a_updateDemoRequest(PDO $pdo, array $in): void
@@ -550,11 +565,12 @@ function a_updateDemoRequest(PDO $pdo, array $in): void
         } else $sched = $d['scheduled_at'];
         if ($status === 'scheduled' && $sched === null) fail('Pick the date and time of the demo.');
     }
-    $pdo->prepare("UPDATE demo_requests SET status = ?, scheduled_at = ?, admin_note = ?, updated_at = ? WHERE id = ?")
-        ->execute([$status, $sched, str_field($in, 'adminNote', 3000), now(), $d['id']]);
-    if ($status !== $d['status']) {
+    $url = ($status === 'declined') ? null : url_field($in, 'meetingUrl');
+    $pdo->prepare("UPDATE demo_requests SET status = ?, scheduled_at = ?, meeting_url = ?, admin_note = ?, updated_at = ? WHERE id = ?")
+        ->execute([$status, $sched, $url, str_field($in, 'adminNote', 3000), now(), $d['id']]);
+    if ($status !== $d['status'] || $url !== $d['meeting_url']) {
         $when = $sched ? ' on ' . date('d M Y, g:i A', strtotime($sched)) : '';
-        log_activity($pdo, (int)$d['user_id'], $d['lead_id'] === null ? null : (int)$d['lead_id'], $d['client_name'], 'demo_update', "Demo $status$when");
+        log_activity($pdo, (int)$d['user_id'], $d['lead_id'] === null ? null : (int)$d['lead_id'], $d['client_name'], 'demo_update', "Demo $status$when" . ($url ? ' — link shared' : ''));
     }
     out(['ok' => true]);
 }
@@ -620,6 +636,38 @@ function a_monthlyWon(PDO $pdo, array $in): void
     out(['fy' => $fy, 'year' => $year, 'years' => range($first, $last),
          'months' => array_values($months), 'totals' => ['clients' => $totClients, 'revenue' => (float)$totRev],
          'byEmployee' => $u['role'] === 'admin' ? array_values($byEmp) : [], 'clients' => $clients]);
+}
+
+// ---------- official links (website, offices, Instagram) ----------
+// Shown to every employee so they can share DTA's official details with customers; only the admin edits them.
+
+const OFFICIAL_KEYS = ['website', 'mapTezpur', 'mapBangalore', 'instagram'];
+const OFFICIAL_DEFAULTS = ['website' => 'https://dtaonline.in', 'mapTezpur' => '', 'mapBangalore' => '', 'instagram' => ''];
+
+function load_official_links(PDO $pdo): array
+{
+    $st = $pdo->prepare("SELECT setting_value FROM settings WHERE setting_key = 'official_links'");
+    $st->execute();
+    $saved = json_decode((string)$st->fetchColumn(), true);
+    $out = OFFICIAL_DEFAULTS;
+    if (is_array($saved)) foreach (OFFICIAL_KEYS as $k) if (isset($saved[$k]) && is_string($saved[$k])) $out[$k] = $saved[$k];
+    return $out;
+}
+
+function a_getOfficialLinks(PDO $pdo, array $in): void
+{
+    current_user($pdo, $in);
+    out(['links' => load_official_links($pdo)]);
+}
+
+function a_setOfficialLinks(PDO $pdo, array $in): void
+{
+    require_admin(current_user($pdo, $in));
+    $links = [];
+    foreach (OFFICIAL_KEYS as $k) $links[$k] = url_field($in, $k) ?? '';
+    $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('official_links', ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)")
+        ->execute([json_encode($links)]);
+    out(['links' => $links]);
 }
 
 // ---------- stats ----------

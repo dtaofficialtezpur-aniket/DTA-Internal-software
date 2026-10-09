@@ -18,7 +18,7 @@ export default function Demos(){
   const [open, setOpen] = useState(null);
 
   const load = useCallback(() => {
-    call('listDemoRequests', { status }).then((d) => { setRows(d.requests); setPendingDemos(d.pending); }).catch((e) => showToast(e.message, 'err'));
+    call('listDemoRequests', { status }).then((d) => { setRows(d.requests); setPendingDemos(isAdmin ? d.pending : d.scheduled); }).catch((e) => showToast(e.message, 'err'));
   }, [call, status, showToast, setPendingDemos]);
   useEffect(load, [load]);
   useEffect(() => { if (!isAdmin) call('listLeads', { limit: 300 }).then((d) => setMyLeads(d.leads)).catch(() => {}); }, [isAdmin, call]);
@@ -45,7 +45,7 @@ export default function Demos(){
                 <td>{PRODUCTS[r.productType]}{r.productName && <div className="muted small">{r.productName}</div>}<div className="muted small">{r.mode === 'onsite' ? 'On-site' : 'Online'}</div></td>
                 <td>{fmtDate(r.preferredDate)}{r.preferredTime && <div className="muted small">{r.preferredTime}</div>}</td>
                 <td><StatusPill status={r.status} /></td>
-                <td>{when(r.scheduledAt)}</td>
+                <td>{when(r.scheduledAt)}{r.meetingUrl && r.status === 'scheduled' && <div><a className="link" href={r.meetingUrl} target="_blank" rel="noopener noreferrer">Join demo ↗</a></div>}</td>
                 <td className="num actions-cell">{!isAdmin && r.status === 'pending' && <button className="link danger" onClick={() => cancel(r)}>Cancel</button>}</td>
               </tr>))}
             {!rows.length && <tr><td colSpan="7" className="muted">{isAdmin ? 'No demo requests here.' : 'No requests yet — use “Request a demo”.'}</td></tr>}
@@ -60,7 +60,8 @@ export default function Demos(){
 
 function DemoDetail({ r, isAdmin, onClose, onSaved }){
   const { call, showToast } = useApp();
-  const [f, setF] = useState({ status: r.status === 'pending' ? 'scheduled' : r.status, scheduledAt: r.scheduledAt ? r.scheduledAt.slice(0, 16) : (r.preferredDate ? r.preferredDate + 'T11:00' : ''), adminNote: r.adminNote || '' });
+  const [f, setF] = useState({ status: r.status === 'pending' ? 'scheduled' : r.status, scheduledAt: r.scheduledAt ? r.scheduledAt.slice(0, 16) : (r.preferredDate ? r.preferredDate + 'T11:00' : ''), adminNote: r.adminNote || '', meetingUrl: r.meetingUrl || '' });
+  const copyLink = () => navigator.clipboard?.writeText(r.meetingUrl).then(() => showToast('Demo link copied.')).catch(() => {});
   const editable = isAdmin && r.status !== 'cancelled';
   const save = (e) => { e.preventDefault(); call('updateDemoRequest', { id: r.id, ...f }).then(() => { showToast('Demo request updated.'); onSaved(); }).catch((err) => showToast(err.message, 'err')); };
 
@@ -74,14 +75,23 @@ function DemoDetail({ r, isAdmin, onClose, onSaved }){
         <dt>Preferred</dt><dd>{fmtDate(r.preferredDate)}{r.preferredTime ? ' · ' + r.preferredTime : ''}</dd>
         {r.notes && <><dt>Notes</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{r.notes}</dd></>}
         {!isAdmin && r.scheduledAt && <><dt>Scheduled for</dt><dd><b>{when(r.scheduledAt)}</b></dd></>}
+        {r.meetingUrl && <><dt>Demo link</dt><dd><a href={r.meetingUrl} target="_blank" rel="noopener noreferrer">{r.meetingUrl}</a></dd></>}
         {!isAdmin && r.adminNote && <><dt>Message from DTA</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{r.adminNote}</dd></>}
       </dl>
+      {!isAdmin && r.meetingUrl && r.status === 'scheduled' && (
+        <div className="link-box" style={{ marginTop: 14 }}>
+          <a className="btn primary" href={r.meetingUrl} target="_blank" rel="noopener noreferrer">Join the demo ↗</a>
+          <button className="btn" onClick={copyLink}>Copy link</button>
+          <span className="muted small">Share this link with your client.</span>
+        </div>
+      )}
       {editable && (
         <form className="form-grid" onSubmit={save} style={{ marginTop: 16 }}>
           <label>Update status<select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
             {['pending', 'scheduled', 'completed', 'declined'].map((s) => <option key={s} value={s}>{DEMO_STATUS[s]}</option>)}</select></label>
           {(f.status === 'scheduled' || f.status === 'completed') && <label>Demo date &amp; time<input type="datetime-local" required={f.status === 'scheduled'} value={f.scheduledAt} onChange={(e) => setF({ ...f, scheduledAt: e.target.value })} /></label>}
-          <label className="span2">Message to the employee<textarea rows="3" placeholder="e.g. Demo link, who will attend, or why it was declined" value={f.adminNote} onChange={(e) => setF({ ...f, adminNote: e.target.value })} /></label>
+          {f.status !== 'declined' && <label className="span2">Demo link — paste the Google Meet / Zoom URL (the employee receives it)<input type="url" placeholder="https://meet.google.com/…" value={f.meetingUrl} onChange={(e) => setF({ ...f, meetingUrl: e.target.value })} /></label>}
+          <label className="span2">Message to the employee<textarea rows="3" placeholder="e.g. who will attend, what to prepare, or why it was declined" value={f.adminNote} onChange={(e) => setF({ ...f, adminNote: e.target.value })} /></label>
           <div className="span2 actions"><button type="button" className="btn ghost" onClick={onClose}>Close</button><button className="btn primary">Save</button></div>
         </form>
       )}

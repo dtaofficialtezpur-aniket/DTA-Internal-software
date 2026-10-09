@@ -7,6 +7,9 @@ import Leads from './pages/Leads.jsx';
 import Activity from './pages/Activity.jsx';
 import Demos from './pages/Demos.jsx';
 import Monthly from './pages/Monthly.jsx';
+import Plan from './pages/Plan.jsx';
+import Official from './pages/Official.jsx';
+import LiveClock from './components/LiveClock.jsx';
 import Team from './pages/Team.jsx';
 
 export default function App(){
@@ -23,11 +26,14 @@ export default function App(){
         <div className="app">
           <Sidebar page={page} onNavigate={(p) => go(p)} />
           <main className="main">
+            <div className="topbar"><LiveClock /></div>
             {page === 'overview' && <Overview onOpenEmployee={(id) => go('leads', id)} />}
             {page === 'leads' && <Leads key={'l' + focusUser} initialUserId={focusUser} />}
             {page === 'activity' && <Activity key={'a' + focusUser} initialUserId={focusUser} />}
             {page === 'monthly' && <Monthly key={'m' + focusUser} initialUserId={focusUser} />}
             {page === 'demos' && <Demos />}
+            {page === 'plan' && <Plan />}
+            {page === 'official' && <Official />}
             {page === 'team' && user.role === 'admin' && <Team onOpen={go} />}
           </main>
         </div>

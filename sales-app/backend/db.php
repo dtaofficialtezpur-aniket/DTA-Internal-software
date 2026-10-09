@@ -129,11 +129,19 @@ function ensure_schema(PDO $pdo): void
             notes TEXT NULL,
             status VARCHAR(16) NOT NULL DEFAULT 'pending',  -- pending|scheduled|completed|declined|cancelled
             scheduled_at DATETIME NULL,
+            meeting_url VARCHAR(1000) NULL,                 -- demo link (Meet / Zoom ...) pasted by the admin; the employee receives it
             admin_note TEXT NULL,
             created_at DATETIME NOT NULL,
             updated_at DATETIME NOT NULL,
             INDEX (status, created_at),
             INDEX (user_id, created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+    // Small key/value store (official links shown to employees: website, office maps, Instagram).
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS settings (
+            setting_key VARCHAR(64) PRIMARY KEY,
+            setting_value TEXT NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 }

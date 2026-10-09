@@ -74,6 +74,8 @@ actId = activities.length;
 
 const isOnline = (u) => u.status === 'active' && (u.simOnline || (u.lastActiveAt && Date.now() - Date.parse(u.lastActiveAt) < 120000));
 const withPresence = (u) => ({ ...u, online: isOnline(u), lastActiveAt: u.simOnline ? iso(Date.now() - 20000) : u.lastActiveAt });
+// Preview only: the website is real; the map and Instagram links are SAMPLES until the admin pastes the real ones.
+let officialLinks = { website: 'https://dtaonline.in', mapTezpur: 'https://www.google.com/maps/search/?api=1&query=Tezpur+Assam', mapBangalore: 'https://www.google.com/maps/search/?api=1&query=Bengaluru+Karnataka', instagram: 'https://www.instagram.com/' };
 const demos = [];
 let demoId = 0;
 const addDemo = (u, l, status, extra = {}) => demos.push({ id: ++demoId, userId: u.id, employee: u.fullName, employeeState: u.state, leadId: l ? l.id : null,
@@ -82,7 +84,7 @@ const addDemo = (u, l, status, extra = {}) => demos.push({ id: ++demoId, userId:
   notes: 'Client wants to see how billing and GST reports work.', status, scheduledAt: null, adminNote: null, createdAt: iso(now - 3600000 * (demoId + 2)), updatedAt: iso(now), ...extra });
 addDemo(users[2], leads.find((l) => l.userId === 3 && l.stage !== 'won'), 'pending');
 addDemo(users[4], leads.find((l) => l.userId === 5 && l.stage !== 'won'), 'pending', { mode: 'onsite' });
-addDemo(users[1], leads.find((l) => l.userId === 2), 'scheduled', { scheduledAt: dateStr(now + 2 * DAY) + 'T15:30', adminNote: 'Demo on Google Meet — link will be sent. Rahul will attend.' });
+addDemo(users[1], leads.find((l) => l.userId === 2), 'scheduled', { scheduledAt: dateStr(now + 2 * DAY) + 'T15:30', meetingUrl: 'https://meet.google.com/abc-defg-hij', adminNote: 'Demo on Google Meet. Rahul will attend.' });
 addDemo(users[6], null, 'completed', { clientName: 'Sunrise Dental Clinic', scheduledAt: dateStr(now - 4 * DAY) + 'T11:00' });
 addDemo(users[3], null, 'declined', { clientName: 'Local Kirana Store', adminNote: 'Budget too low for a live demo — share the brochure instead.' });
 
@@ -167,7 +169,7 @@ const handlers = {
 
   listDemoRequests: (p, me) => {
     const mine = demos.filter((d) => me.role === 'admin' || d.userId === me.id);
-    return { pending: mine.filter((d) => d.status === 'pending').length,
+    return { pending: mine.filter((d) => d.status === 'pending').length, scheduled: mine.filter((d) => d.status === 'scheduled').length,
       requests: mine.filter((d) => (!p.status || d.status === p.status) && (!p.userId || d.userId === Number(p.userId)))
         .sort((a, b) => (b.status === 'pending') - (a.status === 'pending') || b.createdAt.localeCompare(a.createdAt)) };
   },
@@ -176,7 +178,7 @@ const handlers = {
     if (!p.clientName && !l) throw err('clientName is required.');
     demos.push({ id: ++demoId, userId: me.id, employee: me.fullName, employeeState: me.state, leadId: l ? l.id : null, clientName: p.clientName || l.name,
       contactPerson: p.contactPerson || null, phone: p.phone || null, state: p.state, city: p.city || null, productType: p.productType, productName: p.productName || null,
-      mode: p.mode, preferredDate: p.preferredDate || null, preferredTime: p.preferredTime || null, notes: p.notes || null, status: 'pending', scheduledAt: null, adminNote: null,
+      mode: p.mode, meetingUrl: null, preferredDate: p.preferredDate || null, preferredTime: p.preferredTime || null, notes: p.notes || null, status: 'pending', scheduledAt: null, adminNote: null,
       createdAt: iso(Date.now()), updatedAt: iso(Date.now()) });
     addAct(me.id, l, 'demo_requested', `Requested a demo (${p.mode}, ${p.productType})`, Date.now()); return { id: demoId };
   },
@@ -184,7 +186,9 @@ const handlers = {
     if (me.role !== 'admin') throw err('Admin only.', 403);
     const d = demos.find((x) => x.id === p.id); if (!d) throw err('Demo request not found.', 404);
     if (p.status === 'scheduled' && !p.scheduledAt) throw err('Pick the date and time of the demo.');
-    Object.assign(d, { status: p.status, scheduledAt: ['scheduled', 'completed'].includes(p.status) ? (p.scheduledAt || d.scheduledAt) : null, adminNote: p.adminNote || null, updatedAt: iso(Date.now()) });
+    const url = p.status === 'declined' ? null : (p.meetingUrl || '').trim();
+    if (url && !/^https:\/\/[^\s<>"']+$/.test(url)) throw err('meetingUrl must be a valid https:// link.');
+    Object.assign(d, { status: p.status, scheduledAt: ['scheduled', 'completed'].includes(p.status) ? (p.scheduledAt || d.scheduledAt) : null, meetingUrl: url || null, adminNote: p.adminNote || null, updatedAt: iso(Date.now()) });
     return { ok: true };
   },
   cancelDemoRequest: (p, me) => {
@@ -212,6 +216,18 @@ const handlers = {
     const first = Math.min(year, curStart, ...ys), last = Math.max(year, curStart, ...ys);
     return { fy, year, years: Array.from({ length: last - first + 1 }, (_, i) => first + i), months, totals: { clients: inYear.length, revenue: inYear.reduce((s, l) => s + l.dealValue, 0) },
       byEmployee: me.role === 'admin' ? Object.values(byEmp) : [], clients: inYear.map((l) => ({ ...l, wonAt: l.wonAt })) };
+  },
+
+  getOfficialLinks: () => ({ links: officialLinks }),
+  setOfficialLinks: (p, me) => {
+    if (me.role !== 'admin') throw err('Admin only.', 403);
+    const next = {};
+    for (const k of ['website', 'mapTezpur', 'mapBangalore', 'instagram']) {
+      const v = (p[k] || '').trim();
+      if (v && !/^https:\/\/[^\s<>"']+$/.test(v)) throw err(k + ' must be a valid https:// link.');
+      next[k] = v;
+    }
+    officialLinks = next; return { links: officialLinks };
   },
 
   stats: (p, me) => {
