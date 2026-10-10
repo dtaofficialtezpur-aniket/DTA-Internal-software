@@ -1,0 +1,79 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>DTA Sales Backend Setup</title>
+<style>
+@page{size:A4;margin:16mm 15mm 18mm}
+:root{--navy:#052c65;--blue:#3d4fe0;--soft:#e8ecf8;--ink:#1a1d24;--mut:#5a6272;--line:#d9dde8;--good:#1e8e5a;--warn:#a8690f;--warnbg:#fbf1dc}
+*{box-sizing:border-box} body{font-family:Inter,"DejaVu Sans",Arial,sans-serif;color:var(--ink);font-size:10.4pt;line-height:1.5;margin:0}
+h1{font-size:25pt;margin:0 0 4pt;color:var(--navy);line-height:1.15} h2{font-size:15.5pt;color:var(--navy);margin:0 0 8pt;padding-bottom:5pt;border-bottom:2.5pt solid var(--navy)}
+h3{font-size:11.5pt;color:var(--navy);margin:13pt 0 4pt} p{margin:0 0 7pt} ul,ol{margin:0 0 8pt;padding-left:16pt} li{margin-bottom:3pt}
+.page{page-break-after:always} .page:last-child{page-break-after:auto}
+.cover{height:262mm;display:flex;flex-direction:column;justify-content:space-between}
+.cover .band{background:var(--navy);color:#fff;padding:22pt 24pt;border-radius:10pt}
+.cover .band h1{color:#fff;font-size:30pt}.pill{display:inline-block;background:#fff;color:var(--navy);font-weight:800;letter-spacing:.14em;font-size:9pt;padding:4pt 12pt;border-radius:99pt;margin-top:10pt}
+table{width:100%;border-collapse:collapse;margin:4pt 0 10pt;font-size:9.4pt} th{background:var(--navy);color:#fff;text-align:left;padding:5pt 7pt;font-weight:700}
+td{padding:5pt 7pt;border-bottom:1pt solid var(--line);vertical-align:top} tr{page-break-inside:avoid} tr:nth-child(even) td{background:#f6f8fc}
+.box{border:1pt solid var(--line);border-left:4pt solid var(--blue);background:var(--soft);padding:8pt 11pt;border-radius:5pt;margin:8pt 0;page-break-inside:avoid}
+.warn{border-left-color:var(--warn);background:var(--warnbg)} .good{border-left-color:var(--good);background:#e6f4ec}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:12pt} .card{border:1pt solid var(--line);border-radius:7pt;padding:9pt 11pt;page-break-inside:avoid}
+.card h3{margin-top:0}.tag{display:inline-block;background:var(--navy);color:#fff;border-radius:4pt;padding:0 6pt;font-size:8.5pt;font-weight:700}
+.step{display:grid;grid-template-columns:26pt 1fr;gap:8pt;margin-bottom:7pt;page-break-inside:avoid}.num{background:var(--navy);color:#fff;border-radius:50%;width:22pt;height:22pt;text-align:center;line-height:22pt;font-weight:800;font-size:10pt}
+.mut{color:var(--mut)} .small{font-size:8.8pt} .script{font-style:italic;background:#f6f8fc;border-radius:5pt;padding:7pt 10pt;margin:3pt 0 8pt;border-left:3pt solid var(--line)}
+.blank td{height:19pt} footer{display:none}
+</style><style>.flow{display:grid;grid-template-columns:repeat(6,1fr);gap:5pt;margin:8pt 0 10pt}.flow div{background:var(--navy);color:#fff;border-radius:6pt;padding:7pt 6pt;text-align:center;font-size:9pt;font-weight:700;line-height:1.25}.flow span{display:block;font-weight:400;font-size:7.8pt;opacity:.88;margin-top:3pt}
+.say{border-left:3pt solid var(--blue);background:#f3f5fd;padding:6pt 10pt;margin:3pt 0 7pt;border-radius:0 5pt 5pt 0}.no{border-left-color:#c23b3b;background:#fdf0ee}.q{margin:0 0 3pt}</style><style>.st{display:grid;grid-template-columns:30pt 1fr;gap:9pt;margin:0 0 9pt;page-break-inside:avoid}.st .n{background:var(--navy);color:#fff;border-radius:50%;width:26pt;height:26pt;line-height:26pt;text-align:center;font-weight:800}.st h3{margin:0 0 3pt}.path{font-family:"DejaVu Sans Mono",monospace;background:#f1f3f9;border-radius:4pt;padding:1pt 5pt;font-size:9pt;white-space:nowrap}.big{font-size:12pt;font-weight:800;color:#c23b3b}</style></head><body>
+<section class="page" style="page-break-after:always">
+ <div style="display:flex;align-items:center;gap:16pt;margin-bottom:10pt"><svg viewBox="250 170 1050 1010" width="86" height="83" aria-label="DTA">
+   <g fill="#052c65"><polygon points="527,211 665,211 608,331 527,331"/><polygon points="763,211 912,211 912,331 828,331"/><polygon points="686,190 755,190 720,228"/><polygon points="630,331 720,243 810,331"/><rect x="668" y="331" width="103" height="679"/>
+   <path fill-rule="evenodd" d="M668 452 H555 C375 452 272 585 272 732 C272 885 385 1010 560 1010 H771 V452 Z M651 549 H570 C450 549 385 630 385 730 C385 830 450 911 570 911 H651 Z"/>
+   <path fill-rule="evenodd" d="M933 460 H1060 L1262 1011 H1145 L1108 900 H880 L845 1011 H727 L771 890 Z M995 581 L1076 815 H912 Z"/>
+   <rect x="280" y="1037" width="999" height="18"/><rect x="280" y="1143" width="999" height="18"/>
+   <text x="340" y="1122" font-size="62" font-weight="500" textLength="912" lengthAdjust="spacingAndGlyphs" font-family="Inter,Arial,sans-serif">DIGITAL – TRADING – ACCOUNTS</text></g></svg><div><div style="font-size:9pt;letter-spacing:.12em;color:var(--mut)">DTA SALES TEAM DEPARTMENT · PAN INDIA</div><h1 style="font-size:21pt;margin:2pt 0">Put the DTA Sales backend on dtaonline.in</h1><div class="mut">Step-by-step guide · about 15–20 minutes · no coding needed</div></div></div>
+ <div class="box warn"><span class="big">Important:</span> use a <b>NEW, separate database</b> for DTA Sales. Do <b>not</b> reuse the database of the other DTA app (the one at <span class="path">/DTA_Internal</span>) — both apps use tables with the same names and would break each other. The setup page checks this and stops safely if it finds the old app’s tables.</div>
+ <h3>What you need</h3>
+ <ul><li>Your Hostinger login (hPanel) for <b>dtaonline.in</b></li><li>The file <b>DTA_Sales_backend_upload.zip</b> (sent with this guide)</li><li>A notepad to write down 3 database details and your admin key</li></ul>
+
+ <h2 style="margin-top:12pt">Part 1 — On Hostinger</h2>
+ <div class="st"><div class="n">1</div><div><h3>Create a new database</h3>
+  hPanel → your website <b>dtaonline.in</b> → <b>Databases</b> → <b>Management</b> (MySQL Databases). Create a <b>new database + user</b>: name it <span class="path">dtasales</span> (Hostinger adds its own prefix), choose a user name and a <b>strong password</b>, then click <b>Create</b>.<br>
+  <b>Write down exactly as shown (with the prefix):</b> database name · user name · password. Example: <span class="path">u123456789_dtasales</span>.</div></div>
+ <div class="st"><div class="n">2</div><div><h3>Make the folder</h3>
+  hPanel → <b>File Manager</b> → open <span class="path">public_html</span> → <b>New Folder</b> → name it exactly <span class="path">DTA_Sales</span> (capital D-T-A, underscore, capital S). It sits next to your existing <span class="path">DTA_Internal</span> folder. Open the new folder.</div></div>
+ <div class="st"><div class="n">3</div><div><h3>Upload and unzip</h3>
+  Click <b>Upload</b> → choose <b>DTA_Sales_backend_upload.zip</b>. When it appears, right-click it → <b>Extract</b> → extract into the <b>current folder</b> (not a new sub-folder).<br>
+  You should now see <span class="path">api.php</span> · <span class="path">db.php</span> · <span class="path">setup.php</span> · <span class="path">config.php</span> · <span class="path">.htaccess</span> directly inside <span class="path">DTA_Sales</span>. (If .htaccess is not shown, turn on “Show hidden files” in File Manager settings.)<br>
+  Then <b>delete the ZIP file</b> from the server — it contains your private admin key.</div></div>
+</section>
+
+<section class="page" style="page-break-after:always">
+ <div class="st"><div class="n">4</div><div><h3>Fill in your database details</h3>
+  Right-click <span class="path">config.php</span> → <b>Edit</b>. Replace the three <span class="path">PUT_…_HERE</span> values with the database name, user name and password from step 1. Keep the quote marks. Click <b>Save</b>.<br>
+  <b>Do not change</b> the <span class="path">admin_key</span> line. It is your <b>main portal key</b> — copy it now into a safe place (a password manager). You need it once, to create your admin account. <b>Never share it with employees.</b><br>
+  Optional: put your email in <span class="path">notify_email</span> to get an email for every new demo request.</div></div>
+ <div class="st"><div class="n">5</div><div><h3>Run the setup check</h3>
+  In your browser open: <span class="path">https://dtaonline.in/DTA_Sales/setup.php</span><br>
+  Every line should show <b>[ OK ]</b>, ending with “Everything is ready” — the page then deletes itself. If any line shows <b>[FAIL]</b>, see the help table below, fix it, and reload.</div></div>
+ <div class="st"><div class="n">6</div><div><h3>Check the connection</h3>
+  Open <span class="path">https://dtaonline.in/DTA_Sales/api.php</span> — you should see: <span class="path">{"ok":true,"service":"dta-sales-api"}</span></div></div>
+
+ <h2 style="margin-top:12pt">Part 2 — In the DTA Sales app</h2>
+ <div class="st"><div class="n">7</div><div><h3>Create your admin account (once)</h3>
+  Install and open the DTA Sales app (Windows installer) → on the login screen click <b>“First-time setup: create admin account”</b>. Enter your <b>admin key</b> (from config.php), your name, a login ID, and a password of at least 8 characters. This only works once — after it, nobody can create another admin.</div></div>
+ <div class="st"><div class="n">8</div><div><h3>Create the employees’ logins</h3>
+  <b>Sales team → + Create employee login</b>: name, login ID, state, and a password (press <b>Generate</b> for a strong one). Copy the login ID and password from the box that appears and send them to the employee. Only you can create logins; use <b>Lock / Unlock</b> any time.</div></div>
+ <div class="st"><div class="n">9</div><div><h3>Test before you roll out</h3>
+  Create one test employee, log in as them (log out first), add a lead, and confirm you can see it as admin. Then give the installer and logins to the team.</div></div>
+
+ <h2 style="margin-top:12pt">If something goes wrong</h2>
+ <table><tr><th style="width:36%">What you see</th><th>What to do</th></tr>
+ <tr><td><b>[FAIL] this is a NEW, separate database</b></td><td>You used the old app’s database. Create a brand-new database (step 1) and put its details in config.php. Nothing was changed.</td></tr>
+ <tr><td><b>[FAIL] database connection failed</b></td><td>The name, user or password in config.php is wrong. Copy them exactly, including the Hostinger prefix. Keep <span class="path">'localhost'</span> as the host.</td></tr>
+ <tr><td><b>[FAIL] config.php exists</b></td><td>The file is missing or named wrongly (e.g. config.php.txt) or is in the wrong folder.</td></tr>
+ <tr><td><b>[FAIL] admin_key is set…</b></td><td>The admin_key line was changed or shortened. Re-upload the ZIP’s original config.php.</td></tr>
+ <tr><td><b>[FAIL] opened over HTTPS</b></td><td>Type <b>https://</b> in the address. If the site has no SSL, enable the free SSL for dtaonline.in in hPanel.</td></tr>
+ <tr><td><b>[FAIL] PHP 8.0 or newer</b></td><td>hPanel → Advanced → <b>PHP Configuration</b> → choose PHP 8.1 or newer.</td></tr>
+ <tr><td><b>404 Not Found</b> on setup.php</td><td>The files are in the wrong place (for example <span class="path">DTA_Sales/DTA_Sales/</span>). Move them directly into <span class="path">public_html/DTA_Sales</span>.</td></tr>
+ <tr><td><b>“Could not reach the server”</b> in the app</td><td>Open the api.php address (step 6) in a browser. If it does not show the ok message, recheck steps 2–5.</td></tr>
+ <tr><td><b>Blank page / error 500</b></td><td>Check config.php for a missing quote or comma; see the error log in hPanel.</td></tr>
+ <tr><td><b>I forgot my admin password</b></td><td>Upload <span class="path">reset-admin-password.php</span> (from <span class="path">sales-app/backend</span> in the project), open it in the browser, enter the admin key and a new password, then <b>delete that file</b>.</td></tr></table>
+ <div class="box good"><b>Keep it safe:</b> keep your admin key private; use <b>Sales team → Backup to this computer</b> regularly; turn on Hostinger’s automatic backups if your plan has them. Menu names in hPanel can look slightly different — the idea is the same.</div>
+</section>
+</body></html>

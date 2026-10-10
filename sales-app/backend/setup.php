@@ -26,6 +26,16 @@ line(!str_contains((string)($cfg['db_pass'] ?? ''), 'change-me'), 'database pass
 
 require __DIR__ . '/db.php';
 try {
+    // Safety: refuse to run inside a database that already holds ANOTHER app's tables (the existing DTA
+    // Subscription Control app also has users / sessions / settings tables with a different layout).
+    $probe = new PDO("mysql:host={$cfg['db_host']};dbname={$cfg['db_name']};charset=utf8mb4", $cfg['db_user'], $cfg['db_pass'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    $clash = [];
+    foreach (['users' => 'password_hash', 'sessions' => 'token_hash', 'settings' => 'setting_value'] as $t => $col) {
+        if ($probe->query("SHOW TABLES LIKE " . $probe->quote($t))->fetchColumn()
+            && !$probe->query("SHOW COLUMNS FROM `$t` LIKE " . $probe->quote($col))->fetchColumn()) $clash[] = $t;
+    }
+    line(!$clash, 'this is a NEW, separate database' . ($clash ? ' — but it already contains another app\'s table(s): ' . implode(', ', $clash) . '. Create a brand-new database in hPanel for DTA Sales and put its details in config.php (do NOT share the database with the other DTA app)' : ''));
+    if ($clash) { echo "\nNothing was changed. Fix the FAIL line above and reload this page.\n"; exit; }
     $pdo = get_pdo(); // connects and creates any missing tables
     line(true, 'connected to the database');
     foreach (['users', 'sessions', 'leads', 'activities', 'demo_requests', 'settings'] as $t) {

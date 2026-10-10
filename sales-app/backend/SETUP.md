@@ -2,6 +2,10 @@
 
 You need: a domain with HTTPS (e.g. `dtaonline.in`), PHP 8.0+, and one MySQL database. Allow ~15 minutes.
 
+> **Important:** DTA Sales needs its **own new database**. Do not reuse the database of the other DTA app (`/DTA_Internal`) — both apps have `users`, `sessions` and `settings` tables with different layouts. `setup.php` detects this and stops without changing anything.
+>
+> A ready-to-upload package and a printable step-by-step guide (`DTA-Sales-Backend-Setup-Steps.pdf`) are available; the package contains your private admin key, so it is not stored in this repository.
+
 ## 1. Create the database (hPanel)
 Websites → your site → **Databases → MySQL Databases** → create a database + user. Write down the database name, username and password (Hostinger prefixes them, e.g. `u123456789_sales`).
 
