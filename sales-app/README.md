@@ -26,3 +26,7 @@ Sales team page → **Backup to this computer** (admin only): Leads / Activity /
 ## Single-file preview
 
 `DTA-Sales-Preview.html` is the preview mode as one self-contained file you can double-click (sample data, nothing saved). Rebuild it with `cd dashboard && npm run build:single` and copy `dist-single/index.html` over it.
+
+## Hosting the web version (no installer)
+
+The same app also runs in a browser. `DTA_Sales_web_app.zip` is the production build (`npm run build` in `dashboard/`). Upload it to `public_html/sales` on dtaonline.in and extract it; employees open `https://dtaonline.in/sales/`. The backend stays at `https://dtaonline.in/DTA_Sales/` (see `backend/SETUP.md`). If you ever change the backend address, edit `BACKEND_URL` in `dashboard/src/constants.js` and the `connect-src` in `dashboard/index.html`, then rebuild.
