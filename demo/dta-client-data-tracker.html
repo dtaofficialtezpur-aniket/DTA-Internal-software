@@ -31,13 +31,14 @@ select,input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-r
 .pill.paid,.pill.active,.pill.filed{background:rgba(20,134,79,.15);color:var(--good)}.pill.pending,.pill.paused,.pill.due-soon{background:rgba(183,121,31,.18);color:var(--warn)}.pill.overdue{background:rgba(201,58,58,.15);color:var(--bad)}
 dialog{border:0;border-radius:14px;padding:20px;background:var(--card);color:var(--ink);width:min(420px,92vw)}dialog::backdrop{background:rgba(0,0,0,.5)}
 dialog label{display:block;margin:10px 0 4px;color:var(--mute);font-size:12px}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:800px){.two{grid-template-columns:1fr}}
+.two>*{min-width:0}.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:800px){.two{grid-template-columns:1fr}}
 .note{background:rgba(47,91,234,.1);border:1px dashed var(--brand);border-radius:10px;padding:10px 14px;margin-bottom:16px;color:var(--ink)}
 @media(max-width:700px){body{flex-direction:column}aside{width:100%;height:auto;position:static;display:flex;flex-wrap:wrap;gap:4px}aside h1,aside small{width:100%}aside button{width:auto}main{padding:16px}}
 .cols{display:grid;gap:14px;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start}@media(max-width:1000px){.cols{grid-template-columns:1fr}}
 .mini{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}.mini div{background:var(--bg);border-radius:8px;padding:6px 8px}.mini span{display:block;color:var(--mute);font-size:11px;text-transform:uppercase}.mini b{font-size:13px}
 .item b:last-child{white-space:nowrap}.item{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
 .top{display:flex;align-items:center;gap:10px;margin:-8px 0 14px}.top .sp{flex:1}.top label{color:var(--mute);font-size:12px;text-transform:uppercase;letter-spacing:.04em}.top select{width:auto;min-width:200px;font-weight:600}
+.cmp th,.cmp td{padding:8px 6px;white-space:normal}.cmp td:nth-child(3){white-space:nowrap}.cmp button{padding:4px 8px;font-size:12px;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -60,9 +61,10 @@ let clients=[
  {id:1,type:'marketing',name:'Sharma Sweets',service:'Social media + Ads',fee:25000,status:'active',due:d(6)},
  {id:2,type:'marketing',name:'Bodoland Traders',service:'SEO + Website',fee:18000,status:'active',due:d(-4)},
  {id:3,type:'marketing',name:'Green Valley School',service:'Ads management',fee:12000,status:'paused',due:d(15)},
- {id:7,type:'accounts',name:'Kalita Enterprises',gstin:'18AAAPK1234A1Z5',service:'GST Return (GSTR-3B)',fee:1500,status:'pending',due:d(5)},
- {id:8,type:'accounts',name:'Dr. P. Bora',gstin:'PAN ABCPB5678D',service:'ITR Filing',fee:2500,status:'filed',due:d(60)},
- {id:9,type:'accounts',name:'Tezpur Hardware',gstin:'18AABFT9087C1Z2',service:'Bookkeeping + GST',fee:5000,status:'pending',due:d(-3)},
+ {id:7,type:'accounts',name:'Kalita Enterprises',gst:true,gstin:'18AAAPK1234A1Z5',gstFee:1500,itr:false,status:'active'},
+ {id:8,type:'accounts',name:'Dr. P. Bora',gst:false,itr:true,pan:'ABCPB5678D',itrFee:2500,itrStatus:'filed',itrDue:d(17),status:'active'},
+ {id:9,type:'accounts',name:'Tezpur Hardware',gst:true,gstin:'18AABFT9087C1Z2',gstFee:3000,itr:true,pan:'AABFT9087C',itrFee:2000,itrStatus:'pending',itrDue:d(17),status:'active'},
+ {id:10,type:'accounts',name:'Rupam Saikia',gst:false,itr:true,pan:'BXYPS4411K',itrFee:1800,itrStatus:'pending',itrDue:d(-2),status:'active'},
  {id:4,type:'trading',name:'R. Gogoi',capital:500000,share:30,pnl:42000,status:'active'},
  {id:5,type:'trading',name:'M. Das',capital:1200000,share:25,pnl:-18000,status:'active'},
  {id:6,type:'trading',name:'S. Baruah',capital:300000,share:30,pnl:15500,status:'active'}];
@@ -80,13 +82,24 @@ let tx=[
  {id:8,date:d(-3),type:'expense',seg:'accounts',cid:null,desc:'Staff salaries',amt:40000,status:'paid'},
  {id:9,date:d(2),type:'income',seg:'marketing',cid:1,desc:'Monthly retainer',amt:25000,status:'pending'},
  {id:10,date:d(-1),type:'expense',seg:'accounts',cid:null,desc:'Internet & software',amt:3500,status:'paid'}];
-let nid=100,view='dash',portalCid=1,dept='accounts';
+let recs=[],accMonth=today.slice(0,7),nid=100,view='dash',portalCid=1,dept='accounts';
 const DN={general:'Accounts',marketing:'Digital Marketing',trading:'Trading'};
 const hasClients=()=>true;
 const ov=c=>c.status=='pending'&&c.due<today?'overdue':c.status;
 const T=()=>dept?tx.filter(t=>t.seg==dept):tx;
-try{const s=JSON.parse(localStorage.getItem('dta-demo2')||'null');if(s){clients=s.clients;tx=s.tx}}catch(e){}
-const save=()=>{try{localStorage.setItem('dta-demo2',JSON.stringify({clients,tx}))}catch(e){}};
+try{const s=JSON.parse(localStorage.getItem('dta-demo3')||'null');if(s){clients=s.clients;tx=s.tx;recs=s.recs||[]}}catch(e){}
+const save=()=>{try{localStorage.setItem('dta-demo3',JSON.stringify({clients,tx,recs}))}catch(e){}};
+const svc=c=>[c.gst&&'GST',c.itr&&'ITR'].filter(Boolean).join(' + ')||'—';
+const fmtM=m=>new Date(m+'-01T00:00:00Z').toLocaleString('en-IN',{month:'short',year:'numeric',timeZone:'UTC'});
+const recDue=(r,k)=>{const[y,m]=r.m.split('-').map(Number);return new Date(Date.UTC(y,m,k=='r1'?11:20)).toISOString().slice(0,10)};
+const rst=(r,k)=>r[k]=='filed'?'filed':recDue(r,k)<today?'overdue':'pending';
+const rank={filed:0,pending:1,overdue:2};
+const worst=a=>a.reduce((w,x)=>rank[x]>rank[w]?x:w,'filed');
+const itrState=c=>c.itrStatus=='filed'?'filed':c.itrDue<today?'overdue':'pending';
+const gstState=c=>worst(recs.filter(r=>r.cid==c.id).flatMap(r=>[rst(r,'r1'),rst(r,'r3b')]));
+const accState=c=>worst([...(c.gst?[gstState(c)]:[]),...(c.itr?[itrState(c)]:[])]);
+const ensureMonth=m=>{clients.filter(c=>c.type=='accounts'&&c.gst).forEach(c=>{if(!recs.some(r=>r.cid==c.id&&r.m==m))recs.push({id:nid++,cid:c.id,m,r1:'pending',r3b:'pending',d1:'',d3:''})})};
+const mAgo=n=>{const t=new Date();t.setUTCDate(1);t.setUTCMonth(t.getUTCMonth()-n);return t.toISOString().slice(0,7)};
 const cname=id=>(clients.find(c=>c.id==id)||{}).name||'—';
 const pill=s=>`<span class="pill ${s}">${s}</span>`;
 const sum=(a,f)=>a.reduce((t,x)=>t+f(x),0);
@@ -104,7 +117,7 @@ dash(){
   return `<h2>${DN[dept]} · Dashboard</h2><div class="sub">Only ${DN[dept]} data is shown</div>
   <div class="note">This is a clickable demo with sample data. Entries you add are kept in this browser only.</div>
   <div class="grid">${kpi('Income received',inr(paidIn()),'good')}${kpi('Expenses',inr(spent()),'bad')}${kpi('Net profit',inr(net),net>=0?'good':'bad')}${kpi('Outstanding',inr(owed()),'warn')}</div>
-  <div class="two"><div class="card"><b>Clients</b><div style="margin-top:10px">${clients.filter(c=>c.type==dept).map(c=>`<div class="item"><span>${c.name}${c.service&&dept=='accounts'?` <span class="sub">· ${c.service}</span>`:''}</span>${pill(dept=='accounts'?ov(c):c.status)}</div>`).join('')||'No clients'}</div></div>
+  <div class="two"><div class="card"><b>Clients</b><div style="margin-top:10px">${clients.filter(c=>c.type==dept).map(c=>`<div class="item"><span>${c.name}${dept=='accounts'?` <span class="sub">· ${svc(c)}</span>`:''}</span>${pill(dept=='accounts'?accState(c):c.status)}</div>`).join('')||'No clients'}</div></div>
   <div class="card"><b>Needs attention</b><div style="margin-top:10px">${
    T().filter(t=>t.status!='paid').map(t=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)">${pill(t.status)} ${cname(t.cid)} — ${inr(t.amt)} <span class="sub">(${t.date})</span></div>`).join('')||'All clear'}</div></div></div>
   <div class="card" style="margin-top:14px"><b>Recent transactions</b>${txTable([...T()].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6),false)}</div>`},
@@ -120,11 +133,22 @@ ledger(){
   </div>`},
 clients(){return dept=='marketing'?views.mkt():dept=='trading'?views.trd():views.acc()},
 acc(){
-  const list=clients.filter(c=>c.type=='accounts');
-  return `<h2>Accounts · Clients</h2><div class="sub">GST, ITR and bookkeeping clients · ${list.filter(c=>ov(c)=='overdue').length} overdue · ${list.filter(c=>c.status=='pending').length} pending filings</div>
+  ensureMonth(accMonth);
+  const A=clients.filter(c=>c.type=='accounts'),gl=A.filter(c=>c.gst),il=A.filter(c=>c.itr),rs=recs.filter(r=>r.m==accMonth);
+  const od=A.filter(c=>accState(c)=='overdue').length;
+  const cell=(r,k,dk)=>`<td>${pill(rst(r,k))} <span class="sub">due ${recDue(r,k)}</span></td><td><button class="sec" onclick="togRec(${r.id},'${k}')">${r[k]=='filed'?'Reopen':'Mark filed'}</button> <span class="sub">${r[dk]||''}</span></td>`;
+  return `<h2>Accounts · Clients</h2><div class="sub">${gl.length} GST clients · ${il.length} ITR clients · ${od} with overdue filings</div>
   <div class="row"><span class="sp"></span><button class="pri" onclick="addClient('accounts')">+ Add client</button></div>
-  <div class="card tw"><table><tr><th>Client</th><th>GSTIN / PAN</th><th>Service</th><th>Filing due</th><th>Status</th><th class="r">Fee</th><th></th></tr>${
-  list.map(c=>`<tr><td>${c.name}</td><td>${c.gstin||'—'}</td><td>${c.service}</td><td>${c.due}</td><td>${pill(ov(c))}</td><td class="r">${inr(c.fee)}</td><td><button class="sec" onclick="toggle(${c.id})">${c.status=='filed'?'Reopen':'Mark filed'}</button></td></tr>`).join('')}</table></div>`},
+  <div class="two">
+   <div class="card"><b style="font-size:16px">GST clients</b><div class="tw" style="margin-top:8px"><table class="cmp"><tr><th>Client</th><th>GSTIN</th><th>Fee / month</th><th>Status</th><th></th></tr>${
+    gl.map(c=>`<tr><td>${c.name}</td><td>${c.gstin||'—'}</td><td>${inr(c.gstFee)}</td><td>${pill(gstState(c))}</td><td><button class="sec" onclick="gstHist(${c.id})">History</button></td></tr>`).join('')||'<tr><td colspan=5>No GST clients</td></tr>'}</table></div></div>
+   <div class="card"><b style="font-size:16px">ITR clients</b><div class="tw" style="margin-top:8px"><table class="cmp"><tr><th>Client</th><th>PAN</th><th>Due</th><th>Status</th><th class="r">Fee</th><th></th></tr>${
+    il.map(c=>`<tr><td>${c.name}</td><td>${c.pan||'—'}</td><td>${c.itrDue}</td><td>${pill(itrState(c))}</td><td class="r">${inr(c.itrFee)}</td><td><button class="sec" onclick="togItr(${c.id})">${c.itrStatus=='filed'?'Reopen':'Mark filed'}</button></td></tr>`).join('')||'<tr><td colspan=6>No ITR clients</td></tr>'}</table></div></div>
+  </div>
+  <div class="card" style="margin-top:14px"><div class="row"><b style="font-size:16px">Monthly GST filing records</b><span class="sp"></span><label class="sub">Return period</label><input type="month" id="mo" value="${accMonth}"></div>
+   <div class="tw"><table><tr><th>Client</th><th>GSTR-1</th><th></th><th>GSTR-3B</th><th></th></tr>${
+   rs.map(r=>`<tr><td>${cname(r.cid)}</td>${cell(r,'r1','d1')}${cell(r,'r3b','d3')}</tr>`).join('')||'<tr><td colspan=5>No GST clients</td></tr>'}</table></div>
+   <div class="sub" style="margin-top:8px">${fmtM(accMonth)} returns: GSTR-1 is due on the 11th and GSTR-3B on the 20th of the next month.</div></div>`},
 mkt(){
   const list=clients.filter(c=>c.type=='marketing');
   return `<h2>Digital Marketing · Clients</h2><div class="sub">Clients, services and monthly retainers · MRR ${inr(sum(list.filter(c=>c.status=='active'),c=>c.fee))}</div>
@@ -144,8 +168,9 @@ portal(){
   return `<h2>${DN[dept]} · Client Portal</h2><div class="sub">What a client sees after logging in — pick a client to preview</div>
   <div class="row"><select id="pc">${pl.map(x=>`<option value="${x.id}" ${x.id==c.id?'selected':''}>${x.name}</option>`).join('')}</select></div>
   <div class="card"><h3 style="margin:0 0 4px">Welcome, ${c.name}</h3>
-  <div class="sub">${c.type=='accounts'?`Service: ${c.service} · ${c.gstin} · filing due ${c.due} · ${ov(c)}`:c.type=='marketing'?`Plan: ${c.service} · ${inr(c.fee)}/month · next due ${c.due}`:`Capital ${inr(c.capital)} · profit share ${c.share}% · this month ${inr(c.pnl)}`}</div>
+  <div class="sub">${c.type=='accounts'?`Services: ${svc(c)} · overall status: ${accState(c)}`:c.type=='marketing'?`Plan: ${c.service} · ${inr(c.fee)}/month · next due ${c.due}`:`Capital ${inr(c.capital)} · profit share ${c.share}% · this month ${inr(c.pnl)}`}</div>
   <div class="grid">${kpi('Paid so far',inr(sum(mine.filter(t=>t.status=='paid'),t=>t.amt)),'good')}${kpi('Balance due',inr(bal),bal?'warn':'good')}</div>
+  ${c.type=='accounts'?`${c.itr?`<div style="margin-bottom:12px"><b>ITR</b> — ${c.pan} · due ${c.itrDue} ${pill(itrState(c))}</div>`:''}${c.gst?`<b>GST filings</b><div class="tw" style="margin:6px 0 14px"><table><tr><th>Period</th><th>GSTR-1</th><th>GSTR-3B</th></tr>${recs.filter(r=>r.cid==c.id).sort((a,b)=>b.m.localeCompare(a.m)).map(r=>`<tr><td>${fmtM(r.m)}</td><td>${pill(rst(r,'r1'))}</td><td>${pill(rst(r,'r3b'))}</td></tr>`).join('')}</table></div>`:''}`:''}
   <b>Statement</b>${txTable([...mine].sort((a,b)=>b.date.localeCompare(a.date)),false)}</div>`}
 };
 
@@ -154,6 +179,7 @@ function render(){
   if(!hasClients()&&(view=='clients'||view=='portal'))view='dash';
   document.querySelectorAll('aside button').forEach(b=>b.classList.toggle('on',b.dataset.v==view));
   document.getElementById('main').innerHTML=views[view]();
+  if(view=='clients'&&dept=='accounts')mo.onchange=()=>{accMonth=mo.value||accMonth;render()};
   if(view=='portal')pc.onchange=()=>{portalCid=pc.value;render()};
 }
 dsel.onchange=()=>{dept=dsel.value;portalCid=0;render()};
@@ -170,13 +196,21 @@ function addTx(seg){seg=seg||dept;openForm(`<h3 style="margin:0">Add entry</h3>
  <label>Date</label><input id="f6" type="date" value="${today}"><label>Status</label><select id="f7"><option>paid</option><option>pending</option><option>overdue</option></select>`,
  ()=>{tx.push({id:nid++,type:v('f1'),seg:v('f2'),cid:v('f3')?+v('f3'):null,desc:v('f4')||'(no description)',amt:+v('f5')||0,date:v('f6'),status:v('f7')});save();render()})}
 function addClient(type){const m=type=='marketing',a=type=='accounts';openForm(`<h3 style="margin:0">Add ${DN[type]} client</h3><label>Name</label><input id="f1">${a?
- `<label>GSTIN / PAN</label><input id="f5"><label>Service</label><select id="f2"><option>GST Return (GSTR-3B)</option><option>GST Registration</option><option>ITR Filing</option><option>Bookkeeping + GST</option><option>Other</option></select><label>Fee (₹)</label><input id="f3" type="number"><label>Filing due date</label><input id="f4" type="date" value="${d(30)}">`:m?
+ `<label><input type="checkbox" id="g1" checked style="width:auto"> GST client</label><label>GSTIN</label><input id="g2"><label>GST fee per month (₹)</label><input id="g3" type="number">
+  <label><input type="checkbox" id="i1" style="width:auto"> ITR client</label><label>PAN</label><input id="i2"><label>ITR fee (₹)</label><input id="i3" type="number"><label>ITR due date</label><input id="i4" type="date" value="${d(30)}">`:m?
  `<label>Service</label><input id="f2"><label>Monthly fee (₹)</label><input id="f3" type="number">`:
  `<label>Capital (₹)</label><input id="f2" type="number"><label>DTA profit share %</label><input id="f3" type="number" value="30"><label>This month P&amp;L (₹)</label><input id="f4" type="number" value="0">`}`,
  ()=>{const c={id:nid++,type,name:v('f1')||'New client',status:'active'};
-  if(a)Object.assign(c,{gstin:v('f5'),service:v('f2'),fee:+v('f3')||0,due:v('f4'),status:'pending'});else if(m)Object.assign(c,{service:v('f2')||'—',fee:+v('f3')||0,due:d(30)});else Object.assign(c,{capital:+v('f2')||0,share:+v('f3')||0,pnl:+v('f4')||0});
+  if(a)Object.assign(c,{status:'active',gst:g1.checked,gstin:v('g2'),gstFee:+v('g3')||0,itr:i1.checked,pan:v('i2'),itrFee:+v('i3')||0,itrDue:v('i4'),itrStatus:'pending'});else if(m)Object.assign(c,{service:v('f2')||'—',fee:+v('f3')||0,due:d(30)});else Object.assign(c,{capital:+v('f2')||0,share:+v('f3')||0,pnl:+v('f4')||0});
   clients.push(c);save();render()})}
+function togRec(id,k){const r=recs.find(x=>x.id==id),dk=k=='r1'?'d1':'d3';if(r[k]=='filed'){r[k]='pending';r[dk]=''}else{r[k]='filed';r[dk]=today}save();render()}
+function togItr(id){const c=clients.find(x=>x.id==id);c.itrStatus=c.itrStatus=='filed'?'pending':'filed';save();render()}
+function gstHist(id){const c=clients.find(x=>x.id==id);openForm(`<h3 style="margin:0">${c.name} · GST filing history</h3><div class="tw"><table><tr><th>Period</th><th>GSTR-1</th><th>GSTR-3B</th></tr>${recs.filter(r=>r.cid==id).sort((a,b)=>b.m.localeCompare(a.m)).map(r=>`<tr><td>${fmtM(r.m)}</td><td>${pill(rst(r,'r1'))}</td><td>${pill(rst(r,'r3b'))}</td></tr>`).join('')}</table></div>`,()=>{})}
 function toggle(id){const c=clients.find(x=>x.id==id);c.status=c.type=='accounts'?(c.status=='filed'?'pending':'filed'):(c.status=='active'?'paused':'active');save();render()}
+nid=Math.max(100,...clients.map(x=>x.id+1),...tx.map(x=>x.id+1),...recs.map(x=>x.id+1));
+if(!recs.length){ensureMonth(mAgo(2));ensureMonth(mAgo(1));ensureMonth(today.slice(0,7));
+  recs.forEach(r=>{if(r.m!=today.slice(0,7)){r.r1=r.r3b='filed';r.d1=r.d3=r.m+'-18'}});
+  const t=recs.find(r=>r.cid==9&&r.m==mAgo(1));if(t){t.r1='pending';t.d1='';t.r3b='pending';t.d3=''}}
 render();
 </script>
 </body>
