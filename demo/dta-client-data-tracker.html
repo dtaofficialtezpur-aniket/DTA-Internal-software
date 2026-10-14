@@ -37,6 +37,7 @@ dialog label{display:block;margin:10px 0 4px;color:var(--mute);font-size:12px}
 .cols{display:grid;gap:14px;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start}@media(max-width:1000px){.cols{grid-template-columns:1fr}}
 .mini{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}.mini div{background:var(--bg);border-radius:8px;padding:6px 8px}.mini span{display:block;color:var(--mute);font-size:11px;text-transform:uppercase}.mini b{font-size:13px}
 .item b:last-child{white-space:nowrap}.item{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.top{display:flex;align-items:center;gap:10px;margin:-8px 0 14px}.top .sp{flex:1}.top label{color:var(--mute);font-size:12px;text-transform:uppercase;letter-spacing:.04em}.top select{width:auto;min-width:200px;font-weight:600}
 </style>
 </head>
 <body>
@@ -48,7 +49,7 @@ dialog label{display:block;margin:10px 0 4px;color:var(--mute);font-size:12px}
   <button data-v="trd">Trading Clients</button>
   <button data-v="portal">Client Portal</button>
 </aside>
-<main id="main"></main>
+<main><div class="top"><span class="sp"></span><label for="dsel">Department</label><select id="dsel"><option value="">All departments</option><option value="general">Accounts</option><option value="marketing">Digital Marketing</option><option value="trading">Trading</option></select></div><div id="main"></div></main>
 
 <dialog id="dlg"><form method="dialog" id="frm"></form></dialog>
 
@@ -74,16 +75,17 @@ let tx=[
  {id:8,date:d(-3),type:'expense',seg:'general',cid:null,desc:'Staff salaries',amt:40000,status:'paid'},
  {id:9,date:d(2),type:'income',seg:'marketing',cid:1,desc:'Monthly retainer',amt:25000,status:'pending'},
  {id:10,date:d(-1),type:'expense',seg:'general',cid:null,desc:'Internet & software',amt:3500,status:'paid'}];
-let nid=100,view='dash',portalCid=1;
+let nid=100,view='dash',portalCid=1,dept='';
+const T=()=>dept?tx.filter(t=>t.seg==dept):tx;
 try{const s=JSON.parse(localStorage.getItem('dta-demo')||'null');if(s){clients=s.clients;tx=s.tx}}catch(e){}
 const save=()=>{try{localStorage.setItem('dta-demo',JSON.stringify({clients,tx}))}catch(e){}};
 const cname=id=>(clients.find(c=>c.id==id)||{}).name||'—';
 const pill=s=>`<span class="pill ${s}">${s}</span>`;
 const sum=(a,f)=>a.reduce((t,x)=>t+f(x),0);
-const paidIn=()=>sum(tx.filter(t=>t.type=='income'&&t.status=='paid'),t=>t.amt);
-const spent=()=>sum(tx.filter(t=>t.type=='expense'),t=>t.amt);
-const owed=()=>sum(tx.filter(t=>t.type=='income'&&t.status!='paid'),t=>t.amt);
-const segInc=s=>sum(tx.filter(t=>t.type=='income'&&t.status=='paid'&&t.seg==s),t=>t.amt);
+const paidIn=()=>sum(T().filter(t=>t.type=='income'&&t.status=='paid'),t=>t.amt);
+const spent=()=>sum(T().filter(t=>t.type=='expense'),t=>t.amt);
+const owed=()=>sum(T().filter(t=>t.type=='income'&&t.status!='paid'),t=>t.amt);
+const segInc=s=>sum(T().filter(t=>t.type=='income'&&t.status=='paid'&&t.seg==s),t=>t.amt);
 const kpi=(l,v,c='')=>`<div class="card kpi"><div class="l">${l}</div><div class="v ${c}">${v}</div></div>`;
 const txTable=(list,showSeg=true)=>`<div class="tw"><table><tr><th>Date</th><th>Description</th>${showSeg?'<th>Segment</th>':''}<th>Client</th><th>Status</th><th class="r">Amount</th></tr>${
  list.map(t=>`<tr><td>${t.date}</td><td>${t.desc}</td>${showSeg?`<td>${t.seg}</td>`:''}<td>${t.cid?cname(t.cid):'—'}</td><td>${pill(t.status)}</td><td class="r ${t.type=='income'?'good':'bad'}">${t.type=='income'?'+':'−'}${inr(t.amt)}</td></tr>`).join('')||'<tr><td colspan=6>No entries</td></tr>'}</table></div>`;
@@ -91,7 +93,7 @@ const txTable=(list,showSeg=true)=>`<div class="tw"><table><tr><th>Date</th><th>
 const views={
 dash(){
   const net=paidIn()-spent(), m=segInc('marketing'), t=segInc('trading'), tot=(m+t)||1;
-  return `<h2>Dashboard</h2><div class="sub">Accounts, digital marketing and trading in one place</div>
+  return `<h2>Dashboard</h2><div class="sub">${dept?'Showing one department':'Accounts, digital marketing and trading in one place'}</div>
   <div class="note">This is a clickable demo with sample data. Entries you add are kept in this browser only.</div>
   <div class="grid">${kpi('Income received',inr(paidIn()),'good')}${kpi('Expenses',inr(spent()),'bad')}${kpi('Net profit',inr(net),net>=0?'good':'bad')}${kpi('Outstanding',inr(owed()),'warn')}</div>
   <div class="two"><div class="card"><b>Income by business</b>
@@ -99,12 +101,12 @@ dash(){
    <div>🔵 Digital Marketing: <b>${inr(m)}</b></div><div>🟢 Trading: <b>${inr(t)}</b></div>
    <div class="sub" style="margin:12px 0 0">${clients.filter(c=>c.type=='marketing').length} marketing clients · ${clients.filter(c=>c.type=='trading').length} trading clients</div></div>
   <div class="card"><b>Needs attention</b><div style="margin-top:10px">${
-   tx.filter(t=>t.status!='paid').map(t=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)">${pill(t.status)} ${cname(t.cid)} — ${inr(t.amt)} <span class="sub">(${t.date})</span></div>`).join('')||'All clear'}</div></div></div>
-  <div class="card" style="margin-top:14px"><b>Recent transactions</b>${txTable([...tx].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6))}</div>`},
+   T().filter(t=>t.status!='paid').map(t=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)">${pill(t.status)} ${cname(t.cid)} — ${inr(t.amt)} <span class="sub">(${t.date})</span></div>`).join('')||'All clear'}</div></div></div>
+  <div class="card" style="margin-top:14px"><b>Recent transactions</b>${txTable([...T()].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6))}</div>`},
 ledger(){
   const deps=[['general','Accounts','var(--warn)'],['marketing','Digital Marketing','var(--brand)'],['trading','Trading','var(--good)']];
   return `<h2>Department Ledger</h2><div class="sub">Income and expenses, separate for each department</div>
-  <div class="cols">${deps.map(([k,n,col])=>{
+  <div class="cols" style="${dept?'grid-template-columns:minmax(0,520px)':''}">${deps.filter(x=>!dept||x[0]==dept).map(([k,n,col])=>{
     const l=tx.filter(t=>t.seg==k).sort((a,b)=>b.date.localeCompare(a.date));
     const inc=sum(l.filter(t=>t.type=='income'&&t.status=='paid'),t=>t.amt),exp=sum(l.filter(t=>t.type=='expense'),t=>t.amt),due=sum(l.filter(t=>t.type=='income'&&t.status!='paid'),t=>t.amt);
     return `<div class="card col" style="border-top:4px solid ${col}">
@@ -141,6 +143,7 @@ function render(){
   document.getElementById('main').innerHTML=views[view]();
   if(view=='portal')pc.onchange=()=>{portalCid=pc.value;render()};
 }
+dsel.onchange=()=>{dept=dsel.value;render()};
 document.querySelectorAll('aside button').forEach(b=>b.onclick=()=>{view=b.dataset.v;render()});
 
 function openForm(html,onOk){frm.innerHTML=html+`<div class="row" style="margin-top:16px"><span class="sp"></span><button class="sec" value="x" formnovalidate>Cancel</button><button class="pri" value="ok">Save</button></div>`;
