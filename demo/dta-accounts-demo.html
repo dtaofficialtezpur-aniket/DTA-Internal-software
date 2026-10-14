@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DTA Accounts Suite (Demo)</title>
+<style>
+:root{--bg:#f4f6fa;--card:#fff;--ink:#1b2333;--mute:#6b7487;--line:#e3e7ef;--brand:#2f5bea;--brand-ink:#fff;--good:#14864f;--bad:#c93a3a;--warn:#b7791f;--side:#111a2e;--side-ink:#c9d2e6}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1424;--card:#172038;--ink:#e8ecf6;--mute:#93a0ba;--line:#26314f;--brand:#5b82ff;--good:#3ecf8e;--bad:#ff6b6b;--warn:#f0b455;--side:#0a0f1d}}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink);display:flex;min-height:100vh}
+aside{width:220px;background:var(--side);color:var(--side-ink);padding:18px 12px;position:sticky;top:0;height:100vh;flex-shrink:0}
+aside h1{font-size:16px;margin:0 8px 4px;color:#fff}aside small{display:block;margin:0 8px 18px;opacity:.6}
+aside button{display:block;width:100%;text-align:left;background:none;border:0;color:inherit;padding:10px 12px;border-radius:8px;font:inherit;cursor:pointer;margin-bottom:2px}
+aside button:hover{background:rgba(255,255,255,.07)}aside button.on{background:var(--brand);color:#fff}
+main{flex:1;padding:24px;min-width:0}
+h2{margin:0 0 4px;font-size:22px}.sub{color:var(--mute);margin-bottom:18px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin-bottom:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+.kpi .l{color:var(--mute);font-size:12px;text-transform:uppercase;letter-spacing:.04em}.kpi .v{font-size:24px;font-weight:700;margin-top:4px}
+.good{color:var(--good)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--mute);font-size:12px;text-transform:uppercase;letter-spacing:.04em}td.r,th.r{text-align:right}
+.tw{overflow-x:auto}
+.bar{height:10px;border-radius:5px;background:var(--line);overflow:hidden;display:flex}.bar i{display:block;height:100%}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}.row .sp{flex:1}
+button.pri,button.sec{font:inherit;padding:8px 14px;border-radius:8px;cursor:pointer;border:1px solid var(--brand)}
+button.pri{background:var(--brand);color:var(--brand-ink)}button.sec{background:none;color:var(--brand)}
+select,input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);width:100%}
+.row select,.row input{width:auto}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;background:var(--line)}
+.pill.paid,.pill.active{background:rgba(20,134,79,.15);color:var(--good)}.pill.pending,.pill.paused{background:rgba(183,121,31,.18);color:var(--warn)}.pill.overdue{background:rgba(201,58,58,.15);color:var(--bad)}
+dialog{border:0;border-radius:14px;padding:20px;background:var(--card);color:var(--ink);width:min(420px,92vw)}dialog::backdrop{background:rgba(0,0,0,.5)}
+dialog label{display:block;margin:10px 0 4px;color:var(--mute);font-size:12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:800px){.two{grid-template-columns:1fr}}
+.note{background:rgba(47,91,234,.1);border:1px dashed var(--brand);border-radius:10px;padding:10px 14px;margin-bottom:16px;color:var(--ink)}
+@media(max-width:700px){body{flex-direction:column}aside{width:100%;height:auto;position:static;display:flex;flex-wrap:wrap;gap:4px}aside h1,aside small{width:100%}aside button{width:auto}main{padding:16px}}
+</style>
+</head>
+<body>
+<aside>
+  <h1>DTA Accounts Suite</h1><small>Demo · sample data</small>
+  <button data-v="dash" class="on">Dashboard</button>
+  <button data-v="ledger">Accounts Ledger</button>
+  <button data-v="mkt">Digital Marketing</button>
+  <button data-v="trd">Trading Clients</button>
+  <button data-v="portal">Client Portal</button>
+</aside>
+<main id="main"></main>
+
+<dialog id="dlg"><form method="dialog" id="frm"></form></dialog>
+
+<script>
+const inr=n=>'₹'+Math.round(n).toLocaleString('en-IN');
+const today=new Date().toISOString().slice(0,10);
+const d=o=>{const t=new Date();t.setDate(t.getDate()+o);return t.toISOString().slice(0,10)};
+let clients=[
+ {id:1,type:'marketing',name:'Sharma Sweets',service:'Social media + Ads',fee:25000,status:'active',due:d(6)},
+ {id:2,type:'marketing',name:'Bodoland Traders',service:'SEO + Website',fee:18000,status:'active',due:d(-4)},
+ {id:3,type:'marketing',name:'Green Valley School',service:'Ads management',fee:12000,status:'paused',due:d(15)},
+ {id:4,type:'trading',name:'R. Gogoi',capital:500000,share:30,pnl:42000,status:'active'},
+ {id:5,type:'trading',name:'M. Das',capital:1200000,share:25,pnl:-18000,status:'active'},
+ {id:6,type:'trading',name:'S. Baruah',capital:300000,share:30,pnl:15500,status:'active'}];
+let tx=[
+ {id:1,date:d(-25),type:'income',seg:'marketing',cid:1,desc:'Monthly retainer',amt:25000,status:'paid'},
+ {id:2,date:d(-20),type:'income',seg:'marketing',cid:2,desc:'Monthly retainer',amt:18000,status:'paid'},
+ {id:3,date:d(-12),type:'income',seg:'trading',cid:4,desc:'Profit share – last month',amt:12600,status:'paid'},
+ {id:4,date:d(-10),type:'expense',seg:'general',cid:null,desc:'Office rent',amt:15000,status:'paid'},
+ {id:5,date:d(-8),type:'expense',seg:'marketing',cid:null,desc:'Ad credits (Meta)',amt:9000,status:'paid'},
+ {id:6,date:d(-6),type:'income',seg:'trading',cid:6,desc:'Profit share – last month',amt:4650,status:'paid'},
+ {id:7,date:d(-4),type:'income',seg:'marketing',cid:2,desc:'Monthly retainer',amt:18000,status:'overdue'},
+ {id:8,date:d(-3),type:'expense',seg:'general',cid:null,desc:'Staff salaries',amt:40000,status:'paid'},
+ {id:9,date:d(2),type:'income',seg:'marketing',cid:1,desc:'Monthly retainer',amt:25000,status:'pending'},
+ {id:10,date:d(-1),type:'expense',seg:'general',cid:null,desc:'Internet & software',amt:3500,status:'paid'}];
+let nid=100,view='dash',portalCid=1;
+try{const s=JSON.parse(localStorage.getItem('dta-demo')||'null');if(s){clients=s.clients;tx=s.tx}}catch(e){}
+const save=()=>{try{localStorage.setItem('dta-demo',JSON.stringify({clients,tx}))}catch(e){}};
+const cname=id=>(clients.find(c=>c.id==id)||{}).name||'—';
+const pill=s=>`<span class="pill ${s}">${s}</span>`;
+const sum=(a,f)=>a.reduce((t,x)=>t+f(x),0);
+const paidIn=()=>sum(tx.filter(t=>t.type=='income'&&t.status=='paid'),t=>t.amt);
+const spent=()=>sum(tx.filter(t=>t.type=='expense'),t=>t.amt);
+const owed=()=>sum(tx.filter(t=>t.type=='income'&&t.status!='paid'),t=>t.amt);
+const segInc=s=>sum(tx.filter(t=>t.type=='income'&&t.status=='paid'&&t.seg==s),t=>t.amt);
+const kpi=(l,v,c='')=>`<div class="card kpi"><div class="l">${l}</div><div class="v ${c}">${v}</div></div>`;
+const txTable=(list,showSeg=true)=>`<div class="tw"><table><tr><th>Date</th><th>Description</th>${showSeg?'<th>Segment</th>':''}<th>Client</th><th>Status</th><th class="r">Amount</th></tr>${
+ list.map(t=>`<tr><td>${t.date}</td><td>${t.desc}</td>${showSeg?`<td>${t.seg}</td>`:''}<td>${t.cid?cname(t.cid):'—'}</td><td>${pill(t.status)}</td><td class="r ${t.type=='income'?'good':'bad'}">${t.type=='income'?'+':'−'}${inr(t.amt)}</td></tr>`).join('')||'<tr><td colspan=6>No entries</td></tr>'}</table></div>`;
+
+const views={
+dash(){
+  const net=paidIn()-spent(), m=segInc('marketing'), t=segInc('trading'), tot=(m+t)||1;
+  return `<h2>Dashboard</h2><div class="sub">Accounts, digital marketing and trading in one place</div>
+  <div class="note">This is a clickable demo with sample data. Entries you add are kept in this browser only.</div>
+  <div class="grid">${kpi('Income received',inr(paidIn()),'good')}${kpi('Expenses',inr(spent()),'bad')}${kpi('Net profit',inr(net),net>=0?'good':'bad')}${kpi('Outstanding',inr(owed()),'warn')}</div>
+  <div class="two"><div class="card"><b>Income by business</b>
+   <div class="bar" style="margin:14px 0 8px"><i style="width:${m/tot*100}%;background:var(--brand)"></i><i style="width:${t/tot*100}%;background:var(--good)"></i></div>
+   <div>🔵 Digital Marketing: <b>${inr(m)}</b></div><div>🟢 Trading: <b>${inr(t)}</b></div>
+   <div class="sub" style="margin:12px 0 0">${clients.filter(c=>c.type=='marketing').length} marketing clients · ${clients.filter(c=>c.type=='trading').length} trading clients</div></div>
+  <div class="card"><b>Needs attention</b><div style="margin-top:10px">${
+   tx.filter(t=>t.status!='paid').map(t=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)">${pill(t.status)} ${cname(t.cid)} — ${inr(t.amt)} <span class="sub">(${t.date})</span></div>`).join('')||'All clear'}</div></div></div>
+  <div class="card" style="margin-top:14px"><b>Recent transactions</b>${txTable([...tx].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6))}</div>`},
+ledger(){
+  return `<h2>Accounts Ledger</h2><div class="sub">All income and expenses</div>
+  <div class="row"><select id="fs"><option value="">All segments</option><option>marketing</option><option>trading</option><option>general</option></select>
+  <select id="ft"><option value="">Income & expense</option><option>income</option><option>expense</option></select><span class="sp"></span>
+  <button class="pri" onclick="addTx()">+ Add entry</button></div>
+  <div class="card" id="lt"></div>`},
+mkt(){
+  const list=clients.filter(c=>c.type=='marketing');
+  return `<h2>Digital Marketing</h2><div class="sub">Clients, services and monthly retainers · MRR ${inr(sum(list.filter(c=>c.status=='active'),c=>c.fee))}</div>
+  <div class="row"><span class="sp"></span><button class="pri" onclick="addClient('marketing')">+ Add client</button></div>
+  <div class="card tw"><table><tr><th>Client</th><th>Service</th><th>Status</th><th>Next due</th><th class="r">Monthly fee</th><th></th></tr>${
+  list.map(c=>`<tr><td>${c.name}</td><td>${c.service}</td><td>${pill(c.status)}</td><td>${c.due}</td><td class="r">${inr(c.fee)}</td><td><button class="sec" onclick="toggle(${c.id})">${c.status=='active'?'Pause':'Resume'}</button></td></tr>`).join('')}</table></div>`},
+trd(){
+  const list=clients.filter(c=>c.type=='trading'), mine=c=>c.pnl>0?c.pnl*c.share/100:0;
+  return `<h2>Trading Clients</h2><div class="sub">Capital managed ${inr(sum(list,c=>c.capital))} · DTA profit share this month ${inr(sum(list,mine))}</div>
+  <div class="row"><span class="sp"></span><button class="pri" onclick="addClient('trading')">+ Add client</button></div>
+  <div class="card tw"><table><tr><th>Client</th><th class="r">Capital</th><th class="r">Month P&amp;L</th><th class="r">Return</th><th class="r">DTA share %</th><th class="r">DTA earns</th></tr>${
+  list.map(c=>`<tr><td>${c.name}</td><td class="r">${inr(c.capital)}</td><td class="r ${c.pnl>=0?'good':'bad'}">${inr(c.pnl)}</td><td class="r">${(c.pnl/c.capital*100).toFixed(2)}%</td><td class="r">${c.share}%</td><td class="r">${inr(mine(c))}</td></tr>`).join('')}</table></div>
+  <div class="sub" style="margin-top:10px">DTA earns a profit share only in profitable months. Loss months show ₹0.</div>`},
+portal(){
+  const c=clients.find(x=>x.id==portalCid)||clients[0], mine=tx.filter(t=>t.cid==c.id);
+  const bal=sum(mine.filter(t=>t.type=='income'&&t.status!='paid'),t=>t.amt);
+  return `<h2>Client Portal</h2><div class="sub">What a client sees after logging in — pick a client to preview</div>
+  <div class="row"><select id="pc">${clients.map(x=>`<option value="${x.id}" ${x.id==c.id?'selected':''}>${x.name} (${x.type})</option>`).join('')}</select></div>
+  <div class="card"><h3 style="margin:0 0 4px">Welcome, ${c.name}</h3>
+  <div class="sub">${c.type=='marketing'?`Plan: ${c.service} · ${inr(c.fee)}/month · next due ${c.due}`:`Capital ${inr(c.capital)} · profit share ${c.share}% · this month ${inr(c.pnl)}`}</div>
+  <div class="grid">${kpi('Paid so far',inr(sum(mine.filter(t=>t.status=='paid'),t=>t.amt)),'good')}${kpi('Balance due',inr(bal),bal?'warn':'good')}</div>
+  <b>Statement</b>${txTable([...mine].sort((a,b)=>b.date.localeCompare(a.date)),false)}</div>`}
+};
+
+function render(){
+  document.querySelectorAll('aside button').forEach(b=>b.classList.toggle('on',b.dataset.v==view));
+  document.getElementById('main').innerHTML=views[view]();
+  if(view=='ledger'){const f=()=>{const s=fs.value,t=ft.value;
+    lt.innerHTML=txTable([...tx].filter(x=>(!s||x.seg==s)&&(!t||x.type==t)).sort((a,b)=>b.date.localeCompare(a.date)))};
+    fs.onchange=ft.onchange=f;f()}
+  if(view=='portal')pc.onchange=()=>{portalCid=pc.value;render()};
+}
+document.querySelectorAll('aside button').forEach(b=>b.onclick=()=>{view=b.dataset.v;render()});
+
+function openForm(html,onOk){frm.innerHTML=html+`<div class="row" style="margin-top:16px"><span class="sp"></span><button class="sec" value="x" formnovalidate>Cancel</button><button class="pri" value="ok">Save</button></div>`;
+  frm.onsubmit=e=>{if(e.submitter&&e.submitter.value=='ok')onOk()};dlg.showModal()}
+const v=id=>document.getElementById(id).value;
+function addTx(){openForm(`<h3 style="margin:0">Add entry</h3>
+ <label>Type</label><select id="f1"><option>income</option><option>expense</option></select>
+ <label>Segment</label><select id="f2"><option>marketing</option><option>trading</option><option>general</option></select>
+ <label>Client (optional)</label><select id="f3"><option value="">—</option>${clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>
+ <label>Description</label><input id="f4"><label>Amount (₹)</label><input id="f5" type="number" min="0">
+ <label>Date</label><input id="f6" type="date" value="${today}"><label>Status</label><select id="f7"><option>paid</option><option>pending</option><option>overdue</option></select>`,
+ ()=>{tx.push({id:nid++,type:v('f1'),seg:v('f2'),cid:v('f3')?+v('f3'):null,desc:v('f4')||'(no description)',amt:+v('f5')||0,date:v('f6'),status:v('f7')});save();render()})}
+function addClient(type){const m=type=='marketing';openForm(`<h3 style="margin:0">Add ${type} client</h3><label>Name</label><input id="f1">${m?
+ `<label>Service</label><input id="f2"><label>Monthly fee (₹)</label><input id="f3" type="number">`:
+ `<label>Capital (₹)</label><input id="f2" type="number"><label>DTA profit share %</label><input id="f3" type="number" value="30"><label>This month P&amp;L (₹)</label><input id="f4" type="number" value="0">`}`,
+ ()=>{const c={id:nid++,type,name:v('f1')||'New client',status:'active'};
+  if(m)Object.assign(c,{service:v('f2')||'—',fee:+v('f3')||0,due:d(30)});else Object.assign(c,{capital:+v('f2')||0,share:+v('f3')||0,pnl:+v('f4')||0});
+  clients.push(c);save();render()})}
+function toggle(id){const c=clients.find(x=>x.id==id);c.status=c.status=='active'?'paused':'active';save();render()}
+render();
+</script>
+</body>
+</html>
