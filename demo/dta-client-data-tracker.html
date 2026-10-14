@@ -39,12 +39,19 @@ dialog label{display:block;margin:10px 0 4px;color:var(--mute);font-size:12px}
 .item b:last-child{white-space:nowrap}.item{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
 .top{display:flex;align-items:center;gap:10px;margin:-8px 0 14px}.top .sp{flex:1}.top label{color:var(--mute);font-size:12px;text-transform:uppercase;letter-spacing:.04em}.top select{width:auto;min-width:200px;font-weight:600}
 .cmp th,.cmp td{padding:8px 6px;white-space:normal}.cmp td:nth-child(3){white-space:nowrap}.cmp button{padding:4px 8px;font-size:12px;white-space:nowrap}
+.kan{display:grid;grid-template-columns:repeat(5,minmax(200px,1fr));gap:10px;overflow-x:auto;padding-bottom:8px}
+.kcol{background:var(--line);background:color-mix(in srgb,var(--line) 45%,transparent);border-radius:10px;padding:8px;min-height:140px}
+.kh{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:8px}.kh .sub,.lead .sub{margin:0}
+.lead{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:8px;cursor:pointer}.lead:hover{border-color:var(--brand)}
+.pill.today{background:rgba(47,91,234,.15);color:var(--brand)}.pill.upcoming{background:var(--line);color:var(--mute)}
+.notes{max-height:150px;overflow:auto;margin-top:8px}.notes div{padding:6px 0;border-top:1px solid var(--line)}
 </style>
 </head>
 <body>
 <aside>
   <h1>DTA Client Data Tracker</h1><small>Demo · sample data</small>
   <button data-v="dash" class="on">Dashboard</button>
+  <button data-v="crm">CRM / Leads</button>
   <button data-v="ledger">Income &amp; Expenses</button>
   <button data-v="clients" id="navc">Clients</button>
   <button data-v="portal" id="navp">Client Portal</button>
@@ -82,13 +89,25 @@ let tx=[
  {id:8,date:d(-3),type:'expense',seg:'accounts',cid:null,desc:'Staff salaries',amt:40000,status:'paid'},
  {id:9,date:d(2),type:'income',seg:'marketing',cid:1,desc:'Monthly retainer',amt:25000,status:'pending'},
  {id:10,date:d(-1),type:'expense',seg:'accounts',cid:null,desc:'Internet & software',amt:3500,status:'paid'}];
-let recs=[],accMonth=today.slice(0,7),nid=100,view='dash',portalCid=1,dept='accounts';
-const DN={general:'Accounts',marketing:'Digital Marketing',trading:'Trading'};
+let leads=[
+ {id:201,dept:'accounts',name:'Mahanta Traders',phone:'98640 11122',source:'Referral',service:'GST Registration',value:3000,stage:'contacted',next:d(0),notes:[{d:d(-3),t:'Called. Needs GST registration for new shop.'}],cid:null},
+ {id:202,dept:'accounts',name:'Jyoti Pharmacy',phone:'94350 22233',source:'Website',service:'GST Return',value:1500,stage:'new',next:d(-2),notes:[],cid:null},
+ {id:203,dept:'accounts',name:'Dr. A. Hazarika',phone:'70020 33344',source:'WhatsApp',service:'ITR Filing',value:2500,stage:'proposal',next:d(3),notes:[{d:d(-1),t:'Sent fee quote on WhatsApp.'}],cid:null},
+ {id:204,dept:'accounts',name:'Bhabesh Stores',phone:'98540 44455',source:'Walk-in',service:'Bookkeeping + GST',value:5000,stage:'lost',next:'',notes:[{d:d(-9),t:'Went with a local CA.'}],cid:null},
+ {id:211,dept:'marketing',name:'Hotel Rangoli',phone:'98640 55566',source:'Website',service:'Social media + Ads',value:30000,stage:'proposal',next:d(1),notes:[{d:d(-2),t:'Proposal mailed. Owner reviewing.'}],cid:null},
+ {id:212,dept:'marketing',name:'Tezpur Coaching Hub',phone:'94350 66677',source:'Referral',service:'Ads management',value:15000,stage:'new',next:d(0),notes:[],cid:null},
+ {id:213,dept:'marketing',name:'Naturals Salon',phone:'70020 77788',source:'Phone call',service:'SEO + Website',value:20000,stage:'contacted',next:d(-1),notes:[{d:d(-4),t:'Wants a booking website.'}],cid:null},
+ {id:214,dept:'marketing',name:'Anjali Boutique',phone:'98540 88899',source:'Social media',service:'Social media + Ads',value:12000,stage:'won',next:'',wonOn:d(-1),notes:[{d:d(-1),t:'Agreed. Starts next month.'}],cid:null},
+ {id:221,dept:'trading',name:'P. Sharma',phone:'98640 99900',source:'Referral',service:'Portfolio management',value:400000,stage:'contacted',next:d(2),notes:[{d:d(-2),t:'Interested. Wants to see past returns.'}],cid:null},
+ {id:222,dept:'trading',name:'K. Deka',phone:'94350 10101',source:'WhatsApp',service:'Portfolio management',value:800000,stage:'new',next:d(0),notes:[],cid:null},
+ {id:223,dept:'trading',name:'A. Barman',phone:'70020 20202',source:'Referral',service:'Portfolio management',value:250000,stage:'proposal',next:d(5),notes:[],cid:null}],
+ crmQ='',recs=[],accMonth=today.slice(0,7),nid=100,view='dash',portalCid=1,dept='accounts';
+const DN={accounts:'Accounts',marketing:'Digital Marketing',trading:'Trading'};
 const hasClients=()=>true;
 const ov=c=>c.status=='pending'&&c.due<today?'overdue':c.status;
 const T=()=>dept?tx.filter(t=>t.seg==dept):tx;
-try{const s=JSON.parse(localStorage.getItem('dta-demo3')||'null');if(s){clients=s.clients;tx=s.tx;recs=s.recs||[]}}catch(e){}
-const save=()=>{try{localStorage.setItem('dta-demo3',JSON.stringify({clients,tx,recs}))}catch(e){}};
+try{const s=JSON.parse(localStorage.getItem('dta-demo3')||'null');if(s){clients=s.clients;tx=s.tx;recs=s.recs||[];if(s.leads)leads=s.leads}}catch(e){}
+const save=()=>{try{localStorage.setItem('dta-demo3',JSON.stringify({clients,tx,recs,leads}))}catch(e){}};
 const svc=c=>[c.gst&&'GST',c.itr&&'ITR'].filter(Boolean).join(' + ')||'—';
 const fmtM=m=>new Date(m+'-01T00:00:00Z').toLocaleString('en-IN',{month:'short',year:'numeric',timeZone:'UTC'});
 const recDue=(r,k)=>{const[y,m]=r.m.split('-').map(Number);return new Date(Date.UTC(y,m,k=='r1'?11:20)).toISOString().slice(0,10)};
@@ -100,6 +119,12 @@ const gstState=c=>worst(recs.filter(r=>r.cid==c.id).flatMap(r=>[rst(r,'r1'),rst(
 const accState=c=>worst([...(c.gst?[gstState(c)]:[]),...(c.itr?[itrState(c)]:[])]);
 const ensureMonth=m=>{clients.filter(c=>c.type=='accounts'&&c.gst).forEach(c=>{if(!recs.some(r=>r.cid==c.id&&r.m==m))recs.push({id:nid++,cid:c.id,m,r1:'pending',r3b:'pending',d1:'',d3:''})})};
 const mAgo=n=>{const t=new Date();t.setUTCDate(1);t.setUTCMonth(t.getUTCMonth()-n);return t.toISOString().slice(0,7)};
+const STAGES=[['new','New'],['contacted','Contacted'],['proposal','Proposal sent'],['won','Won'],['lost','Lost']];
+const SRC=['Website','Referral','Phone call','WhatsApp','Walk-in','Social media'];
+const SVC={accounts:['GST Return','GST Registration','ITR Filing','Bookkeeping + GST'],marketing:['Social media + Ads','SEO + Website','Ads management','Website only'],trading:['Portfolio management']};
+const fu=l=>['won','lost'].includes(l.stage)||!l.next?'':l.next<today?'overdue':l.next==today?'today':'upcoming';
+const board=()=>{const q=crmQ.toLowerCase(),L=leads.filter(l=>l.dept==dept&&(!q||(l.name+l.phone).toLowerCase().includes(q)));
+  return STAGES.map(([k,n])=>{const col=L.filter(l=>l.stage==k);return `<div class="kcol" ondragover="event.preventDefault()" ondrop="dropLead(event,'${k}')"><div class="kh"><b>${n}</b><span class="sub">${col.length} · ${inr(sum(col,l=>l.value))}</span></div>${col.map(l=>`<div class="lead" draggable="true" ondragstart="event.dataTransfer.setData('text','${l.id}')" onclick="leadOpen(${l.id})"><b>${l.name}</b><div class="sub" style="margin:2px 0 6px">${l.service} · ${l.source}</div><div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><b>${inr(l.value)}</b>${fu(l)?pill(fu(l)):''}</div>${l.cid?'<div class="sub" style="margin-top:4px">✓ converted to client</div>':''}</div>`).join('')}</div>`}).join('')};
 const cname=id=>(clients.find(c=>c.id==id)||{}).name||'—';
 const pill=s=>`<span class="pill ${s}">${s}</span>`;
 const sum=(a,f)=>a.reduce((t,x)=>t+f(x),0);
@@ -121,8 +146,17 @@ dash(){
   <div class="card"><b>Needs attention</b><div style="margin-top:10px">${
    T().filter(t=>t.status!='paid').map(t=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)">${pill(t.status)} ${cname(t.cid)} — ${inr(t.amt)} <span class="sub">(${t.date})</span></div>`).join('')||'All clear'}</div></div></div>
   <div class="card" style="margin-top:14px"><b>Recent transactions</b>${txTable([...T()].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6),false)}</div>`},
+crm(){
+  const L=leads.filter(l=>l.dept==dept),open=L.filter(l=>!['won','lost'].includes(l.stage));
+  const due=open.filter(l=>['overdue','today'].includes(fu(l))).sort((a,b)=>a.next.localeCompare(b.next));
+  const won=L.filter(l=>l.stage=='won'&&(l.wonOn||'').startsWith(today.slice(0,7)));
+  return `<h2>${DN[dept]} · CRM</h2><div class="sub">Leads and follow-ups for ${DN[dept]} only</div>
+  <div class="grid">${kpi('Open leads',open.length)}${kpi('Pipeline value',inr(sum(open,l=>l.value)))}${kpi('Won this month',won.length,'good')}${kpi('Follow-ups due',due.length,due.length?'bad':'good')}</div>
+  ${due.length?`<div class="card" style="margin-bottom:14px"><b>Follow-ups due</b>${due.map(l=>`<div class="item" style="cursor:pointer" onclick="leadOpen(${l.id})"><span><b>${l.name}</b> <span class="sub">· ${l.phone} · ${l.service}</span></span><span>${pill(fu(l))} <span class="sub">${l.next}</span></span></div>`).join('')}</div>`:''}
+  <div class="row"><input id="cq" placeholder="Search name or phone" value="${crmQ}" style="max-width:260px"><span class="sp"></span><button class="pri" onclick="addLead()">+ Add lead</button></div>
+  <div class="kan" id="kb">${board()}</div><div class="sub" style="margin-top:6px">Tip: drag a card to another column to change its stage, or click a card to open it.</div>`},
 ledger(){
-  const k=dept,n=DN[k],col={general:'var(--warn)',marketing:'var(--brand)',trading:'var(--good)'}[k];
+  const k=dept,n=DN[k],col={accounts:'var(--warn)',marketing:'var(--brand)',trading:'var(--good)'}[k];
   const l=tx.filter(t=>t.seg==k).sort((a,b)=>b.date.localeCompare(a.date));
   const inc=sum(l.filter(t=>t.type=='income'&&t.status=='paid'),t=>t.amt),exp=sum(l.filter(t=>t.type=='expense'),t=>t.amt),due=sum(l.filter(t=>t.type=='income'&&t.status!='paid'),t=>t.amt);
   return `<h2>${n} · Income &amp; Expenses</h2><div class="sub">Only ${n} entries</div>
@@ -180,6 +214,7 @@ function render(){
   document.querySelectorAll('aside button').forEach(b=>b.classList.toggle('on',b.dataset.v==view));
   document.getElementById('main').innerHTML=views[view]();
   if(view=='clients'&&dept=='accounts')mo.onchange=()=>{accMonth=mo.value||accMonth;render()};
+  if(view=='crm')cq.oninput=()=>{crmQ=cq.value;kb.innerHTML=board()};
   if(view=='portal')pc.onchange=()=>{portalCid=pc.value;render()};
 }
 dsel.onchange=()=>{dept=dsel.value;portalCid=0;render()};
@@ -203,11 +238,30 @@ function addClient(type){const m=type=='marketing',a=type=='accounts';openForm(`
  ()=>{const c={id:nid++,type,name:v('f1')||'New client',status:'active'};
   if(a)Object.assign(c,{status:'active',gst:g1.checked,gstin:v('g2'),gstFee:+v('g3')||0,itr:i1.checked,pan:v('i2'),itrFee:+v('i3')||0,itrDue:v('i4'),itrStatus:'pending'});else if(m)Object.assign(c,{service:v('f2')||'—',fee:+v('f3')||0,due:d(30)});else Object.assign(c,{capital:+v('f2')||0,share:+v('f3')||0,pnl:+v('f4')||0});
   clients.push(c);save();render()})}
+function setStage(l,k){l.stage=k;if(k=='won'&&!l.wonOn)l.wonOn=today;if(k=='won'||k=='lost')l.next=''}
+function dropLead(e,k){e.preventDefault();const l=leads.find(x=>x.id==e.dataTransfer.getData('text'));if(l){setStage(l,k);save();render()}}
+function addLead(){openForm(`<h3 style="margin:0">Add lead · ${DN[dept]}</h3><label>Name</label><input id="a1"><label>Phone</label><input id="a2">
+ <label>Source</label><select id="a3">${SRC.map(x=>`<option>${x}</option>`).join('')}</select>
+ <label>Service wanted</label><select id="a4">${SVC[dept].map(x=>`<option>${x}</option>`).join('')}</select>
+ <label>${dept=='trading'?'Expected capital (₹)':'Expected fee (₹)'}</label><input id="a5" type="number">
+ <label>Next follow-up</label><input id="a6" type="date" value="${d(2)}"><label>Note</label><input id="a7">`,
+ ()=>{const n=v('a7');leads.push({id:nid++,dept,name:v('a1')||'New lead',phone:v('a2'),source:v('a3'),service:v('a4'),value:+v('a5')||0,stage:'new',next:v('a6'),notes:n?[{d:today,t:n}]:[],cid:null});save();render()})}
+function leadOpen(id){const l=leads.find(x=>x.id==id);openForm(`<h3 style="margin:0">${l.name}</h3><div class="sub" style="margin:0">${l.phone} · ${l.service} · ${inr(l.value)} · ${l.source}</div>
+ <label>Stage</label><select id="l1">${STAGES.map(([k,n])=>`<option value="${k}" ${k==l.stage?'selected':''}>${n}</option>`).join('')}</select>
+ <label>Next follow-up</label><input id="l2" type="date" value="${l.next||''}"><label>Add note</label><input id="l3" placeholder="What happened on this call / message?">
+ <div class="notes">${[...l.notes].reverse().map(n=>`<div><span class="sub">${n.d}</span> ${n.t}</div>`).join('')||'<div class="sub">No notes yet</div>'}</div>
+ <div style="margin-top:12px">${l.cid?`<span class="pill paid">✓ Converted to client: ${cname(l.cid)}</span>`:`<button type="button" class="sec" onclick="convertLead(${l.id})">Convert to client</button>`}</div>`,
+ ()=>{setStage(l,v('l1'));if(v('l1')=='new'||v('l1')=='contacted'||v('l1')=='proposal')l.next=v('l2');const n=v('l3');if(n)l.notes.push({d:today,t:n});save();render()})}
+function convertLead(id){const l=leads.find(x=>x.id==id),c={id:nid++,type:l.dept,name:l.name,status:'active'};
+  if(l.dept=='accounts')Object.assign(c,{gst:/GST|Bookkeeping/.test(l.service),gstin:'',gstFee:l.value,itr:/ITR/.test(l.service),pan:'',itrFee:l.value,itrDue:d(30),itrStatus:'pending'});
+  else if(l.dept=='marketing')Object.assign(c,{service:l.service,fee:l.value,due:d(30)});
+  else Object.assign(c,{capital:l.value,share:30,pnl:0});
+  clients.push(c);l.cid=c.id;setStage(l,'won');l.notes.push({d:today,t:'Converted to client'});save();dlg.close();render()}
 function togRec(id,k){const r=recs.find(x=>x.id==id),dk=k=='r1'?'d1':'d3';if(r[k]=='filed'){r[k]='pending';r[dk]=''}else{r[k]='filed';r[dk]=today}save();render()}
 function togItr(id){const c=clients.find(x=>x.id==id);c.itrStatus=c.itrStatus=='filed'?'pending':'filed';save();render()}
 function gstHist(id){const c=clients.find(x=>x.id==id);openForm(`<h3 style="margin:0">${c.name} · GST filing history</h3><div class="tw"><table><tr><th>Period</th><th>GSTR-1</th><th>GSTR-3B</th></tr>${recs.filter(r=>r.cid==id).sort((a,b)=>b.m.localeCompare(a.m)).map(r=>`<tr><td>${fmtM(r.m)}</td><td>${pill(rst(r,'r1'))}</td><td>${pill(rst(r,'r3b'))}</td></tr>`).join('')}</table></div>`,()=>{})}
 function toggle(id){const c=clients.find(x=>x.id==id);c.status=c.type=='accounts'?(c.status=='filed'?'pending':'filed'):(c.status=='active'?'paused':'active');save();render()}
-nid=Math.max(100,...clients.map(x=>x.id+1),...tx.map(x=>x.id+1),...recs.map(x=>x.id+1));
+nid=Math.max(100,...clients.map(x=>x.id+1),...tx.map(x=>x.id+1),...recs.map(x=>x.id+1),...leads.map(x=>x.id+1));
 if(!recs.length){ensureMonth(mAgo(2));ensureMonth(mAgo(1));ensureMonth(today.slice(0,7));
   recs.forEach(r=>{if(r.m!=today.slice(0,7)){r.r1=r.r3b='filed';r.d1=r.d3=r.m+'-18'}});
   const t=recs.find(r=>r.cid==9&&r.m==mAgo(1));if(t){t.r1='pending';t.d1='';t.r3b='pending';t.d3=''}}
