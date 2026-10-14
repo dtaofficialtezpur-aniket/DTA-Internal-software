@@ -34,13 +34,16 @@ dialog label{display:block;margin:10px 0 4px;color:var(--mute);font-size:12px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:800px){.two{grid-template-columns:1fr}}
 .note{background:rgba(47,91,234,.1);border:1px dashed var(--brand);border-radius:10px;padding:10px 14px;margin-bottom:16px;color:var(--ink)}
 @media(max-width:700px){body{flex-direction:column}aside{width:100%;height:auto;position:static;display:flex;flex-wrap:wrap;gap:4px}aside h1,aside small{width:100%}aside button{width:auto}main{padding:16px}}
+.cols{display:grid;gap:14px;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start}@media(max-width:1000px){.cols{grid-template-columns:1fr}}
+.mini{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}.mini div{background:var(--bg);border-radius:8px;padding:6px 8px}.mini span{display:block;color:var(--mute);font-size:11px;text-transform:uppercase}.mini b{font-size:13px}
+.item b:last-child{white-space:nowrap}.item{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
 </style>
 </head>
 <body>
 <aside>
   <h1>DTA Client Data Tracker</h1><small>Demo · sample data</small>
   <button data-v="dash" class="on">Dashboard</button>
-  <button data-v="ledger">Accounts Ledger</button>
+  <button data-v="ledger">Department Ledger</button>
   <button data-v="mkt">Digital Marketing</button>
   <button data-v="trd">Trading Clients</button>
   <button data-v="portal">Client Portal</button>
@@ -99,11 +102,16 @@ dash(){
    tx.filter(t=>t.status!='paid').map(t=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)">${pill(t.status)} ${cname(t.cid)} — ${inr(t.amt)} <span class="sub">(${t.date})</span></div>`).join('')||'All clear'}</div></div></div>
   <div class="card" style="margin-top:14px"><b>Recent transactions</b>${txTable([...tx].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6))}</div>`},
 ledger(){
-  return `<h2>Accounts Ledger</h2><div class="sub">All income and expenses</div>
-  <div class="row"><select id="fs"><option value="">All segments</option><option>marketing</option><option>trading</option><option>general</option></select>
-  <select id="ft"><option value="">Income & expense</option><option>income</option><option>expense</option></select><span class="sp"></span>
-  <button class="pri" onclick="addTx()">+ Add entry</button></div>
-  <div class="card" id="lt"></div>`},
+  const deps=[['general','Accounts','var(--warn)'],['marketing','Digital Marketing','var(--brand)'],['trading','Trading','var(--good)']];
+  return `<h2>Department Ledger</h2><div class="sub">Income and expenses, separate for each department</div>
+  <div class="cols">${deps.map(([k,n,col])=>{
+    const l=tx.filter(t=>t.seg==k).sort((a,b)=>b.date.localeCompare(a.date));
+    const inc=sum(l.filter(t=>t.type=='income'&&t.status=='paid'),t=>t.amt),exp=sum(l.filter(t=>t.type=='expense'),t=>t.amt),due=sum(l.filter(t=>t.type=='income'&&t.status!='paid'),t=>t.amt);
+    return `<div class="card col" style="border-top:4px solid ${col}">
+     <div class="row"><b style="font-size:16px">${n}</b><span class="sp"></span><button class="pri" onclick="addTx('${k}')">+ Add</button></div>
+     <div class="mini"><div><span>Income</span><b class="good">${inr(inc)}</b></div><div><span>Expense</span><b class="bad">${inr(exp)}</b></div><div><span>Net</span><b>${inr(inc-exp)}</b></div><div><span>Due</span><b class="warn">${inr(due)}</b></div></div>
+     ${l.map(t=>`<div class="item"><div><b>${t.desc}</b><div class="sub" style="margin:0">${t.date} · ${t.cid?cname(t.cid):'—'} ${pill(t.status)}</div></div><b class="${t.type=='income'?'good':'bad'}">${t.type=='income'?'+':'−'}${inr(t.amt)}</b></div>`).join('')||'<div class="sub">No entries</div>'}
+    </div>`}).join('')}</div>`},
 mkt(){
   const list=clients.filter(c=>c.type=='marketing');
   return `<h2>Digital Marketing</h2><div class="sub">Clients, services and monthly retainers · MRR ${inr(sum(list.filter(c=>c.status=='active'),c=>c.fee))}</div>
@@ -131,9 +139,6 @@ portal(){
 function render(){
   document.querySelectorAll('aside button').forEach(b=>b.classList.toggle('on',b.dataset.v==view));
   document.getElementById('main').innerHTML=views[view]();
-  if(view=='ledger'){const f=()=>{const s=fs.value,t=ft.value;
-    lt.innerHTML=txTable([...tx].filter(x=>(!s||x.seg==s)&&(!t||x.type==t)).sort((a,b)=>b.date.localeCompare(a.date)))};
-    fs.onchange=ft.onchange=f;f()}
   if(view=='portal')pc.onchange=()=>{portalCid=pc.value;render()};
 }
 document.querySelectorAll('aside button').forEach(b=>b.onclick=()=>{view=b.dataset.v;render()});
@@ -141,9 +146,9 @@ document.querySelectorAll('aside button').forEach(b=>b.onclick=()=>{view=b.datas
 function openForm(html,onOk){frm.innerHTML=html+`<div class="row" style="margin-top:16px"><span class="sp"></span><button class="sec" value="x" formnovalidate>Cancel</button><button class="pri" value="ok">Save</button></div>`;
   frm.onsubmit=e=>{if(e.submitter&&e.submitter.value=='ok')onOk()};dlg.showModal()}
 const v=id=>document.getElementById(id).value;
-function addTx(){openForm(`<h3 style="margin:0">Add entry</h3>
+function addTx(seg){openForm(`<h3 style="margin:0">Add entry</h3>
  <label>Type</label><select id="f1"><option>income</option><option>expense</option></select>
- <label>Segment</label><select id="f2"><option>marketing</option><option>trading</option><option>general</option></select>
+ <label>Department</label><select id="f2">${[['general','Accounts'],['marketing','Digital Marketing'],['trading','Trading']].map(([k,n])=>`<option value="${k}" ${k==seg?'selected':''}>${n}</option>`).join('')}</select>
  <label>Client (optional)</label><select id="f3"><option value="">—</option>${clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>
  <label>Description</label><input id="f4"><label>Amount (₹)</label><input id="f5" type="number" min="0">
  <label>Date</label><input id="f6" type="date" value="${today}"><label>Status</label><select id="f7"><option>paid</option><option>pending</option><option>overdue</option></select>`,
