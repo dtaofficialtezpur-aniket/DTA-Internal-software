@@ -54,6 +54,8 @@ dialog label{display:block;margin:10px 0 4px;color:var(--mute);font-size:12px}
   <button data-v="crm">CRM / Leads</button>
   <button data-v="ledger">Income &amp; Expenses</button>
   <button data-v="clients" id="navc">Clients</button>
+  <button data-v="gst" id="navg">GST Clients</button>
+  <button data-v="itr" id="navi">ITR Clients</button>
   <button data-v="portal" id="navp">Client Portal</button>
 </aside>
 <main><div class="top"><span class="sp"></span><label for="dsel">Department</label><select id="dsel"><option value="accounts" selected>Accounts</option><option value="marketing">Digital Marketing</option><option value="trading">Trading</option></select></div><div id="main"></div></main>
@@ -70,7 +72,8 @@ let clients=[
  {id:3,type:'marketing',name:'Green Valley School',service:'Ads management',fee:12000,status:'paused',due:d(15)},
  {id:7,type:'accounts',name:'Kalita Enterprises',gst:true,gstin:'18AAAPK1234A1Z5',gstFee:1500,itr:false,status:'active'},
  {id:8,type:'accounts',name:'Dr. P. Bora',gst:false,itr:true,pan:'ABCPB5678D',itrFee:2500,itrStatus:'filed',itrDue:d(17),status:'active'},
- {id:9,type:'accounts',name:'Tezpur Hardware',gst:true,gstin:'18AABFT9087C1Z2',gstFee:3000,itr:true,pan:'AABFT9087C',itrFee:2000,itrStatus:'pending',itrDue:d(17),status:'active'},
+ {id:9,type:'accounts',name:'Tezpur Hardware',gst:true,gstin:'18AABFT9087C1Z2',gstFee:3000,itr:false,status:'active'},
+ {id:12,type:'accounts',name:'R. Gupta (Tezpur Hardware)',gst:false,itr:true,pan:'AABFT9087C',itrFee:2000,itrStatus:'pending',itrDue:d(17),status:'active'},
  {id:10,type:'accounts',name:'Rupam Saikia',gst:false,itr:true,pan:'BXYPS4411K',itrFee:1800,itrStatus:'pending',itrDue:d(-2),status:'active'},
  {id:4,type:'trading',name:'R. Gogoi',capital:500000,share:30,pnl:42000,status:'active'},
  {id:5,type:'trading',name:'M. Das',capital:1200000,share:25,pnl:-18000,status:'active'},
@@ -106,8 +109,8 @@ const DN={accounts:'Accounts',marketing:'Digital Marketing',trading:'Trading'};
 const hasClients=()=>true;
 const ov=c=>c.status=='pending'&&c.due<today?'overdue':c.status;
 const T=()=>dept?tx.filter(t=>t.seg==dept):tx;
-try{const s=JSON.parse(localStorage.getItem('dta-demo3')||'null');if(s){clients=s.clients;tx=s.tx;recs=s.recs||[];if(s.leads)leads=s.leads}}catch(e){}
-const save=()=>{try{localStorage.setItem('dta-demo3',JSON.stringify({clients,tx,recs,leads}))}catch(e){}};
+try{const s=JSON.parse(localStorage.getItem('dta-demo4')||'null');if(s){clients=s.clients;tx=s.tx;recs=s.recs||[];if(s.leads)leads=s.leads}}catch(e){}
+const save=()=>{try{localStorage.setItem('dta-demo4',JSON.stringify({clients,tx,recs,leads}))}catch(e){}};
 const svc=c=>[c.gst&&'GST',c.itr&&'ITR'].filter(Boolean).join(' + ')||'—';
 const fmtM=m=>new Date(m+'-01T00:00:00Z').toLocaleString('en-IN',{month:'short',year:'numeric',timeZone:'UTC'});
 const recDue=(r,k)=>{const[y,m]=r.m.split('-').map(Number);return new Date(Date.UTC(y,m,k=='r1'?11:20)).toISOString().slice(0,10)};
@@ -165,24 +168,25 @@ ledger(){
    <div class="mini"><div><span>Income</span><b class="good">${inr(inc)}</b></div><div><span>Expense</span><b class="bad">${inr(exp)}</b></div><div><span>Net</span><b>${inr(inc-exp)}</b></div><div><span>Due</span><b class="warn">${inr(due)}</b></div></div>
    ${l.map(t=>`<div class="item"><div><b>${t.desc}</b><div class="sub" style="margin:0">${t.date} · ${t.cid?cname(t.cid):'—'} ${pill(t.status)}</div></div><b class="${t.type=='income'?'good':'bad'}">${t.type=='income'?'+':'−'}${inr(t.amt)}</b></div>`).join('')||'<div class="sub">No entries</div>'}
   </div>`},
-clients(){return dept=='marketing'?views.mkt():dept=='trading'?views.trd():views.acc()},
-acc(){
+clients(){return dept=='marketing'?views.mkt():views.trd()},
+gst(){
   ensureMonth(accMonth);
-  const A=clients.filter(c=>c.type=='accounts'),gl=A.filter(c=>c.gst),il=A.filter(c=>c.itr),rs=recs.filter(r=>r.m==accMonth);
-  const od=A.filter(c=>accState(c)=='overdue').length;
+  const gl=clients.filter(c=>c.type=='accounts'&&c.gst),rs=recs.filter(r=>r.m==accMonth);
   const cell=(r,k,dk)=>`<td>${pill(rst(r,k))} <span class="sub">due ${recDue(r,k)}</span></td><td><button class="sec" onclick="togRec(${r.id},'${k}')">${r[k]=='filed'?'Reopen':'Mark filed'}</button> <span class="sub">${r[dk]||''}</span></td>`;
-  return `<h2>Accounts · Clients</h2><div class="sub">${gl.length} GST clients · ${il.length} ITR clients · ${od} with overdue filings</div>
-  <div class="row"><span class="sp"></span><button class="pri" onclick="addClient('accounts')">+ Add client</button></div>
-  <div class="two">
-   <div class="card"><b style="font-size:16px">GST clients</b><div class="tw" style="margin-top:8px"><table class="cmp"><tr><th>Client</th><th>GSTIN</th><th>Fee / month</th><th>Status</th><th></th></tr>${
-    gl.map(c=>`<tr><td>${c.name}</td><td>${c.gstin||'—'}</td><td>${inr(c.gstFee)}</td><td>${pill(gstState(c))}</td><td><button class="sec" onclick="gstHist(${c.id})">History</button></td></tr>`).join('')||'<tr><td colspan=5>No GST clients</td></tr>'}</table></div></div>
-   <div class="card"><b style="font-size:16px">ITR clients</b><div class="tw" style="margin-top:8px"><table class="cmp"><tr><th>Client</th><th>PAN</th><th>Due</th><th>Status</th><th class="r">Fee</th><th></th></tr>${
-    il.map(c=>`<tr><td>${c.name}</td><td>${c.pan||'—'}</td><td>${c.itrDue}</td><td>${pill(itrState(c))}</td><td class="r">${inr(c.itrFee)}</td><td><button class="sec" onclick="togItr(${c.id})">${c.itrStatus=='filed'?'Reopen':'Mark filed'}</button></td></tr>`).join('')||'<tr><td colspan=6>No ITR clients</td></tr>'}</table></div></div>
-  </div>
+  return `<h2>Accounts · GST Clients</h2><div class="sub">${gl.length} GST clients · ${gl.filter(c=>gstState(c)=='overdue').length} with overdue returns · monthly fee total ${inr(sum(gl,c=>c.gstFee))}</div>
+  <div class="row"><span class="sp"></span><button class="pri" onclick="addClient('accounts','gst')">+ Add GST client</button></div>
+  <div class="card tw"><table><tr><th>Client</th><th>GSTIN</th><th class="r">Fee / month</th><th>Status</th><th></th></tr>${
+   gl.map(c=>`<tr><td>${c.name}</td><td>${c.gstin||'—'}</td><td class="r">${inr(c.gstFee)}</td><td>${pill(gstState(c))}</td><td><button class="sec" onclick="gstHist(${c.id})">History</button></td></tr>`).join('')||'<tr><td colspan=5>No GST clients</td></tr>'}</table></div>
   <div class="card" style="margin-top:14px"><div class="row"><b style="font-size:16px">Monthly GST filing records</b><span class="sp"></span><label class="sub">Return period</label><input type="month" id="mo" value="${accMonth}"></div>
    <div class="tw"><table><tr><th>Client</th><th>GSTR-1</th><th></th><th>GSTR-3B</th><th></th></tr>${
    rs.map(r=>`<tr><td>${cname(r.cid)}</td>${cell(r,'r1','d1')}${cell(r,'r3b','d3')}</tr>`).join('')||'<tr><td colspan=5>No GST clients</td></tr>'}</table></div>
    <div class="sub" style="margin-top:8px">${fmtM(accMonth)} returns: GSTR-1 is due on the 11th and GSTR-3B on the 20th of the next month.</div></div>`},
+itr(){
+  const il=clients.filter(c=>c.type=='accounts'&&c.itr);
+  return `<h2>Accounts · ITR Clients</h2><div class="sub">${il.length} ITR clients · ${il.filter(c=>itrState(c)=='overdue').length} overdue · ${il.filter(c=>c.itrStatus=='pending').length} pending</div>
+  <div class="row"><span class="sp"></span><button class="pri" onclick="addClient('accounts','itr')">+ Add ITR client</button></div>
+  <div class="card tw"><table><tr><th>Client</th><th>PAN</th><th>Due date</th><th>Status</th><th class="r">Fee</th><th></th></tr>${
+   il.map(c=>`<tr><td>${c.name}</td><td>${c.pan||'—'}</td><td>${c.itrDue}</td><td>${pill(itrState(c))}</td><td class="r">${inr(c.itrFee)}</td><td><button class="sec" onclick="togItr(${c.id})">${c.itrStatus=='filed'?'Reopen':'Mark filed'}</button></td></tr>`).join('')||'<tr><td colspan=6>No ITR clients</td></tr>'}</table></div>`},
 mkt(){
   const list=clients.filter(c=>c.type=='marketing');
   return `<h2>Digital Marketing · Clients</h2><div class="sub">Clients, services and monthly retainers · MRR ${inr(sum(list.filter(c=>c.status=='active'),c=>c.fee))}</div>
@@ -200,7 +204,7 @@ portal(){
   const pl=clients.filter(x=>x.type==dept),c=pl.find(x=>x.id==portalCid)||pl[0], mine=tx.filter(t=>t.cid==c.id);
   const bal=sum(mine.filter(t=>t.type=='income'&&t.status!='paid'),t=>t.amt);
   return `<h2>${DN[dept]} · Client Portal</h2><div class="sub">What a client sees after logging in — pick a client to preview</div>
-  <div class="row"><select id="pc">${pl.map(x=>`<option value="${x.id}" ${x.id==c.id?'selected':''}>${x.name}</option>`).join('')}</select></div>
+  <div class="row"><select id="pc">${pl.map(x=>`<option value="${x.id}" ${x.id==c.id?'selected':''}>${x.name}${x.type=='accounts'?' ('+svc(x)+')':''}</option>`).join('')}</select></div>
   <div class="card"><h3 style="margin:0 0 4px">Welcome, ${c.name}</h3>
   <div class="sub">${c.type=='accounts'?`Services: ${svc(c)} · overall status: ${accState(c)}`:c.type=='marketing'?`Plan: ${c.service} · ${inr(c.fee)}/month · next due ${c.due}`:`Capital ${inr(c.capital)} · profit share ${c.share}% · this month ${inr(c.pnl)}`}</div>
   <div class="grid">${kpi('Paid so far',inr(sum(mine.filter(t=>t.status=='paid'),t=>t.amt)),'good')}${kpi('Balance due',inr(bal),bal?'warn':'good')}</div>
@@ -209,11 +213,13 @@ portal(){
 };
 
 function render(){
-  navc.style.display=navp.style.display=hasClients()?'':'none';
+  const ac=dept=='accounts';navc.style.display=ac?'none':'';navg.style.display=navi.style.display=ac?'':'none';
+  if(ac&&view=='clients')view='gst';
+  if(!ac&&(view=='gst'||view=='itr'))view='clients';
   if(!hasClients()&&(view=='clients'||view=='portal'))view='dash';
   document.querySelectorAll('aside button').forEach(b=>b.classList.toggle('on',b.dataset.v==view));
   document.getElementById('main').innerHTML=views[view]();
-  if(view=='clients'&&dept=='accounts')mo.onchange=()=>{accMonth=mo.value||accMonth;render()};
+  if(view=='gst')mo.onchange=()=>{accMonth=mo.value||accMonth;render()};
   if(view=='crm')cq.oninput=()=>{crmQ=cq.value;kb.innerHTML=board()};
   if(view=='portal')pc.onchange=()=>{portalCid=pc.value;render()};
 }
@@ -230,13 +236,13 @@ function addTx(seg){seg=seg||dept;openForm(`<h3 style="margin:0">Add entry</h3>
  <label>Description</label><input id="f4"><label>Amount (₹)</label><input id="f5" type="number" min="0">
  <label>Date</label><input id="f6" type="date" value="${today}"><label>Status</label><select id="f7"><option>paid</option><option>pending</option><option>overdue</option></select>`,
  ()=>{tx.push({id:nid++,type:v('f1'),seg:v('f2'),cid:v('f3')?+v('f3'):null,desc:v('f4')||'(no description)',amt:+v('f5')||0,date:v('f6'),status:v('f7')});save();render()})}
-function addClient(type){const m=type=='marketing',a=type=='accounts';openForm(`<h3 style="margin:0">Add ${DN[type]} client</h3><label>Name</label><input id="f1">${a?
- `<label><input type="checkbox" id="g1" checked style="width:auto"> GST client</label><label>GSTIN</label><input id="g2"><label>GST fee per month (₹)</label><input id="g3" type="number">
-  <label><input type="checkbox" id="i1" style="width:auto"> ITR client</label><label>PAN</label><input id="i2"><label>ITR fee (₹)</label><input id="i3" type="number"><label>ITR due date</label><input id="i4" type="date" value="${d(30)}">`:m?
+function addClient(type,kind){const m=type=='marketing',a=type=='accounts';openForm(`<h3 style="margin:0">Add ${a?kind.toUpperCase()+' ':''}${DN[type]=='Accounts'?'':DN[type]+' '}client</h3><label>Name</label><input id="f1">${a?(kind=='gst'?
+ `<label>GSTIN</label><input id="g2"><label>Fee per month (₹)</label><input id="g3" type="number">`:
+ `<label>PAN</label><input id="i2"><label>ITR fee (₹)</label><input id="i3" type="number"><label>ITR due date</label><input id="i4" type="date" value="${d(30)}">`):m?
  `<label>Service</label><input id="f2"><label>Monthly fee (₹)</label><input id="f3" type="number">`:
  `<label>Capital (₹)</label><input id="f2" type="number"><label>DTA profit share %</label><input id="f3" type="number" value="30"><label>This month P&amp;L (₹)</label><input id="f4" type="number" value="0">`}`,
  ()=>{const c={id:nid++,type,name:v('f1')||'New client',status:'active'};
-  if(a)Object.assign(c,{status:'active',gst:g1.checked,gstin:v('g2'),gstFee:+v('g3')||0,itr:i1.checked,pan:v('i2'),itrFee:+v('i3')||0,itrDue:v('i4'),itrStatus:'pending'});else if(m)Object.assign(c,{service:v('f2')||'—',fee:+v('f3')||0,due:d(30)});else Object.assign(c,{capital:+v('f2')||0,share:+v('f3')||0,pnl:+v('f4')||0});
+  if(a)Object.assign(c,kind=='gst'?{gst:true,itr:false,gstin:v('g2'),gstFee:+v('g3')||0}:{gst:false,itr:true,pan:v('i2'),itrFee:+v('i3')||0,itrDue:v('i4'),itrStatus:'pending'});else if(m)Object.assign(c,{service:v('f2')||'—',fee:+v('f3')||0,due:d(30)});else Object.assign(c,{capital:+v('f2')||0,share:+v('f3')||0,pnl:+v('f4')||0});
   clients.push(c);save();render()})}
 function setStage(l,k){l.stage=k;if(k=='won'&&!l.wonOn)l.wonOn=today;if(k=='won'||k=='lost')l.next=''}
 function dropLead(e,k){e.preventDefault();const l=leads.find(x=>x.id==e.dataTransfer.getData('text'));if(l){setStage(l,k);save();render()}}
@@ -253,7 +259,7 @@ function leadOpen(id){const l=leads.find(x=>x.id==id);openForm(`<h3 style="margi
  <div style="margin-top:12px">${l.cid?`<span class="pill paid">✓ Converted to client: ${cname(l.cid)}</span>`:`<button type="button" class="sec" onclick="convertLead(${l.id})">Convert to client</button>`}</div>`,
  ()=>{setStage(l,v('l1'));if(v('l1')=='new'||v('l1')=='contacted'||v('l1')=='proposal')l.next=v('l2');const n=v('l3');if(n)l.notes.push({d:today,t:n});save();render()})}
 function convertLead(id){const l=leads.find(x=>x.id==id),c={id:nid++,type:l.dept,name:l.name,status:'active'};
-  if(l.dept=='accounts')Object.assign(c,{gst:/GST|Bookkeeping/.test(l.service),gstin:'',gstFee:l.value,itr:/ITR/.test(l.service),pan:'',itrFee:l.value,itrDue:d(30),itrStatus:'pending'});
+  if(l.dept=='accounts')Object.assign(c,/ITR/.test(l.service)?{gst:false,itr:true,pan:'',itrFee:l.value,itrDue:d(30),itrStatus:'pending'}:{gst:true,itr:false,gstin:'',gstFee:l.value});
   else if(l.dept=='marketing')Object.assign(c,{service:l.service,fee:l.value,due:d(30)});
   else Object.assign(c,{capital:l.value,share:30,pnl:0});
   clients.push(c);l.cid=c.id;setStage(l,'won');l.notes.push({d:today,t:'Converted to client'});save();dlg.close();render()}
