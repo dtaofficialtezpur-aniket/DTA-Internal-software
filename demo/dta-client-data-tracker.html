@@ -28,7 +28,7 @@ button.pri{background:var(--brand);color:var(--brand-ink)}button.sec{background:
 select,input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);width:100%}
 .row select,.row input{width:auto}
 .pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;background:var(--line)}
-.pill.paid,.pill.active{background:rgba(20,134,79,.15);color:var(--good)}.pill.pending,.pill.paused{background:rgba(183,121,31,.18);color:var(--warn)}.pill.overdue{background:rgba(201,58,58,.15);color:var(--bad)}
+.pill.paid,.pill.active,.pill.filed{background:rgba(20,134,79,.15);color:var(--good)}.pill.pending,.pill.paused,.pill.due-soon{background:rgba(183,121,31,.18);color:var(--warn)}.pill.overdue{background:rgba(201,58,58,.15);color:var(--bad)}
 dialog{border:0;border-radius:14px;padding:20px;background:var(--card);color:var(--ink);width:min(420px,92vw)}dialog::backdrop{background:rgba(0,0,0,.5)}
 dialog label{display:block;margin:10px 0 4px;color:var(--mute);font-size:12px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:800px){.two{grid-template-columns:1fr}}
@@ -48,7 +48,7 @@ dialog label{display:block;margin:10px 0 4px;color:var(--mute);font-size:12px}
   <button data-v="clients" id="navc">Clients</button>
   <button data-v="portal" id="navp">Client Portal</button>
 </aside>
-<main><div class="top"><span class="sp"></span><label for="dsel">Department</label><select id="dsel"><option value="general" selected>Accounts</option><option value="marketing">Digital Marketing</option><option value="trading">Trading</option></select></div><div id="main"></div></main>
+<main><div class="top"><span class="sp"></span><label for="dsel">Department</label><select id="dsel"><option value="accounts" selected>Accounts</option><option value="marketing">Digital Marketing</option><option value="trading">Trading</option></select></div><div id="main"></div></main>
 
 <dialog id="dlg"><form method="dialog" id="frm"></form></dialog>
 
@@ -60,6 +60,9 @@ let clients=[
  {id:1,type:'marketing',name:'Sharma Sweets',service:'Social media + Ads',fee:25000,status:'active',due:d(6)},
  {id:2,type:'marketing',name:'Bodoland Traders',service:'SEO + Website',fee:18000,status:'active',due:d(-4)},
  {id:3,type:'marketing',name:'Green Valley School',service:'Ads management',fee:12000,status:'paused',due:d(15)},
+ {id:7,type:'accounts',name:'Kalita Enterprises',gstin:'18AAAPK1234A1Z5',service:'GST Return (GSTR-3B)',fee:1500,status:'pending',due:d(5)},
+ {id:8,type:'accounts',name:'Dr. P. Bora',gstin:'PAN ABCPB5678D',service:'ITR Filing',fee:2500,status:'filed',due:d(60)},
+ {id:9,type:'accounts',name:'Tezpur Hardware',gstin:'18AABFT9087C1Z2',service:'Bookkeeping + GST',fee:5000,status:'pending',due:d(-3)},
  {id:4,type:'trading',name:'R. Gogoi',capital:500000,share:30,pnl:42000,status:'active'},
  {id:5,type:'trading',name:'M. Das',capital:1200000,share:25,pnl:-18000,status:'active'},
  {id:6,type:'trading',name:'S. Baruah',capital:300000,share:30,pnl:15500,status:'active'}];
@@ -67,19 +70,23 @@ let tx=[
  {id:1,date:d(-25),type:'income',seg:'marketing',cid:1,desc:'Monthly retainer',amt:25000,status:'paid'},
  {id:2,date:d(-20),type:'income',seg:'marketing',cid:2,desc:'Monthly retainer',amt:18000,status:'paid'},
  {id:3,date:d(-12),type:'income',seg:'trading',cid:4,desc:'Profit share – last month',amt:12600,status:'paid'},
- {id:4,date:d(-10),type:'expense',seg:'general',cid:null,desc:'Office rent',amt:15000,status:'paid'},
+ {id:11,date:d(-14),type:'income',seg:'accounts',cid:8,desc:'ITR filing fee',amt:2500,status:'paid'},
+ {id:12,date:d(-9),type:'income',seg:'accounts',cid:9,desc:'Bookkeeping + GST (monthly)',amt:5000,status:'paid'},
+ {id:13,date:d(-2),type:'income',seg:'accounts',cid:7,desc:'GSTR-3B filing fee',amt:1500,status:'pending'},
+ {id:4,date:d(-10),type:'expense',seg:'accounts',cid:null,desc:'Office rent',amt:15000,status:'paid'},
  {id:5,date:d(-8),type:'expense',seg:'marketing',cid:null,desc:'Ad credits (Meta)',amt:9000,status:'paid'},
  {id:6,date:d(-6),type:'income',seg:'trading',cid:6,desc:'Profit share – last month',amt:4650,status:'paid'},
  {id:7,date:d(-4),type:'income',seg:'marketing',cid:2,desc:'Monthly retainer',amt:18000,status:'overdue'},
- {id:8,date:d(-3),type:'expense',seg:'general',cid:null,desc:'Staff salaries',amt:40000,status:'paid'},
+ {id:8,date:d(-3),type:'expense',seg:'accounts',cid:null,desc:'Staff salaries',amt:40000,status:'paid'},
  {id:9,date:d(2),type:'income',seg:'marketing',cid:1,desc:'Monthly retainer',amt:25000,status:'pending'},
- {id:10,date:d(-1),type:'expense',seg:'general',cid:null,desc:'Internet & software',amt:3500,status:'paid'}];
-let nid=100,view='dash',portalCid=1,dept='general';
+ {id:10,date:d(-1),type:'expense',seg:'accounts',cid:null,desc:'Internet & software',amt:3500,status:'paid'}];
+let nid=100,view='dash',portalCid=1,dept='accounts';
 const DN={general:'Accounts',marketing:'Digital Marketing',trading:'Trading'};
-const hasClients=()=>dept!='general';
+const hasClients=()=>true;
+const ov=c=>c.status=='pending'&&c.due<today?'overdue':c.status;
 const T=()=>dept?tx.filter(t=>t.seg==dept):tx;
-try{const s=JSON.parse(localStorage.getItem('dta-demo')||'null');if(s){clients=s.clients;tx=s.tx}}catch(e){}
-const save=()=>{try{localStorage.setItem('dta-demo',JSON.stringify({clients,tx}))}catch(e){}};
+try{const s=JSON.parse(localStorage.getItem('dta-demo2')||'null');if(s){clients=s.clients;tx=s.tx}}catch(e){}
+const save=()=>{try{localStorage.setItem('dta-demo2',JSON.stringify({clients,tx}))}catch(e){}};
 const cname=id=>(clients.find(c=>c.id==id)||{}).name||'—';
 const pill=s=>`<span class="pill ${s}">${s}</span>`;
 const sum=(a,f)=>a.reduce((t,x)=>t+f(x),0);
@@ -97,9 +104,7 @@ dash(){
   return `<h2>${DN[dept]} · Dashboard</h2><div class="sub">Only ${DN[dept]} data is shown</div>
   <div class="note">This is a clickable demo with sample data. Entries you add are kept in this browser only.</div>
   <div class="grid">${kpi('Income received',inr(paidIn()),'good')}${kpi('Expenses',inr(spent()),'bad')}${kpi('Net profit',inr(net),net>=0?'good':'bad')}${kpi('Outstanding',inr(owed()),'warn')}</div>
-  <div class="two"><div class="card"><b>${dept=='general'?'Where the money goes':'Clients'}</b><div style="margin-top:10px">${dept=='general'?
-   T().filter(t=>t.type=='expense').map(t=>`<div class="item"><span>${t.desc}</span><b>${inr(t.amt)}</b></div>`).join('')||'No expenses':
-   clients.filter(c=>c.type==dept).map(c=>`<div class="item"><span>${c.name}</span>${pill(c.status)}</div>`).join('')||'No clients'}</div></div>
+  <div class="two"><div class="card"><b>Clients</b><div style="margin-top:10px">${clients.filter(c=>c.type==dept).map(c=>`<div class="item"><span>${c.name}${c.service&&dept=='accounts'?` <span class="sub">· ${c.service}</span>`:''}</span>${pill(dept=='accounts'?ov(c):c.status)}</div>`).join('')||'No clients'}</div></div>
   <div class="card"><b>Needs attention</b><div style="margin-top:10px">${
    T().filter(t=>t.status!='paid').map(t=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)">${pill(t.status)} ${cname(t.cid)} — ${inr(t.amt)} <span class="sub">(${t.date})</span></div>`).join('')||'All clear'}</div></div></div>
   <div class="card" style="margin-top:14px"><b>Recent transactions</b>${txTable([...T()].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6),false)}</div>`},
@@ -113,7 +118,13 @@ ledger(){
    <div class="mini"><div><span>Income</span><b class="good">${inr(inc)}</b></div><div><span>Expense</span><b class="bad">${inr(exp)}</b></div><div><span>Net</span><b>${inr(inc-exp)}</b></div><div><span>Due</span><b class="warn">${inr(due)}</b></div></div>
    ${l.map(t=>`<div class="item"><div><b>${t.desc}</b><div class="sub" style="margin:0">${t.date} · ${t.cid?cname(t.cid):'—'} ${pill(t.status)}</div></div><b class="${t.type=='income'?'good':'bad'}">${t.type=='income'?'+':'−'}${inr(t.amt)}</b></div>`).join('')||'<div class="sub">No entries</div>'}
   </div>`},
-clients(){return dept=='marketing'?views.mkt():views.trd()},
+clients(){return dept=='marketing'?views.mkt():dept=='trading'?views.trd():views.acc()},
+acc(){
+  const list=clients.filter(c=>c.type=='accounts');
+  return `<h2>Accounts · Clients</h2><div class="sub">GST, ITR and bookkeeping clients · ${list.filter(c=>ov(c)=='overdue').length} overdue · ${list.filter(c=>c.status=='pending').length} pending filings</div>
+  <div class="row"><span class="sp"></span><button class="pri" onclick="addClient('accounts')">+ Add client</button></div>
+  <div class="card tw"><table><tr><th>Client</th><th>GSTIN / PAN</th><th>Service</th><th>Filing due</th><th>Status</th><th class="r">Fee</th><th></th></tr>${
+  list.map(c=>`<tr><td>${c.name}</td><td>${c.gstin||'—'}</td><td>${c.service}</td><td>${c.due}</td><td>${pill(ov(c))}</td><td class="r">${inr(c.fee)}</td><td><button class="sec" onclick="toggle(${c.id})">${c.status=='filed'?'Reopen':'Mark filed'}</button></td></tr>`).join('')}</table></div>`},
 mkt(){
   const list=clients.filter(c=>c.type=='marketing');
   return `<h2>Digital Marketing · Clients</h2><div class="sub">Clients, services and monthly retainers · MRR ${inr(sum(list.filter(c=>c.status=='active'),c=>c.fee))}</div>
@@ -133,7 +144,7 @@ portal(){
   return `<h2>${DN[dept]} · Client Portal</h2><div class="sub">What a client sees after logging in — pick a client to preview</div>
   <div class="row"><select id="pc">${pl.map(x=>`<option value="${x.id}" ${x.id==c.id?'selected':''}>${x.name}</option>`).join('')}</select></div>
   <div class="card"><h3 style="margin:0 0 4px">Welcome, ${c.name}</h3>
-  <div class="sub">${c.type=='marketing'?`Plan: ${c.service} · ${inr(c.fee)}/month · next due ${c.due}`:`Capital ${inr(c.capital)} · profit share ${c.share}% · this month ${inr(c.pnl)}`}</div>
+  <div class="sub">${c.type=='accounts'?`Service: ${c.service} · ${c.gstin} · filing due ${c.due} · ${ov(c)}`:c.type=='marketing'?`Plan: ${c.service} · ${inr(c.fee)}/month · next due ${c.due}`:`Capital ${inr(c.capital)} · profit share ${c.share}% · this month ${inr(c.pnl)}`}</div>
   <div class="grid">${kpi('Paid so far',inr(sum(mine.filter(t=>t.status=='paid'),t=>t.amt)),'good')}${kpi('Balance due',inr(bal),bal?'warn':'good')}</div>
   <b>Statement</b>${txTable([...mine].sort((a,b)=>b.date.localeCompare(a.date)),false)}</div>`}
 };
@@ -153,18 +164,19 @@ function openForm(html,onOk){frm.innerHTML=html+`<div class="row" style="margin-
 const v=id=>document.getElementById(id).value;
 function addTx(seg){seg=seg||dept;openForm(`<h3 style="margin:0">Add entry</h3>
  <label>Type</label><select id="f1"><option>income</option><option>expense</option></select>
- <label>Department</label><select id="f2" disabled>${[['general','Accounts'],['marketing','Digital Marketing'],['trading','Trading']].map(([k,n])=>`<option value="${k}" ${k==seg?'selected':''}>${n}</option>`).join('')}</select>
+ <label>Department</label><select id="f2" disabled>${[['accounts','Accounts'],['marketing','Digital Marketing'],['trading','Trading']].map(([k,n])=>`<option value="${k}" ${k==seg?'selected':''}>${n}</option>`).join('')}</select>
  <label>Client (optional)</label><select id="f3"><option value="">—</option>${clients.filter(c=>c.type==seg).map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>
  <label>Description</label><input id="f4"><label>Amount (₹)</label><input id="f5" type="number" min="0">
  <label>Date</label><input id="f6" type="date" value="${today}"><label>Status</label><select id="f7"><option>paid</option><option>pending</option><option>overdue</option></select>`,
  ()=>{tx.push({id:nid++,type:v('f1'),seg:v('f2'),cid:v('f3')?+v('f3'):null,desc:v('f4')||'(no description)',amt:+v('f5')||0,date:v('f6'),status:v('f7')});save();render()})}
-function addClient(type){const m=type=='marketing';openForm(`<h3 style="margin:0">Add ${type} client</h3><label>Name</label><input id="f1">${m?
+function addClient(type){const m=type=='marketing',a=type=='accounts';openForm(`<h3 style="margin:0">Add ${DN[type]} client</h3><label>Name</label><input id="f1">${a?
+ `<label>GSTIN / PAN</label><input id="f5"><label>Service</label><select id="f2"><option>GST Return (GSTR-3B)</option><option>GST Registration</option><option>ITR Filing</option><option>Bookkeeping + GST</option><option>Other</option></select><label>Fee (₹)</label><input id="f3" type="number"><label>Filing due date</label><input id="f4" type="date" value="${d(30)}">`:m?
  `<label>Service</label><input id="f2"><label>Monthly fee (₹)</label><input id="f3" type="number">`:
  `<label>Capital (₹)</label><input id="f2" type="number"><label>DTA profit share %</label><input id="f3" type="number" value="30"><label>This month P&amp;L (₹)</label><input id="f4" type="number" value="0">`}`,
  ()=>{const c={id:nid++,type,name:v('f1')||'New client',status:'active'};
-  if(m)Object.assign(c,{service:v('f2')||'—',fee:+v('f3')||0,due:d(30)});else Object.assign(c,{capital:+v('f2')||0,share:+v('f3')||0,pnl:+v('f4')||0});
+  if(a)Object.assign(c,{gstin:v('f5'),service:v('f2'),fee:+v('f3')||0,due:v('f4'),status:'pending'});else if(m)Object.assign(c,{service:v('f2')||'—',fee:+v('f3')||0,due:d(30)});else Object.assign(c,{capital:+v('f2')||0,share:+v('f3')||0,pnl:+v('f4')||0});
   clients.push(c);save();render()})}
-function toggle(id){const c=clients.find(x=>x.id==id);c.status=c.status=='active'?'paused':'active';save();render()}
+function toggle(id){const c=clients.find(x=>x.id==id);c.status=c.type=='accounts'?(c.status=='filed'?'pending':'filed'):(c.status=='active'?'paused':'active');save();render()}
 render();
 </script>
 </body>
