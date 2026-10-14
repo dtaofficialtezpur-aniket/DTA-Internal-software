@@ -44,12 +44,11 @@ dialog label{display:block;margin:10px 0 4px;color:var(--mute);font-size:12px}
 <aside>
   <h1>DTA Client Data Tracker</h1><small>Demo · sample data</small>
   <button data-v="dash" class="on">Dashboard</button>
-  <button data-v="ledger">Department Ledger</button>
-  <button data-v="mkt">Digital Marketing</button>
-  <button data-v="trd">Trading Clients</button>
-  <button data-v="portal">Client Portal</button>
+  <button data-v="ledger">Income &amp; Expenses</button>
+  <button data-v="clients" id="navc">Clients</button>
+  <button data-v="portal" id="navp">Client Portal</button>
 </aside>
-<main><div class="top"><span class="sp"></span><label for="dsel">Department</label><select id="dsel"><option value="">All departments</option><option value="general">Accounts</option><option value="marketing">Digital Marketing</option><option value="trading">Trading</option></select></div><div id="main"></div></main>
+<main><div class="top"><span class="sp"></span><label for="dsel">Department</label><select id="dsel"><option value="general" selected>Accounts</option><option value="marketing">Digital Marketing</option><option value="trading">Trading</option></select></div><div id="main"></div></main>
 
 <dialog id="dlg"><form method="dialog" id="frm"></form></dialog>
 
@@ -75,7 +74,9 @@ let tx=[
  {id:8,date:d(-3),type:'expense',seg:'general',cid:null,desc:'Staff salaries',amt:40000,status:'paid'},
  {id:9,date:d(2),type:'income',seg:'marketing',cid:1,desc:'Monthly retainer',amt:25000,status:'pending'},
  {id:10,date:d(-1),type:'expense',seg:'general',cid:null,desc:'Internet & software',amt:3500,status:'paid'}];
-let nid=100,view='dash',portalCid=1,dept='';
+let nid=100,view='dash',portalCid=1,dept='general';
+const DN={general:'Accounts',marketing:'Digital Marketing',trading:'Trading'};
+const hasClients=()=>dept!='general';
 const T=()=>dept?tx.filter(t=>t.seg==dept):tx;
 try{const s=JSON.parse(localStorage.getItem('dta-demo')||'null');if(s){clients=s.clients;tx=s.tx}}catch(e){}
 const save=()=>{try{localStorage.setItem('dta-demo',JSON.stringify({clients,tx}))}catch(e){}};
@@ -92,46 +93,45 @@ const txTable=(list,showSeg=true)=>`<div class="tw"><table><tr><th>Date</th><th>
 
 const views={
 dash(){
-  const net=paidIn()-spent(), m=segInc('marketing'), t=segInc('trading'), tot=(m+t)||1;
-  return `<h2>Dashboard</h2><div class="sub">${dept?'Showing one department':'Accounts, digital marketing and trading in one place'}</div>
+  const net=paidIn()-spent();
+  return `<h2>${DN[dept]} · Dashboard</h2><div class="sub">Only ${DN[dept]} data is shown</div>
   <div class="note">This is a clickable demo with sample data. Entries you add are kept in this browser only.</div>
   <div class="grid">${kpi('Income received',inr(paidIn()),'good')}${kpi('Expenses',inr(spent()),'bad')}${kpi('Net profit',inr(net),net>=0?'good':'bad')}${kpi('Outstanding',inr(owed()),'warn')}</div>
-  <div class="two"><div class="card"><b>Income by business</b>
-   <div class="bar" style="margin:14px 0 8px"><i style="width:${m/tot*100}%;background:var(--brand)"></i><i style="width:${t/tot*100}%;background:var(--good)"></i></div>
-   <div>🔵 Digital Marketing: <b>${inr(m)}</b></div><div>🟢 Trading: <b>${inr(t)}</b></div>
-   <div class="sub" style="margin:12px 0 0">${clients.filter(c=>c.type=='marketing').length} marketing clients · ${clients.filter(c=>c.type=='trading').length} trading clients</div></div>
+  <div class="two"><div class="card"><b>${dept=='general'?'Where the money goes':'Clients'}</b><div style="margin-top:10px">${dept=='general'?
+   T().filter(t=>t.type=='expense').map(t=>`<div class="item"><span>${t.desc}</span><b>${inr(t.amt)}</b></div>`).join('')||'No expenses':
+   clients.filter(c=>c.type==dept).map(c=>`<div class="item"><span>${c.name}</span>${pill(c.status)}</div>`).join('')||'No clients'}</div></div>
   <div class="card"><b>Needs attention</b><div style="margin-top:10px">${
    T().filter(t=>t.status!='paid').map(t=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)">${pill(t.status)} ${cname(t.cid)} — ${inr(t.amt)} <span class="sub">(${t.date})</span></div>`).join('')||'All clear'}</div></div></div>
-  <div class="card" style="margin-top:14px"><b>Recent transactions</b>${txTable([...T()].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6))}</div>`},
+  <div class="card" style="margin-top:14px"><b>Recent transactions</b>${txTable([...T()].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6),false)}</div>`},
 ledger(){
-  const deps=[['general','Accounts','var(--warn)'],['marketing','Digital Marketing','var(--brand)'],['trading','Trading','var(--good)']];
-  return `<h2>Department Ledger</h2><div class="sub">Income and expenses, separate for each department</div>
-  <div class="cols" style="${dept?'grid-template-columns:minmax(0,520px)':''}">${deps.filter(x=>!dept||x[0]==dept).map(([k,n,col])=>{
-    const l=tx.filter(t=>t.seg==k).sort((a,b)=>b.date.localeCompare(a.date));
-    const inc=sum(l.filter(t=>t.type=='income'&&t.status=='paid'),t=>t.amt),exp=sum(l.filter(t=>t.type=='expense'),t=>t.amt),due=sum(l.filter(t=>t.type=='income'&&t.status!='paid'),t=>t.amt);
-    return `<div class="card col" style="border-top:4px solid ${col}">
-     <div class="row"><b style="font-size:16px">${n}</b><span class="sp"></span><button class="pri" onclick="addTx('${k}')">+ Add</button></div>
-     <div class="mini"><div><span>Income</span><b class="good">${inr(inc)}</b></div><div><span>Expense</span><b class="bad">${inr(exp)}</b></div><div><span>Net</span><b>${inr(inc-exp)}</b></div><div><span>Due</span><b class="warn">${inr(due)}</b></div></div>
-     ${l.map(t=>`<div class="item"><div><b>${t.desc}</b><div class="sub" style="margin:0">${t.date} · ${t.cid?cname(t.cid):'—'} ${pill(t.status)}</div></div><b class="${t.type=='income'?'good':'bad'}">${t.type=='income'?'+':'−'}${inr(t.amt)}</b></div>`).join('')||'<div class="sub">No entries</div>'}
-    </div>`}).join('')}</div>`},
+  const k=dept,n=DN[k],col={general:'var(--warn)',marketing:'var(--brand)',trading:'var(--good)'}[k];
+  const l=tx.filter(t=>t.seg==k).sort((a,b)=>b.date.localeCompare(a.date));
+  const inc=sum(l.filter(t=>t.type=='income'&&t.status=='paid'),t=>t.amt),exp=sum(l.filter(t=>t.type=='expense'),t=>t.amt),due=sum(l.filter(t=>t.type=='income'&&t.status!='paid'),t=>t.amt);
+  return `<h2>${n} · Income &amp; Expenses</h2><div class="sub">Only ${n} entries</div>
+  <div class="card col" style="border-top:4px solid ${col};max-width:640px">
+   <div class="row"><b style="font-size:16px">${n}</b><span class="sp"></span><button class="pri" onclick="addTx('${k}')">+ Add entry</button></div>
+   <div class="mini"><div><span>Income</span><b class="good">${inr(inc)}</b></div><div><span>Expense</span><b class="bad">${inr(exp)}</b></div><div><span>Net</span><b>${inr(inc-exp)}</b></div><div><span>Due</span><b class="warn">${inr(due)}</b></div></div>
+   ${l.map(t=>`<div class="item"><div><b>${t.desc}</b><div class="sub" style="margin:0">${t.date} · ${t.cid?cname(t.cid):'—'} ${pill(t.status)}</div></div><b class="${t.type=='income'?'good':'bad'}">${t.type=='income'?'+':'−'}${inr(t.amt)}</b></div>`).join('')||'<div class="sub">No entries</div>'}
+  </div>`},
+clients(){return dept=='marketing'?views.mkt():views.trd()},
 mkt(){
   const list=clients.filter(c=>c.type=='marketing');
-  return `<h2>Digital Marketing</h2><div class="sub">Clients, services and monthly retainers · MRR ${inr(sum(list.filter(c=>c.status=='active'),c=>c.fee))}</div>
+  return `<h2>Digital Marketing · Clients</h2><div class="sub">Clients, services and monthly retainers · MRR ${inr(sum(list.filter(c=>c.status=='active'),c=>c.fee))}</div>
   <div class="row"><span class="sp"></span><button class="pri" onclick="addClient('marketing')">+ Add client</button></div>
   <div class="card tw"><table><tr><th>Client</th><th>Service</th><th>Status</th><th>Next due</th><th class="r">Monthly fee</th><th></th></tr>${
   list.map(c=>`<tr><td>${c.name}</td><td>${c.service}</td><td>${pill(c.status)}</td><td>${c.due}</td><td class="r">${inr(c.fee)}</td><td><button class="sec" onclick="toggle(${c.id})">${c.status=='active'?'Pause':'Resume'}</button></td></tr>`).join('')}</table></div>`},
 trd(){
   const list=clients.filter(c=>c.type=='trading'), mine=c=>c.pnl>0?c.pnl*c.share/100:0;
-  return `<h2>Trading Clients</h2><div class="sub">Capital managed ${inr(sum(list,c=>c.capital))} · DTA profit share this month ${inr(sum(list,mine))}</div>
+  return `<h2>Trading · Clients</h2><div class="sub">Capital managed ${inr(sum(list,c=>c.capital))} · DTA profit share this month ${inr(sum(list,mine))}</div>
   <div class="row"><span class="sp"></span><button class="pri" onclick="addClient('trading')">+ Add client</button></div>
   <div class="card tw"><table><tr><th>Client</th><th class="r">Capital</th><th class="r">Month P&amp;L</th><th class="r">Return</th><th class="r">DTA share %</th><th class="r">DTA earns</th></tr>${
   list.map(c=>`<tr><td>${c.name}</td><td class="r">${inr(c.capital)}</td><td class="r ${c.pnl>=0?'good':'bad'}">${inr(c.pnl)}</td><td class="r">${(c.pnl/c.capital*100).toFixed(2)}%</td><td class="r">${c.share}%</td><td class="r">${inr(mine(c))}</td></tr>`).join('')}</table></div>
   <div class="sub" style="margin-top:10px">DTA earns a profit share only in profitable months. Loss months show ₹0.</div>`},
 portal(){
-  const c=clients.find(x=>x.id==portalCid)||clients[0], mine=tx.filter(t=>t.cid==c.id);
+  const pl=clients.filter(x=>x.type==dept),c=pl.find(x=>x.id==portalCid)||pl[0], mine=tx.filter(t=>t.cid==c.id);
   const bal=sum(mine.filter(t=>t.type=='income'&&t.status!='paid'),t=>t.amt);
-  return `<h2>Client Portal</h2><div class="sub">What a client sees after logging in — pick a client to preview</div>
-  <div class="row"><select id="pc">${clients.map(x=>`<option value="${x.id}" ${x.id==c.id?'selected':''}>${x.name} (${x.type})</option>`).join('')}</select></div>
+  return `<h2>${DN[dept]} · Client Portal</h2><div class="sub">What a client sees after logging in — pick a client to preview</div>
+  <div class="row"><select id="pc">${pl.map(x=>`<option value="${x.id}" ${x.id==c.id?'selected':''}>${x.name}</option>`).join('')}</select></div>
   <div class="card"><h3 style="margin:0 0 4px">Welcome, ${c.name}</h3>
   <div class="sub">${c.type=='marketing'?`Plan: ${c.service} · ${inr(c.fee)}/month · next due ${c.due}`:`Capital ${inr(c.capital)} · profit share ${c.share}% · this month ${inr(c.pnl)}`}</div>
   <div class="grid">${kpi('Paid so far',inr(sum(mine.filter(t=>t.status=='paid'),t=>t.amt)),'good')}${kpi('Balance due',inr(bal),bal?'warn':'good')}</div>
@@ -139,20 +139,22 @@ portal(){
 };
 
 function render(){
+  navc.style.display=navp.style.display=hasClients()?'':'none';
+  if(!hasClients()&&(view=='clients'||view=='portal'))view='dash';
   document.querySelectorAll('aside button').forEach(b=>b.classList.toggle('on',b.dataset.v==view));
   document.getElementById('main').innerHTML=views[view]();
   if(view=='portal')pc.onchange=()=>{portalCid=pc.value;render()};
 }
-dsel.onchange=()=>{dept=dsel.value;render()};
+dsel.onchange=()=>{dept=dsel.value;portalCid=0;render()};
 document.querySelectorAll('aside button').forEach(b=>b.onclick=()=>{view=b.dataset.v;render()});
 
 function openForm(html,onOk){frm.innerHTML=html+`<div class="row" style="margin-top:16px"><span class="sp"></span><button class="sec" value="x" formnovalidate>Cancel</button><button class="pri" value="ok">Save</button></div>`;
   frm.onsubmit=e=>{if(e.submitter&&e.submitter.value=='ok')onOk()};dlg.showModal()}
 const v=id=>document.getElementById(id).value;
-function addTx(seg){openForm(`<h3 style="margin:0">Add entry</h3>
+function addTx(seg){seg=seg||dept;openForm(`<h3 style="margin:0">Add entry</h3>
  <label>Type</label><select id="f1"><option>income</option><option>expense</option></select>
- <label>Department</label><select id="f2">${[['general','Accounts'],['marketing','Digital Marketing'],['trading','Trading']].map(([k,n])=>`<option value="${k}" ${k==seg?'selected':''}>${n}</option>`).join('')}</select>
- <label>Client (optional)</label><select id="f3"><option value="">—</option>${clients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>
+ <label>Department</label><select id="f2" disabled>${[['general','Accounts'],['marketing','Digital Marketing'],['trading','Trading']].map(([k,n])=>`<option value="${k}" ${k==seg?'selected':''}>${n}</option>`).join('')}</select>
+ <label>Client (optional)</label><select id="f3"><option value="">—</option>${clients.filter(c=>c.type==seg).map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>
  <label>Description</label><input id="f4"><label>Amount (₹)</label><input id="f5" type="number" min="0">
  <label>Date</label><input id="f6" type="date" value="${today}"><label>Status</label><select id="f7"><option>paid</option><option>pending</option><option>overdue</option></select>`,
  ()=>{tx.push({id:nid++,type:v('f1'),seg:v('f2'),cid:v('f3')?+v('f3'):null,desc:v('f4')||'(no description)',amt:+v('f5')||0,date:v('f6'),status:v('f7')});save();render()})}
