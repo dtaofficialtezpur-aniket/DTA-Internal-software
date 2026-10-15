@@ -4,13 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DTA Client Data Tracker</title>
-<script>try{var __t=localStorage.getItem('dta-theme');if(__t)document.documentElement.setAttribute('data-theme',__t)}catch(e){}</script>
 <style>
-:root,[data-theme=white]{--bg:#F7F8FA;--card:#fff;--ink:#1F2937;--mute:#6B7280;--line:#EEF0F4;--brand:#2F5BEA;--brand2:#2447C4;--brand-ink:#fff;--yel:#EEF1F6;--yel2:#F8F9FB;--bline:#E1E5EC;--s1:#fff;--s2:#fff;--sink:#1F2937;--hov:#F3F5F9;--good:#14864F;--bad:#C93A3A;--warn:#B7791F;--sh:31,41,55;--g1:#F7F8FA;--g2:#F7F8FA;--thc:#374151}
-[data-theme=sunrise]{--bg:#FFFBEF;--card:#fff;--ink:#3B3B3B;--mute:#7A6A55;--line:#F6E7B4;--brand:#CF3A56;--brand2:#A52A41;--brand-ink:#fff;--yel:#FFE27A;--yel2:#FFF1B8;--bline:#F0A9B4;--s1:#FFF3C2;--s2:#FFE58A;--sink:#4A2A2F;--hov:rgba(255,255,255,.65);--good:#1F7A4D;--bad:#B42318;--warn:#9A5B00;--sh:207,58,86;--g1:#FFE9A8;--g2:#FFD9DF;--thc:#4A2A2F}
-[data-theme=ocean]{--bg:#F4F6FF;--card:#fff;--ink:#2B2F5C;--mute:#6B7099;--line:#E4E9FF;--brand:#5B5BF0;--brand2:#3F3FD1;--yel:#BFD0FF;--yel2:#E3EAFF;--bline:#CBD5FF;--s1:#EAEFFF;--s2:#C9D6FF;--sink:#1F2350;--hov:rgba(255,255,255,.7);--good:#1F7A4D;--bad:#B42318;--warn:#9A5B00;--sh:91,91,240;--g1:#DDE5FF;--g2:#EADDFF;--thc:#1F2350}
-[data-theme=forest]{--bg:#F3FBF6;--card:#fff;--ink:#20352B;--mute:#5F7A6C;--line:#DDF0E4;--brand:#1F8A5B;--brand2:#146B45;--yel:#BDE8CF;--yel2:#E3F6EB;--bline:#A9D9BE;--s1:#E6F7EC;--s2:#BFE8D0;--sink:#153526;--hov:rgba(255,255,255,.7);--good:#146B45;--bad:#B42318;--warn:#9A5B00;--sh:31,138,91;--g1:#D7F2E2;--g2:#FFF1C9;--thc:#153526}
-[data-theme=night]{--bg:#12162B;--card:#1C2140;--ink:#E8ECF6;--mute:#9AA3C7;--line:#2A3157;--brand:#7C8CFF;--brand2:#5B6CF0;--brand-ink:#0E1226;--yel:#2F376A;--yel2:#252B52;--bline:#3A4375;--s1:#1B2142;--s2:#10142A;--sink:#C9D2F0;--hov:rgba(255,255,255,.08);--good:#3ECF8E;--bad:#FF7A7A;--warn:#F0B455;--sh:0,0,0;--g1:#1E2552;--g2:#2B1E4D;--thc:#E8ECF6}
+:root{--bg:#F7F8FA;--card:#fff;--ink:#1F2937;--mute:#6B7280;--line:#EEF0F4;--brand:#2F5BEA;--brand2:#2447C4;--brand-ink:#fff;--yel:#EEF1F6;--yel2:#F8F9FB;--bline:#E1E5EC;--s1:#fff;--s2:#fff;--sink:#1F2937;--hov:#F3F5F9;--good:#14864F;--bad:#C93A3A;--warn:#B7791F;--sh:31,41,55;--g1:#F7F8FA;--g2:#F7F8FA;--thc:#374151}
 *{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink);display:flex;min-height:100vh}
 aside{width:220px;background:var(--side);color:var(--side-ink);padding:18px 12px;position:sticky;top:0;height:100vh;flex-shrink:0}
 aside h1{font-size:16px;margin:0 8px 4px;color:#fff}aside small{display:block;margin:0 8px 18px;opacity:.6}
@@ -145,7 +140,6 @@ dialog{border:2px solid var(--bline);border-radius:20px;background:var(--card);c
   <div class="qw"><button class="pri" onclick="qaToggle(event)">+ Quick add ▾</button><div id="qam"></div></div>
   <div class="bw"><button class="bell" title="Alerts" onclick="alToggle(event)">🔔<em id="bellN">0</em></button><div id="alm"></div></div>
   <div class="seg" id="dseg"><button data-d="accounts" class="on">Accounts</button><button data-d="marketing">Digital Marketing</button><button data-d="trading">Trading</button></div>
-  <div class="themes" title="Colour theme"><button style="background:#fff" onclick="setTheme('white')" aria-label="White"></button><button style="background:#CF3A56" onclick="setTheme('sunrise')" aria-label="Sunrise"></button><button style="background:#5B5BF0" onclick="setTheme('ocean')" aria-label="Ocean"></button><button style="background:#1F8A5B" onclick="setTheme('forest')" aria-label="Forest"></button><button style="background:#2F376A" onclick="setTheme('night')" aria-label="Night"></button></div>
   <span class="dpill" id="dpill"></span>
 </header>
 <main><div id="main"></div></main>
@@ -578,7 +572,6 @@ function backupAll(){dl('DTA-client-data-backup-'+today+'.json',{app:'DTA Client
 function restoreAll(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const o=JSON.parse(r.result);if(!Array.isArray(o.clients)||!Array.isArray(o.ledgers)||!Array.isArray(o.vouchers))throw 0;if(!confirm('Replace all current data with this backup?'))return;clients=o.clients;leads=o.leads||[];deleted=o.deleted||[];ledgers=o.ledgers;vouchers=o.vouchers;nid=Math.max(100,...clients.map(x=>x.id+1),...deleted.map(x=>x.id+1),...leads.map(x=>x.id+1),...ledgers.map(x=>x.id+1),...vouchers.map(x=>x.id+1));vs=null;lgId=null;save();toast('Backup restored');render()}catch(e){toast('That file is not a valid DTA backup')}inp.value=''};r.readAsText(f)}
 nid=Math.max(100,...clients.map(x=>x.id+1),...deleted.map(x=>x.id+1),...leads.map(x=>x.id+1),...ledgers.map(x=>x.id+1),...vouchers.map(x=>x.id+1));
 if(!ledgers.length)seedBooks();
-function setTheme(t){document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('dta-theme',t)}catch(e){}}
 dpill.textContent=new Date().toLocaleDateString('en-IN',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
 function openClient(c){setDept(c.type);if(c.service&&CATS[c.type]&&CATS[c.type].includes(c.service)){view='cat:'+c.service;catQ=c.name;catF=''}else view='clients';render()}
 function gsRun(){const q=gsq.value.trim().toLowerCase();if(q.length<2){gsres.style.display='none';gsres._o=[];return}const out=[];
