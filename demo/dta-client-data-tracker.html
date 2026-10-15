@@ -54,6 +54,11 @@ td.pw{cursor:pointer;letter-spacing:.1em}#ct table{font-size:12.5px}#ct th,#ct t
 .rr{display:flex;align-items:center;gap:8px;margin:4px 0}.rr span.l{flex:1}.rr select{width:auto}
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:99px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:99}
 aside{overflow:auto}.nh{font-size:11px;text-transform:uppercase;letter-spacing:.06em;opacity:.5;margin:12px 12px 4px}
+
+.vtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.vtabs button{flex:1;min-width:84px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:8px 6px;cursor:pointer;font:inherit;font-weight:600}.vtabs button small{color:var(--mute);font-weight:700}.vtabs button.on{background:var(--brand);border-color:var(--brand);color:#fff}.vtabs button.on small{color:#dfe6ff}
+.vhead{display:flex;gap:28px;align-items:flex-end;flex-wrap:wrap;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+.vrow{display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap}.vrow label{font-weight:700;min-width:110px}.vrow input{max-width:320px}
+.vt2{margin:6px 0 10px}.vt2 td,.vt2 th{padding:5px 6px}.vt2 select{width:auto}
 </style>
 </head>
 <body>
@@ -94,20 +99,6 @@ let clients=[
  {id:4,type:'trading',name:'R. Gogoi',capital:500000,share:30,pnl:42000,status:'active'},
  {id:5,type:'trading',name:'M. Das',capital:1200000,share:25,pnl:-18000,status:'active'},
  {id:6,type:'trading',name:'S. Baruah',capital:300000,share:30,pnl:15500,status:'active'}];
-let tx=[
- {id:1,date:d(-25),type:'income',seg:'marketing',cid:1,desc:'Monthly retainer',amt:25000,status:'paid'},
- {id:2,date:d(-20),type:'income',seg:'marketing',cid:2,desc:'Monthly retainer',amt:18000,status:'paid'},
- {id:3,date:d(-12),type:'income',seg:'trading',cid:4,desc:'Profit share – last month',amt:12600,status:'paid'},
- {id:11,date:d(-14),type:'income',seg:'accounts',cid:8,desc:'ITR filing fee',amt:2500,status:'paid'},
- {id:12,date:d(-9),type:'income',seg:'accounts',cid:9,desc:'Bookkeeping + GST (monthly)',amt:5000,status:'paid'},
- {id:13,date:d(-2),type:'income',seg:'accounts',cid:7,desc:'GSTR-3B filing fee',amt:1500,status:'pending'},
- {id:4,date:d(-10),type:'expense',seg:'accounts',cid:null,desc:'Office rent',amt:15000,status:'paid'},
- {id:5,date:d(-8),type:'expense',seg:'marketing',cid:null,desc:'Ad credits (Meta)',amt:9000,status:'paid'},
- {id:6,date:d(-6),type:'income',seg:'trading',cid:6,desc:'Profit share – last month',amt:4650,status:'paid'},
- {id:7,date:d(-4),type:'income',seg:'marketing',cid:2,desc:'Monthly retainer',amt:18000,status:'overdue'},
- {id:8,date:d(-3),type:'expense',seg:'accounts',cid:null,desc:'Staff salaries',amt:40000,status:'paid'},
- {id:9,date:d(2),type:'income',seg:'marketing',cid:1,desc:'Monthly retainer',amt:25000,status:'pending'},
- {id:10,date:d(-1),type:'expense',seg:'accounts',cid:null,desc:'Internet & software',amt:3500,status:'paid'}];
 let leads=[
  {id:201,dept:'accounts',name:'Mahanta Traders',phone:'98640 11122',source:'Referral',service:'GST',value:3000,stage:'contacted',next:d(0),notes:[{d:d(-3),t:'Called. Needs GST registration for new shop.'}],cid:null},
  {id:202,dept:'accounts',name:'Jyoti Pharmacy',phone:'94350 22233',source:'Website',service:'GST',value:1500,stage:'new',next:d(-2),notes:[],cid:null},
@@ -120,13 +111,12 @@ let leads=[
  {id:221,dept:'trading',name:'P. Sharma',phone:'98640 99900',source:'Referral',service:'Portfolio management',value:400000,stage:'contacted',next:d(2),notes:[{d:d(-2),t:'Interested. Wants to see past returns.'}],cid:null},
  {id:222,dept:'trading',name:'K. Deka',phone:'94350 10101',source:'WhatsApp',service:'Portfolio management',value:800000,stage:'new',next:d(0),notes:[],cid:null},
  {id:223,dept:'trading',name:'A. Barman',phone:'70020 20202',source:'Referral',service:'Portfolio management',value:250000,stage:'proposal',next:d(5),notes:[],cid:null}],
- crmQ='',deleted=[],catQ='',catF='',fid=null,fyear=Y,nid=100,view='dash',portalCid=1,dept='accounts';
+ crmQ='',deleted=[],ledgers=[],vouchers=[],vs=null,lgId=null,dbf={from:'',to:'',type:''},catQ='',catF='',fid=null,fyear=Y,nid=100,view='dash',portalCid=1,dept='accounts';
 const DN={accounts:'Accounts',marketing:'Digital Marketing',trading:'Trading'};
 const hasClients=()=>true;
 const ov=c=>c.status=='pending'&&c.due<today?'overdue':c.status;
-const T=()=>dept?tx.filter(t=>t.seg==dept):tx;
-try{const s=JSON.parse(localStorage.getItem('dta-demo7')||'null');if(s){clients=s.clients;tx=s.tx;if(s.leads)leads=s.leads;deleted=s.deleted||[]}}catch(e){}
-const save=()=>{try{localStorage.setItem('dta-demo7',JSON.stringify({clients,tx,leads,deleted}))}catch(e){}};
+try{const s=JSON.parse(localStorage.getItem('dta-demo8')||'null');if(s){clients=s.clients;if(s.leads)leads=s.leads;deleted=s.deleted||[];if(s.ledgers)ledgers=s.ledgers;if(s.vouchers)vouchers=s.vouchers}}catch(e){}
+const save=()=>{try{localStorage.setItem('dta-demo8',JSON.stringify({clients,leads,deleted,ledgers,vouchers}))}catch(e){}};
 const CATS={
  accounts:['GST','ITR','TDS','PAN','PROVIDENT FUND','ESI','Professional Tax','Accounting & Bookkeeping','Audit','Other'],
  trading:['Trade License','FSSAI License','Shop & Establishment','Udyam (MSME)','Import Export Code (IEC)','Drug License','Trademark','ISO Certification','Digital Signature (DSC)','Company / LLP Registration','Partnership / Society Registration','Other License']};
@@ -171,14 +161,27 @@ const board=()=>{const q=crmQ.toLowerCase(),L=leads.filter(l=>l.dept==dept&&(!q|
 const cname=id=>(clients.find(c=>c.id==id)||deleted.find(c=>c.id==id)||{}).name||'—';
 const pill=s=>`<span class="pill ${s}">${s=='na'?'N/A':s}</span>`;
 const sum=(a,f)=>a.reduce((t,x)=>t+f(x),0);
-const paidIn=()=>sum(T().filter(t=>t.type=='income'&&t.status=='paid'),t=>t.amt);
-const spent=()=>sum(T().filter(t=>t.type=='expense'),t=>t.amt);
-const owed=()=>sum(T().filter(t=>t.type=='income'&&t.status!='paid'),t=>t.amt);
-const segInc=s=>sum(T().filter(t=>t.type=='income'&&t.status=='paid'&&t.seg==s),t=>t.amt);
 const kpi=(l,v,c='')=>`<div class="card kpi"><div class="l">${l}</div><div class="v ${c}">${v}</div></div>`;
-const txTable=(list,showSeg=true)=>`<div class="tw"><table><tr><th>Date</th><th>Description</th>${showSeg?'<th>Segment</th>':''}<th>Client</th><th>Status</th><th class="r">Amount</th></tr>${
- list.map(t=>`<tr><td>${t.date}</td><td>${t.desc}</td>${showSeg?`<td>${t.seg}</td>`:''}<td>${t.cid?cname(t.cid):'—'}</td><td>${pill(t.status)}</td><td class="r ${t.type=='income'?'good':'bad'}">${t.type=='income'?'+':'−'}${inr(t.amt)}</td></tr>`).join('')||'<tr><td colspan=6>No entries</td></tr>'}</table></div>`;
-
+const GR={'Capital Account':'L','Loans (Liability)':'L','Current Liabilities':'L','Sundry Creditors':'L','Duties & Taxes':'L','Fixed Assets':'A','Current Assets':'A','Bank Accounts':'A','Cash-in-hand':'A','Sundry Debtors':'A','Sales Accounts':'I','Direct Incomes':'I','Indirect Incomes':'I','Purchase Accounts':'E','Direct Expenses':'E','Indirect Expenses':'E'};
+const LGRP=['Capital Account','Loans (Liability)','Current Liabilities','Sundry Creditors','Duties & Taxes'],AGRP=['Fixed Assets','Current Assets','Bank Accounts','Cash-in-hand','Sundry Debtors'],IGRP=['Sales Accounts','Direct Incomes','Indirect Incomes'],EGRP=['Purchase Accounts','Direct Expenses','Indirect Expenses'];
+const VT=[['Contra','F4'],['Payment','F5'],['Receipt','F6'],['Journal','F7'],['Sales','F8'],['Purchase','F9']];
+const m2=n=>(Math.round(n*100)/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const LD=()=>ledgers.filter(l=>l.dept==dept),VD=()=>vouchers.filter(x=>x.dept==dept);
+const lg=id=>ledgers.find(l=>l.id==id),lname=id=>(lg(id)||{}).name||'?';
+const lgByName=n=>{n=String(n||'').trim().toLowerCase();return LD().find(l=>l.name.toLowerCase()==n)};
+const closing=l=>{let b=l.open||0;VD().forEach(x=>x.lines.forEach(y=>{if(y.l==l.id)b+=y.dr-y.cr}));return b};
+const balTxt=b=>Math.abs(b)<0.005?'—':m2(Math.abs(b))+(b>0?' Dr':' Cr');
+const nat=l=>GR[l.group];
+const incTot=()=>sum(LD().filter(l=>nat(l)=='I'),l=>-closing(l)),expTot=()=>sum(LD().filter(l=>nat(l)=='E'),l=>closing(l));
+const outstanding=()=>sum(LD().filter(l=>l.group=='Sundry Debtors'),l=>Math.max(closing(l),0));
+const clientLedger=c=>ledgers.find(l=>l.dept==c.type&&l.group=='Sundry Debtors'&&l.name==c.name);
+const ensureLedgers=()=>{clients.forEach(c=>{if(!ledgers.some(l=>l.dept==c.type&&l.name.toLowerCase()==String(c.name).toLowerCase()))ledgers.push({id:nid++,dept:c.type,name:c.name,group:'Sundry Debtors',open:0})})};
+const nextNo=t=>1+Math.max(0,...VD().filter(x=>x.type==t).map(x=>x.no));
+const sortV=l=>[...l].sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
+const names=(x,k)=>[...new Set(x.lines.filter(y=>y[k]>0).map(y=>esc(lname(y.l))))].join(', ');
+const vTable=(list,act)=>`<table><tr><th>Date</th><th>Particulars</th><th>Vch type</th><th>Vch no.</th><th class="r">Amount (₹)</th>${act?'<th></th>':''}</tr>${
+  list.map(x=>`<tr><td>${x.date}</td><td><b>${names(x,'dr')}</b> <span class="sub" style="margin:0">to</span> ${names(x,'cr')}${x.narr?`<br><span class="sub" style="margin:0">${esc(x.narr)}</span>`:''}</td><td>${x.type}</td><td>${x.no}</td><td class="r">${m2(sum(x.lines,y=>y.dr))}</td>${act?`<td><button class="ic" title="Alter" onclick="editV(${x.id})">✎</button><button class="ic" title="Delete" onclick="delV(${x.id})">✕</button></td>`:''}</tr>`).join('')||'<tr><td colspan=6>No vouchers</td></tr>'}</table>`;
+function ledgerStmt(l){let b=l.open||0;const rows=[];sortV(VD().filter(x=>x.lines.some(y=>y.l==l.id))).forEach(x=>{const me=x.lines.filter(y=>y.l==l.id),dr=sum(me,y=>y.dr),cr=sum(me,y=>y.cr);b+=dr-cr;rows.push({x,dr,cr,bal:b,others:[...new Set(x.lines.filter(y=>y.l!=l.id).map(y=>esc(lname(y.l))))].join(', ')})});return{rows,close:b,tdr:sum(rows,r=>r.dr),tcr:sum(rows,r=>r.cr)}}
 const catRows=S=>{
   const q=catQ.toLowerCase(),L=clients.filter(c=>c.type==dept&&c.service==S&&(!catF||c.status==catF)&&(!q||[c.name,c.businessName,c.serial,c.phone,c.loginId,c.regNo,c.detail,c.email,c.notes].join(' ').toLowerCase().includes(q))).reverse();
   const core=['GST','ITR','TDS','PAN'].includes(S),ex=!core?'<th>Payment</th>':S=='GST'?'<th>This month</th><th>Payment</th>':S=='ITR'?'<th>This year</th><th>Payment</th>':S=='TDS'?'<th>Challan · Return</th><th>Payment</th>':S=='PAN'?'<th>Application</th><th>Payment</th>':'';
@@ -195,14 +198,13 @@ const catRows=S=>{
   <div class="sub" style="margin:10px 0 0">${L.length} ${S} client record${L.length==1?'':'s'} (of ${clients.filter(c=>c.type==dept&&c.service).length} total)</div>`};
 const views={
 dash(){
-  const net=paidIn()-spent();
-  return `<h2>${DN[dept]} · Dashboard</h2><div class="sub">Only ${DN[dept]} data is shown</div>
+  const net=incTot()-expTot(),deb=LD().filter(l=>l.group=='Sundry Debtors'&&closing(l)>0.004);
+  return `<h2>${DN[dept]} · Dashboard</h2><div class="sub">Only ${DN[dept]} books are shown</div>
   <div class="note">This is a clickable demo with sample data. Entries you add are kept in this browser only.</div>
-  <div class="grid">${kpi('Income received',inr(paidIn()),'good')}${kpi('Expenses',inr(spent()),'bad')}${kpi('Net profit',inr(net),net>=0?'good':'bad')}${kpi('Outstanding',inr(owed()),'warn')}</div>
+  <div class="grid">${kpi('Income',inr(incTot()),'good')}${kpi('Expenses',inr(expTot()),'bad')}${kpi('Net profit',inr(net),net>=0?'good':'bad')}${kpi('Outstanding (receivable)',inr(outstanding()),'warn')}</div>
   <div class="two"><div class="card"><b>${hasCat()?'Clients by service':'Clients'}</b><div style="margin-top:10px">${(hasCat()?(dept=='trading'?clients.filter(c=>c.type=='trading'&&!c.service).length?`<div class="item"><span>Portfolio management</span><span>${clients.filter(c=>c.type=='trading'&&!c.service).length} clients</span></div>`:'':''):'')+(hasCat()?CATS[dept].map(a=>{const L=clients.filter(c=>c.type==dept&&c.service==a),o=L.filter(c=>accState(c)=='overdue').length;return L.length?`<div class="item"><span>${LBL(a)}</span><span>${L.length} client${L.length>1?'s':''} ${o?pill('overdue')+' '+o:''}</span></div>`:''}).join(''):clients.filter(c=>c.type==dept).map(c=>`<div class="item"><span>${c.name}</span>${pill(c.status)}</div>`).join('')||'No clients')}</div></div>
-  <div class="card"><b>Needs attention</b><div style="margin-top:10px">${
-   T().filter(t=>t.status!='paid').map(t=>`<div style="padding:6px 0;border-bottom:1px solid var(--line)">${pill(t.status)} ${cname(t.cid)} — ${inr(t.amt)} <span class="sub">(${t.date})</span></div>`).join('')||'All clear'}</div></div></div>
-  <div class="card" style="margin-top:14px"><b>Recent transactions</b>${txTable([...T()].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6),false)}</div>`},
+  <div class="card"><b>Money to collect</b><div style="margin-top:10px">${deb.map(l=>`<div class="item"><span>${esc(l.name)}</span><b class="warn">${m2(closing(l))}</b></div>`).join('')||'All clear'}</div></div></div>
+  <div class="card tw" style="margin-top:14px"><b>Recent vouchers</b>${vTable(sortV(VD()).reverse().slice(0,6),false)}</div>`},
 crm(){
   const L=leads.filter(l=>l.dept==dept),open=L.filter(l=>!['won','lost'].includes(l.stage));
   const due=open.filter(l=>['overdue','today'].includes(fu(l))).sort((a,b)=>a.next.localeCompare(b.next));
@@ -212,16 +214,6 @@ crm(){
   ${due.length?`<div class="card" style="margin-bottom:14px"><b>Follow-ups due</b>${due.map(l=>`<div class="item" style="cursor:pointer" onclick="leadOpen(${l.id})"><span><b>${l.name}</b> <span class="sub">· ${l.phone} · ${l.service}</span></span><span>${pill(fu(l))} <span class="sub">${l.next}</span></span></div>`).join('')}</div>`:''}
   <div class="row"><input id="cq" placeholder="Search name or phone" value="${crmQ}" style="max-width:260px"><span class="sp"></span><button class="pri" onclick="addLead()">+ Add lead</button></div>
   <div class="kan" id="kb">${board()}</div><div class="sub" style="margin-top:6px">Tip: drag a card to another column to change its stage, or click a card to open it.</div>`},
-ledger(){
-  const k=dept,n=DN[k],col={accounts:'var(--warn)',marketing:'var(--brand)',trading:'var(--good)'}[k];
-  const l=tx.filter(t=>t.seg==k).sort((a,b)=>b.date.localeCompare(a.date));
-  const inc=sum(l.filter(t=>t.type=='income'&&t.status=='paid'),t=>t.amt),exp=sum(l.filter(t=>t.type=='expense'),t=>t.amt),due=sum(l.filter(t=>t.type=='income'&&t.status!='paid'),t=>t.amt);
-  return `<h2>${n} · Income &amp; Expenses</h2><div class="sub">Only ${n} entries</div>
-  <div class="card col" style="border-top:4px solid ${col};max-width:640px">
-   <div class="row"><b style="font-size:16px">${n}</b><span class="sp"></span><button class="pri" onclick="addTx('${k}')">+ Add entry</button></div>
-   <div class="mini"><div><span>Income</span><b class="good">${inr(inc)}</b></div><div><span>Expense</span><b class="bad">${inr(exp)}</b></div><div><span>Net</span><b>${inr(inc-exp)}</b></div><div><span>Due</span><b class="warn">${inr(due)}</b></div></div>
-   ${l.map(t=>`<div class="item"><div><b>${t.desc}</b><div class="sub" style="margin:0">${t.date} · ${t.cid?cname(t.cid):'—'} ${pill(t.status)}</div></div><b class="${t.type=='income'?'good':'bad'}">${t.type=='income'?'+':'−'}${inr(t.amt)}</b></div>`).join('')||'<div class="sub">No entries</div>'}
-  </div>`},
 clients(){return dept=='marketing'?views.mkt():views.trd()},
 cat(S){
   return `<h2>${DN[dept]} · ${LBL(S)} clients</h2><div class="sub">Separate catalog for ${LBL(S)}. Passwords: click a cell to show it and copy it.</div>
@@ -233,6 +225,62 @@ trash(){
   return `<h2>${DN[dept]} · Deleted clients</h2><div class="sub">Deleted clients aren't erased. Restore them here, or delete forever if you're sure.</div>
   <div class="card tw"><table><tr><th>Client</th><th>Service</th><th>Phone</th><th>Deleted on</th><th></th></tr>${
   deleted.map((c,i)=>({c,i})).filter(x=>x.c.type==dept).map(({c,i})=>`<tr><td>${esc(c.name)}</td><td>${c.service}</td><td>${esc(c.phone)}</td><td>${(c.deletedAt||'').slice(0,10)}</td><td><button class="sec" onclick="restoreAcc(${i})">Restore</button> <button class="sec" onclick="purgeAcc(${i})">Delete forever</button></td></tr>`).join('')||'<tr><td colspan=5>No deleted clients</td></tr>'}</table></div>`},
+vch(){
+  if(!vs)vs=newVs('Payment');
+  const t=vs.type,sg=vs.mode=='single',no=vs.editId?vouchers.find(x=>x.id==vs.editId).no:nextNo(t),al={Payment:'Account (Cr)',Receipt:'Account (Dr)',Contra:'From (Cr)'}[t];
+  const cb=LD().filter(l=>['Cash-in-hand','Bank Accounts'].includes(l.group));
+  const rowH=(r,i)=>`<tr data-r="${i}">${sg?'':`<td><select class="vs" oninput="vTot()"><option ${r.s=='Dr'?'selected':''}>Dr</option><option ${r.s=='Cr'?'selected':''}>Cr</option></select></td>`}<td><input class="vl" list="dl_all" data-i="${i}" value="${esc(r.n)}" placeholder="Ledger name"></td><td><input class="va" type="number" step="0.01" min="0" value="${r.a}" oninput="vTot()" style="text-align:right"></td></tr>`;
+  return `<h2>${DN[dept]} · Voucher Entry</h2><div class="sub">Double entry, like Tally. <b>F4–F9</b> change the voucher type · <b>Enter</b> moves to the next field · <b>Ctrl+Enter</b> saves.</div>
+  <div class="vtabs">${VT.map(([k,f])=>`<button class="${k==t?'on':''}" onclick="setVt('${k}')"><small>${f}</small><br>${k}</button>`).join('')}</div>
+  <div class="card vch">
+   <div class="vhead"><div><span class="sub" style="margin:0">Voucher type</span><br><b style="font-size:18px">${t}</b>${vs.editId?' <span class="pill pending">altering</span>':''}</div><div><span class="sub" style="margin:0">No.</span><br><b style="font-size:18px">${no}</b></div><div><span class="sub" style="margin:0">Date</span><br><input type="date" id="v_date" value="${vs.date}" style="width:auto"></div><div style="flex:1"></div><button class="sec" onclick="ledgerForm(null,true)">+ Ledger</button></div>
+   ${sg?`<div class="vrow"><label>${al}</label><input id="v_acct" list="dl_cb" value="${esc(vs.acct)}" placeholder="Cash / Bank ledger" oninput="curBal()"><span id="v_bal" class="sub" style="margin:0"></span></div>`:''}
+   <table class="vt2"><tr>${sg?'':'<th style="width:80px">Dr / Cr</th>'}<th>Particulars${sg?` (${t=='Receipt'?'Cr':'Dr'})`:''}</th><th class="r" style="width:170px">Amount (₹)</th></tr>${vs.rows.map(rowH).join('')}
+   <tr><td ${sg?'':'colspan=2'} class="r"><b>Total</b></td><td class="r"><b id="v_tot">0.00</b></td></tr></table>
+   <button class="sec" onclick="addRow()">+ Add line</button>
+   <label class="sub" style="display:block;margin:14px 0 4px">Narration</label><textarea id="v_narr" rows="2" style="width:100%;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)">${esc(vs.narr)}</textarea>
+   <div id="v_err" class="bad" style="min-height:20px;margin-top:6px"></div>
+   <div class="row" style="margin-top:6px"><button class="pri" id="v_save" onclick="saveV()">Accept (Ctrl+Enter)</button><button class="sec" onclick="clearV()">Clear</button></div>
+  </div>
+  <datalist id="dl_cb">${cb.map(l=>`<option value="${esc(l.name)}">`).join('')}</datalist><datalist id="dl_all">${LD().map(l=>`<option value="${esc(l.name)}">`).join('')}</datalist>`},
+daybook(){
+  const L=sortV(VD()).filter(x=>(!dbf.from||x.date>=dbf.from)&&(!dbf.to||x.date<=dbf.to)&&(!dbf.type||x.type==dbf.type));
+  return `<h2>${DN[dept]} · Day Book</h2><div class="sub">Every voucher, oldest first. Use ✎ to alter a voucher or ✕ to delete it.</div>
+  <div class="row"><label class="sub" style="margin:0">From</label><input type="date" id="dbfrom" value="${dbf.from}"><label class="sub" style="margin:0">To</label><input type="date" id="dbto" value="${dbf.to}"><select id="dbtype"><option value="">All voucher types</option>${VT.map(([k])=>`<option ${k==dbf.type?'selected':''}>${k}</option>`).join('')}</select><span class="sp"></span><button class="pri" onclick="newV()">+ New voucher</button></div>
+  <div class="card tw">${vTable(L,true)}<div class="sub" style="margin:10px 0 0">${L.length} voucher${L.length==1?'':'s'}</div></div>`},
+lgr(){
+  if(lgId&&lg(lgId)){const l=lg(lgId),S=ledgerStmt(l);
+    return `<h2>${DN[dept]} · ${esc(l.name)}</h2><div class="sub">Ledger account · under ${l.group} · opening ${balTxt(l.open||0)}</div>
+    <div class="row"><button class="sec" onclick="lgId=null;render()">‹ All ledgers</button><span class="sp"></span><button class="pri" onclick="newV()">+ New voucher</button></div>
+    <div class="card tw"><table><tr><th>Date</th><th>Particulars</th><th>Vch type</th><th>Vch no.</th><th class="r">Debit</th><th class="r">Credit</th><th class="r">Balance</th></tr>
+    <tr><td></td><td><i>Opening balance</i></td><td></td><td></td><td></td><td></td><td class="r">${balTxt(l.open||0)}</td></tr>${
+    S.rows.map(r=>`<tr><td>${r.x.date}</td><td>${r.others}</td><td>${r.x.type}</td><td>${r.x.no}</td><td class="r">${r.dr?m2(r.dr):''}</td><td class="r">${r.cr?m2(r.cr):''}</td><td class="r">${balTxt(r.bal)}</td></tr>`).join('')}
+    <tr><td colspan=4 class="r"><b>Total</b></td><td class="r"><b>${m2(S.tdr)}</b></td><td class="r"><b>${m2(S.tcr)}</b></td><td></td></tr>
+    <tr><td colspan=6 class="r"><b>Closing balance</b></td><td class="r"><b>${balTxt(S.close)}</b></td></tr></table></div>`}
+  return `<h2>${DN[dept]} · Ledgers</h2><div class="sub">Click a ledger to see its account. Client ledgers are created automatically under Sundry Debtors.</div>
+  <div class="row"><span class="sp"></span><button class="pri" onclick="ledgerForm()">+ Create ledger</button></div>
+  <div class="card tw"><table><tr><th>Ledger</th><th>Under</th><th class="r">Opening</th><th class="r">Closing</th><th></th></tr>${
+  [...LD()].sort((a,b)=>Object.keys(GR).indexOf(a.group)-Object.keys(GR).indexOf(b.group)||a.name.localeCompare(b.name)).map(l=>`<tr><td><a href="#" onclick="lgId=${l.id};render();return false" style="color:var(--brand)">${esc(l.name)}</a></td><td>${l.group}</td><td class="r">${balTxt(l.open||0)}</td><td class="r">${balTxt(closing(l))}</td><td><button class="ic" title="Alter" onclick="ledgerForm(${l.id})">✎</button><button class="ic" title="Delete" onclick="delLg(${l.id})">✕</button></td></tr>`).join('')}</table></div>`},
+tb(){
+  let td=0,tc=0;const rows=[...LGRP,...AGRP,...IGRP,...EGRP].map(g=>{const L=LD().filter(l=>l.group==g&&Math.abs(closing(l))>0.004);if(!L.length)return'';
+    return `<tr><td colspan=3><b>${g}</b></td></tr>`+L.map(l=>{const b=closing(l);if(b>0)td+=b;else tc-=b;return `<tr><td style="padding-left:24px">${esc(l.name)}</td><td class="r">${b>0?m2(b):''}</td><td class="r">${b<0?m2(-b):''}</td></tr>`}).join('')}).join('');
+  return `<h2>${DN[dept]} · Trial Balance</h2><div class="sub">Closing balance of every ledger. Debit total must equal credit total.</div>
+  <div class="card tw"><table><tr><th>Particulars</th><th class="r">Debit (₹)</th><th class="r">Credit (₹)</th></tr>${rows}<tr><td class="r"><b>Grand total</b></td><td class="r"><b>${m2(td)}</b></td><td class="r"><b>${m2(tc)}</b></td></tr></table>
+  ${Math.abs(td-tc)>0.005?`<div class="bad" style="margin-top:8px">Difference in books: ₹${m2(Math.abs(td-tc))}</div>`:`<div class="good" style="margin-top:8px">✓ Books are balanced</div>`}</div>`},
+pl(){
+  const side=(grps,sgn)=>grps.map(g=>{const L=LD().filter(l=>l.group==g&&Math.abs(closing(l))>0.004);return L.length?`<div class="item"><b>${g}</b><span></span></div>`+L.map(l=>`<div class="item" style="border-top:0;padding:3px 0 3px 18px"><span>${esc(l.name)}</span><span>${m2(sgn*closing(l))}</span></div>`).join(''):''}).join('');
+  const ex=expTot(),inc=incTot(),np=inc-ex,tot=Math.max(ex,inc);
+  return `<h2>${DN[dept]} · Profit &amp; Loss A/c</h2><div class="sub">Expenses on the left, incomes on the right (like Tally).</div>
+  <div class="two"><div class="card"><b>Expenses</b><div style="margin-top:8px">${side(EGRP,1)||'<div class="sub">None</div>'}${np>=0?`<div class="item"><b>Net Profit</b><b class="good">${m2(np)}</b></div>`:''}<div class="item"><b>Total</b><b>${m2(tot)}</b></div></div></div>
+  <div class="card"><b>Incomes</b><div style="margin-top:8px">${side(IGRP,-1)||'<div class="sub">None</div>'}${np<0?`<div class="item"><b>Net Loss</b><b class="bad">${m2(-np)}</b></div>`:''}<div class="item"><b>Total</b><b>${m2(tot)}</b></div></div></div></div>`},
+bs(){
+  const np=incTot()-expTot();
+  const side=(grps,sgn)=>grps.map(g=>{const L=LD().filter(l=>l.group==g&&Math.abs(closing(l))>0.004);return L.length?`<div class="item"><b>${g}</b><span></span></div>`+L.map(l=>`<div class="item" style="border-top:0;padding:3px 0 3px 18px"><span>${esc(l.name)}</span><span>${m2(sgn*closing(l))}</span></div>`).join(''):''}).join('');
+  const lt=sum(LD().filter(l=>LGRP.includes(l.group)),l=>-closing(l))+(np>=0?np:0),at=sum(LD().filter(l=>AGRP.includes(l.group)),l=>closing(l))+(np<0?-np:0);
+  return `<h2>${DN[dept]} · Balance Sheet</h2><div class="sub">Liabilities on the left, assets on the right (like Tally). Net profit is added to the capital side.</div>
+  <div class="two"><div class="card"><b>Liabilities</b><div style="margin-top:8px">${side(LGRP,-1)}${np>=0?`<div class="item"><b>Profit &amp; Loss A/c</b><span>${m2(np)}</span></div>`:''}<div class="item"><b>Total</b><b>${m2(lt)}</b></div></div></div>
+  <div class="card"><b>Assets</b><div style="margin-top:8px">${side(AGRP,1)}${np<0?`<div class="item"><b>Profit &amp; Loss A/c (loss)</b><span>${m2(-np)}</span></div>`:''}<div class="item"><b>Total</b><b>${m2(at)}</b></div></div></div></div>
+  ${Math.abs(lt-at)>0.005?`<div class="bad" style="margin-top:10px">Difference: ₹${m2(Math.abs(lt-at))}</div>`:`<div class="good" style="margin-top:10px">✓ Balance sheet tallies</div>`}`},
 mkt(){
   const list=clients.filter(c=>c.type=='marketing');
   return `<h2>Digital Marketing · Clients</h2><div class="sub">Clients, services and monthly retainers · MRR ${inr(sum(list.filter(c=>c.status=='active'),c=>c.fee))}</div>
@@ -247,44 +295,114 @@ trd(){
   list.map(c=>`<tr><td>${c.name}</td><td class="r">${inr(c.capital)}</td><td class="r ${c.pnl>=0?'good':'bad'}">${inr(c.pnl)}</td><td class="r">${(c.pnl/c.capital*100).toFixed(2)}%</td><td class="r">${c.share}%</td><td class="r">${inr(mine(c))}</td></tr>`).join('')}</table></div>
   <div class="sub" style="margin-top:10px">DTA earns a profit share only in profitable months. Loss months show ₹0.</div>`},
 portal(){
-  const pl=clients.filter(x=>x.type==dept),c=pl.find(x=>x.id==portalCid)||pl[0], mine=tx.filter(t=>t.cid==c.id);
-  const bal=sum(mine.filter(t=>t.type=='income'&&t.status!='paid'),t=>t.amt);
+  const pl=clients.filter(x=>x.type==dept),c=pl.find(x=>x.id==portalCid)||pl[0],L=clientLedger(c),S=L?ledgerStmt(L):{rows:[],close:0,tcr:0},bal=Math.max(S.close,0);
   return `<h2>${DN[dept]} · Client Portal</h2><div class="sub">What a client sees after logging in — pick a client to preview</div>
   <div class="row"><select id="pc">${pl.map(x=>`<option value="${x.id}" ${x.id==c.id?'selected':''}>${x.name}${isCat(x)?' ('+x.service+')':''}</option>`).join('')}</select></div>
   <div class="card"><h3 style="margin:0 0 4px">Welcome, ${c.name}</h3>
   <div class="sub">${isCat(c)?`Service: ${c.service}${c.detail?' · '+esc(c.detail):''} · status: ${accState(c)}`:c.type=='marketing'?`Plan: ${c.service} · ${inr(c.fee)}/month · next due ${c.due}`:`Capital ${inr(c.capital)} · profit share ${c.share}% · this month ${inr(c.pnl)}`}</div>
-  <div class="grid">${kpi('Paid so far',inr(sum(mine.filter(t=>t.status=='paid'),t=>t.amt)),'good')}${kpi('Balance due',inr(bal),bal?'warn':'good')}</div>
+  <div class="grid">${kpi('Paid so far',inr(S.tcr),'good')}${kpi('Balance due',inr(bal),bal?'warn':'good')}</div>
   ${isCat(c)?(c.service=='GST'?`<b>GST filings · ${Y}</b><div class="tw" style="margin:6px 0 14px"><table><tr><th>Month</th><th>GSTR-1</th><th>GSTR-3B</th><th>Payment</th></tr>${MN.map((n,i)=>({n,i,f:monthFil(c,Y+'-'+String(i+1).padStart(2,'0'))})).filter(x=>x.i<=new Date().getMonth()).map(x=>`<tr><td>${x.n}</td><td>${pill(retSt(x.f.gstr1,Y,x.i,11))}</td><td>${pill(retSt(x.f.gstr3b,Y,x.i,20))}</td><td>${pill(x.f.payment.toLowerCase())}</td></tr>`).join('')}</table></div>`:c.service=='ITR'?`<b>ITR filings</b><div class="tw" style="margin:6px 0 14px"><table><tr><th>Financial year</th><th>Filing</th><th>Payment</th></tr>${[0,1,2].map(k=>Y-k).map(y=>{const f=yearFil(c,y);return `<tr><td>FY ${y-1}-${String(y).slice(-2)}</td><td>${pill(f.filed.toLowerCase().replace('n/a','na'))}</td><td>${pill(f.payment.toLowerCase())}</td></tr>`}).join('')}</table></div>`:c.service=='TDS'?`<b>TDS · FY ${FY0}-${String(FY0+1).slice(-2)}</b><div class="tw" style="margin:6px 0 14px"><table><tr><th>Quarter</th><th>Return</th><th>Payment</th></tr>${[1,2,3,4].map(q=>({q,f:qFil(c,FY0,q)})).map(x=>`<tr><td>${qLabel(FY0,x.q)}</td><td>${pill(tdsQSt(c,FY0,x.q))}</td><td>${pill(x.f.fee.toLowerCase())}</td></tr>`).join('')}</table></div>`:c.service=='PAN'?`<b>PAN application</b><div style="margin:6px 0 14px">${panInfo(c).type} · ack ${esc(panInfo(c).ack)||'—'} · applied ${panInfo(c).applied||'—'} ${pillL(panState(c),panInfo(c).status)}</div>`:`<div style="margin-bottom:12px"><b>${esc(c.detail)||c.service}</b> · due ${c.dueDate||'—'} ${pill(accState(c))}</div>`):''}
-  <b>Statement</b>${txTable([...mine].sort((a,b)=>b.date.localeCompare(a.date)),false)}</div>`}
+  <b>Statement of account</b><div class="tw"><table><tr><th>Date</th><th>Particulars</th><th class="r">Debit</th><th class="r">Credit</th><th class="r">Balance</th></tr>${S.rows.map(r=>`<tr><td>${r.x.date}</td><td>${r.x.type} ${r.x.no}${r.x.narr?' · '+esc(r.x.narr):''}</td><td class="r">${r.dr?m2(r.dr):''}</td><td class="r">${r.cr?m2(r.cr):''}</td><td class="r">${balTxt(r.bal)}</td></tr>`).join('')||'<tr><td colspan=5>No entries yet</td></tr>'}</table></div></div>`}
 };
 
 function navItems(){
-  const base=[['dash','Dashboard'],['crm','CRM / Leads'],['ledger','Income & Expenses']];
-  if(dept=='marketing')return [...base,['clients','Clients'],['portal','Client Portal']];
+  const base=[['dash','Dashboard'],['crm','CRM / Leads']],books=[['--books','Books of accounts'],['vch','Voucher Entry'],['daybook','Day Book'],['lgr','Ledgers'],['tb','Trial Balance'],['pl','Profit & Loss'],['bs','Balance Sheet']];
+  if(dept=='marketing')return [...base,['clients','Clients'],...books,['portal','Client Portal']];
   const cats=[['--services',dept=='accounts'?'Accounting & compliance':'Licenses & registrations'],...CATS[dept].map(a=>['cat:'+a,LBL(a)])];
-  return [...base,...(dept=='trading'?[['clients','Portfolio clients']]:[]),...cats,['--other','More'],['trash','Deleted'+(deleted.some(x=>x.type==dept)?' ('+deleted.filter(x=>x.type==dept).length+')':'')],['portal','Client Portal']]}
+  return [...base,...(dept=='trading'?[['clients','Portfolio clients']]:[]),...books,...cats,['--other','More'],['trash','Deleted'+(deleted.some(x=>x.type==dept)?' ('+deleted.filter(x=>x.type==dept).length+')':'')],['portal','Client Portal']]}
 function render(){
+  ensureLedgers();
   const items=navItems();if(!items.some(i=>i[0]==view))view='dash';
   nav.innerHTML=items.map(([k,l])=>k.startsWith('--')?`<div class="nh">${l}</div>`:`<button data-v="${k}" class="${k==view?'on':''}">${l}</button>`).join('');
   const[vk,arg]=view.split(':');
   document.getElementById('main').innerHTML=views[vk](arg);
   if(vk=='cat'){csr.oninput=()=>{catQ=csr.value;ct.innerHTML=catRows(arg)};cfs.onchange=()=>{catF=cfs.value;ct.innerHTML=catRows(arg)}}
+  if(vk=='vch'){curBal();vTot();const f=vs.fr!=null?document.querySelector('.vch tr[data-r="'+vs.fr+'"] .vl'):document.querySelector('#v_acct,.vch .vl');vs.fr=null;if(f)f.focus()}
+  if(vk=='daybook'){const f=()=>{dbf={from:dbfrom.value,to:dbto.value,type:dbtype.value};render()};dbfrom.onchange=dbto.onchange=dbtype.onchange=f}
   if(vk=='crm')cq.oninput=()=>{crmQ=cq.value;kb.innerHTML=board()};
   if(vk=='portal')pc.onchange=()=>{portalCid=pc.value;render()};
 }
 nav.onclick=e=>{const b=e.target.closest('button');if(b){if(view!=b.dataset.v){catQ='';catF=''}view=b.dataset.v;render()}};
-dsel.onchange=()=>{dept=dsel.value;portalCid=0;catQ='';catF='';render()};
+dsel.onchange=()=>{dept=dsel.value;vs=null;lgId=null;dbf={from:'',to:'',type:''};portalCid=0;catQ='';catF='';render()};
 
 function openForm(html,onOk){frm.innerHTML=html+`<div class="row" style="margin-top:16px"><span class="sp"></span><button class="sec" value="x" formnovalidate>Cancel</button><button class="pri" value="ok">Save</button></div>`;
   frm.onsubmit=e=>{if(e.submitter&&e.submitter.value=='ok')onOk()};dlg.showModal()}
 const v=id=>document.getElementById(id).value;
-function addTx(seg){seg=seg||dept;openForm(`<h3 style="margin:0">Add entry</h3>
- <label>Type</label><select id="f1"><option>income</option><option>expense</option></select>
- <label>Department</label><select id="f2" disabled>${[['accounts','Accounts'],['marketing','Digital Marketing'],['trading','Trading']].map(([k,n])=>`<option value="${k}" ${k==seg?'selected':''}>${n}</option>`).join('')}</select>
- <label>Client (optional)</label><select id="f3"><option value="">—</option>${clients.filter(c=>c.type==seg).map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>
- <label>Description</label><input id="f4"><label>Amount (₹)</label><input id="f5" type="number" min="0">
- <label>Date</label><input id="f6" type="date" value="${today}"><label>Status</label><select id="f7"><option>paid</option><option>pending</option><option>overdue</option></select>`,
- ()=>{tx.push({id:nid++,type:v('f1'),seg:v('f2'),cid:v('f3')?+v('f3'):null,desc:v('f4')||'(no description)',amt:+v('f5')||0,date:v('f6'),status:v('f7')});save();render()})}
+const defLg=g=>{const l=LD().find(x=>g.includes(x.group));return l?l.name:''};
+function newVs(type,keep){const sg=['Payment','Receipt','Contra'].includes(type),b=()=>({s:'Dr',n:'',a:''});
+  const rows=sg?[b(),b(),b()]:type=='Journal'?[b(),{...b(),s:'Cr'}]:type=='Sales'?[b(),{s:'Cr',n:defLg(['Sales Accounts','Direct Incomes']),a:''}]:[{s:'Dr',n:defLg(['Purchase Accounts','Direct Expenses']),a:''},{...b(),s:'Cr'}];
+  return{type,mode:sg?'single':'grid',date:keep?keep.date:today,acct:'',rows,narr:keep?keep.narr||'':'',editId:null}}
+function syncV(){if(!vs||!document.getElementById('v_date'))return;vs.date=v_date.value;vs.narr=v_narr.value;if(vs.mode=='single')vs.acct=v_acct.value;
+  vs.rows=[...document.querySelectorAll('.vch tr[data-r]')].map(tr=>{const o={n:tr.querySelector('.vl').value,a:tr.querySelector('.va').value},s=tr.querySelector('.vs');o.s=s?s.value:'Dr';return o})}
+function setVt(k){if(vs&&vs.editId){toast('Finish altering this voucher, or press Clear');return}syncV();vs=newVs(k,vs);render()}
+function clearV(){vs=newVs(vs.type,vs);vs.narr='';render()}
+function newV(){vs=newVs(vs?vs.type:'Payment',vs);view='vch';render()}
+function addRow(){syncV();vs.rows.push({s:'Dr',n:'',a:''});vs.fr=vs.rows.length-1;render()}
+function curBal(){const l=lgByName(document.getElementById('v_acct')&&v_acct.value);document.getElementById('v_bal')&&(v_bal.textContent=l?'Cur Bal: '+balTxt(closing(l)):'')}
+function vTot(){const el=document.getElementById('v_tot');if(!el)return;const rs=[...document.querySelectorAll('.vch tr[data-r]')];
+  if(vs.mode=='single'){el.textContent=m2(sum(rs,tr=>+tr.querySelector('.va').value||0));return}
+  const dr=sum(rs.filter(tr=>tr.querySelector('.vs').value=='Dr'),tr=>+tr.querySelector('.va').value||0),cr=sum(rs.filter(tr=>tr.querySelector('.vs').value=='Cr'),tr=>+tr.querySelector('.va').value||0);
+  el.innerHTML='Dr '+m2(dr)+' · Cr '+m2(cr)+(Math.abs(dr-cr)>0.004?' <span class="bad">· diff '+m2(Math.abs(dr-cr))+'</span>':' <span class="good">✓</span>')}
+function vErr(m){const e=document.getElementById('v_err');if(e)e.textContent=m;toast(m)}
+function saveV(){syncV();const t=vs.type,sg=vs.mode=='single',rows=vs.rows.filter(r=>r.n.trim()||+r.a),lines=[];
+  const get=n=>{const l=lgByName(n);if(!l)throw new Error('Ledger “'+n+'” not found. Click “+ Ledger” to create it.');return l};
+  try{
+    if(!vs.date)throw new Error('Enter the voucher date');
+    if(!rows.length)throw new Error('Add at least one line');
+    rows.forEach(r=>{if(!(+r.a>0))throw new Error('Enter an amount for '+(r.n||'each line'))});
+    if(sg){const a=get(vs.acct),tot=sum(rows,r=>+r.a);
+      if(t=='Contra')[a,...rows.map(r=>get(r.n))].forEach(l=>{if(!['Cash-in-hand','Bank Accounts'].includes(l.group))throw new Error('Contra is only between Cash and Bank ledgers')});
+      if(t=='Receipt'){lines.push({l:a.id,dr:tot,cr:0});rows.forEach(r=>lines.push({l:get(r.n).id,dr:0,cr:+r.a}))}
+      else{lines.push({l:a.id,dr:0,cr:tot});rows.forEach(r=>lines.push({l:get(r.n).id,dr:+r.a,cr:0}))}
+    }else{
+      if(rows.length<2)throw new Error('A voucher needs at least two lines (one Dr and one Cr)');
+      rows.forEach(r=>{const l=get(r.n);lines.push({l:l.id,dr:r.s=='Dr'?+r.a:0,cr:r.s=='Cr'?+r.a:0})});
+      const dr=sum(lines,x=>x.dr),cr=sum(lines,x=>x.cr);if(Math.abs(dr-cr)>0.005)throw new Error('Debit ₹'+m2(dr)+' and Credit ₹'+m2(cr)+' do not match (difference ₹'+m2(Math.abs(dr-cr))+')');
+    }
+  }catch(e){vErr(e.message);return}
+  let no;if(vs.editId){const x=vouchers.find(y=>y.id==vs.editId);if(x.type!=t)x.no=nextNo(t);Object.assign(x,{type:t,date:vs.date,narr:vs.narr,lines});no=x.no}
+  else{no=nextNo(t);vouchers.push({id:nid++,dept,type:t,no,date:vs.date,narr:vs.narr,lines})}
+  save();toast(t+' voucher no. '+no+(vs.editId?' altered':' saved'));vs=newVs(t,{date:vs.date});view=vs.editId?view:'vch';render()}
+function editV(id){const x=vouchers.find(y=>y.id==id),t=x.type,drs=x.lines.filter(l=>l.dr>0),crs=x.lines.filter(l=>l.cr>0),clean=x.lines.every(l=>!(l.dr>0&&l.cr>0));
+  const s={type:t,date:x.date,narr:x.narr||'',editId:id,acct:'',rows:[],mode:'grid'};
+  if(clean&&['Payment','Contra'].includes(t)&&crs.length==1){s.mode='single';s.acct=lname(crs[0].l);s.rows=drs.map(l=>({n:lname(l.l),a:l.dr,s:'Dr'}))}
+  else if(clean&&t=='Receipt'&&drs.length==1){s.mode='single';s.acct=lname(drs[0].l);s.rows=crs.map(l=>({n:lname(l.l),a:l.cr,s:'Dr'}))}
+  else s.rows=x.lines.map(l=>({s:l.dr>0?'Dr':'Cr',n:lname(l.l),a:l.dr||l.cr}));
+  vs=s;view='vch';render()}
+function delV(id){if(!confirm('Delete this voucher?'))return;vouchers=vouchers.filter(x=>x.id!=id);save();toast('Voucher deleted');render()}
+function delLg(id){if(vouchers.some(x=>x.lines.some(y=>y.l==id))){toast('This ledger has vouchers — delete or alter them first');return}if(!confirm('Delete this ledger?'))return;ledgers=ledgers.filter(l=>l.id!=id);save();render()}
+function ledgerForm(id,fromV){if(fromV)syncV();const l=id?lg(id):{};
+  openForm(`<h3 style="margin:0">${id?'Alter':'Create'} ledger</h3><label>Name</label><input id="lg1" value="${esc(l.name||'')}"><label>Under (group)</label><select id="lg2">${Object.keys(GR).map(g=>`<option ${g==(l.group||'Indirect Expenses')?'selected':''}>${g}</option>`).join('')}</select>
+  <label>Opening balance (₹)</label><div class="row" style="margin:0"><input id="lg3" type="number" step="0.01" value="${Math.abs(l.open||0)||''}" style="flex:1"><select id="lg4" style="width:90px"><option ${(l.open||0)>=0?'selected':''}>Dr</option><option ${(l.open||0)<0?'selected':''}>Cr</option></select></div>`,
+  ()=>{const n=v('lg1').trim();if(!n){toast('Enter a ledger name');return}if(LD().some(x=>x.id!=id&&x.name.toLowerCase()==n.toLowerCase())){toast('A ledger with this name already exists');return}
+   const o=(+v('lg3')||0)*(v('lg4')=='Cr'?-1:1);if(id)Object.assign(l,{name:n,group:v('lg2'),open:o});else ledgers.push({id:nid++,dept,name:n,group:v('lg2'),open:o});save();toast('Ledger saved');render()})}
+function seedBooks(){
+  const spec={accounts:{cash:20000,bank:150000,cap:170000,L:[['Professional Fees','Direct Incomes'],['Other Income','Indirect Incomes'],['Office Rent','Indirect Expenses'],['Staff Salaries','Indirect Expenses'],['Internet & Software','Indirect Expenses'],['GST Payable','Duties & Taxes']]},
+   marketing:{cash:10000,bank:90000,cap:100000,L:[['Retainer Income','Sales Accounts'],['Ad Credits (Meta / Google)','Direct Expenses'],['Freelancer Charges','Direct Expenses'],['Software Subscriptions','Indirect Expenses']]},
+   trading:{cash:5000,bank:60000,cap:65000,L:[['Profit Share Income','Direct Incomes'],['License Fees','Sales Accounts'],['Govt. Fees Paid','Direct Expenses'],['Office Expenses','Indirect Expenses']]}};
+  Object.entries(spec).forEach(([dp,sp])=>{const mk_=(n,g,o)=>ledgers.push({id:nid++,dept:dp,name:n,group:g,open:o||0});mk_('Cash','Cash-in-hand',sp.cash);mk_('SBI Bank A/c','Bank Accounts',sp.bank);mk_('Capital Account','Capital Account',-sp.cap);sp.L.forEach(([n,g])=>mk_(n,g))});
+  ensureLedgers();
+  const V=(dp,type,date,narr,ls)=>{const no=1+Math.max(0,...vouchers.filter(x=>x.dept==dp&&x.type==type).map(x=>x.no));
+    vouchers.push({id:nid++,dept:dp,type,no,date,narr,lines:ls.map(([n,s,a])=>({l:ledgers.find(l=>l.dept==dp&&l.name==n).id,dr:s=='Dr'?a:0,cr:s=='Cr'?a:0}))})};
+  const sale=(dp,date,party,inc,amt,narr,paid)=>{V(dp,'Sales',date,narr,[[party,'Dr',amt],[inc,'Cr',amt]]);if(paid)V(dp,'Receipt',date,'Received from '+party,[['SBI Bank A/c','Dr',amt],[party,'Cr',amt]])};
+  sale('accounts',d(-14),'Dr. P. Bora','Professional Fees',2500,'ITR filing fee',true);
+  sale('accounts',d(-9),'Tezpur Hardware','Professional Fees',5000,'Bookkeeping + GST (monthly)',true);
+  sale('accounts',d(-20),'Tezpur Hardware','Professional Fees',45000,'Accounting and audit fees',true);
+  sale('accounts',d(-16),'Green Valley School','Professional Fees',30000,'TDS returns and payroll compliance',true);
+  sale('accounts',d(-2),'Kalita Enterprises','Professional Fees',1500,'GSTR-3B filing fee',false);
+  V('accounts','Payment',d(-10),'Office rent for the month',[['SBI Bank A/c','Cr',15000],['Office Rent','Dr',15000]]);
+  V('accounts','Payment',d(-3),'Staff salaries',[['SBI Bank A/c','Cr',40000],['Staff Salaries','Dr',40000]]);
+  V('accounts','Payment',d(-1),'Internet and software',[['Cash','Cr',3500],['Internet & Software','Dr',3500]]);
+  sale('marketing',d(-25),'Sharma Sweets','Retainer Income',25000,'Monthly retainer',true);
+  sale('marketing',d(-20),'Bodoland Traders','Retainer Income',18000,'Monthly retainer',true);
+  sale('marketing',d(-4),'Bodoland Traders','Retainer Income',18000,'Monthly retainer',false);
+  sale('marketing',d(2),'Sharma Sweets','Retainer Income',25000,'Monthly retainer',false);
+  V('marketing','Payment',d(-8),'Ad credits (Meta)',[['SBI Bank A/c','Cr',9000],['Ad Credits (Meta / Google)','Dr',9000]]);
+  V('trading','Receipt',d(-12),'Profit share from R. Gogoi – last month',[['SBI Bank A/c','Dr',12600],['Profit Share Income','Cr',12600]]);
+  V('trading','Receipt',d(-6),'Profit share from S. Baruah – last month',[['SBI Bank A/c','Dr',4650],['Profit Share Income','Cr',4650]]);
+  sale('trading',d(-7),'Sharma Sweets','License Fees',4000,'FSSAI renewal service fee',false);
+  V('trading','Payment',d(-5),'FSSAI government fee',[['Cash','Cr',1500],['Govt. Fees Paid','Dr',1500]]);
+}
 function addClient(type){const m=type=='marketing';openForm(`<h3 style="margin:0">Add ${DN[type]} client</h3><label>Name</label><input id="f1">${m?
  `<label>Service</label><input id="f2"><label>Monthly fee (₹)</label><input id="f3" type="number">`:
  `<label>Capital (₹)</label><input id="f2" type="number"><label>DTA profit share %</label><input id="f3" type="number" value="30"><label>This month P&amp;L (₹)</label><input id="f4" type="number" value="0">`}`,
@@ -378,7 +496,15 @@ function exportCsv(S){const L=clients.filter(c=>c.type==dept&&c.service==S);if(!
     if(S=='ITR')[5,4,3,2,1,0].forEach(k=>{const f=yearFil(c,Y-k);r.push(f.filed+' / '+f.payment)});return r});
   const csv='\ufeff'+[H,...rows].map(r=>r.map(x=>'"'+String(x==null?'':x).replace(/"/g,'""')+'"').join(',')).join('\r\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='DTA-'+S.replace(' ','-')+'-clients.csv';a.click();toast('Exported — opens in Excel')}
-nid=Math.max(100,...clients.map(x=>x.id+1),...deleted.map(x=>x.id+1),...tx.map(x=>x.id+1),...leads.map(x=>x.id+1));
+nid=Math.max(100,...clients.map(x=>x.id+1),...deleted.map(x=>x.id+1),...leads.map(x=>x.id+1),...ledgers.map(x=>x.id+1),...vouchers.map(x=>x.id+1));
+if(!ledgers.length)seedBooks();
+document.addEventListener('keydown',e=>{
+  if(view!='vch'||dlg.open)return;
+  const m={F4:'Contra',F5:'Payment',F6:'Receipt',F7:'Journal',F8:'Sales',F9:'Purchase'}[e.key];
+  if(m){e.preventDefault();setVt(m);return}
+  if(e.key=='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();saveV();return}
+  if(e.key=='Enter'&&e.target.matches('.vch input,.vch select')){const el=[...document.querySelectorAll('.vch input,.vch select,.vch textarea,#v_save')],i=el.indexOf(e.target);setTimeout(()=>{const n=el[i+1];if(n)n.focus()},0)}
+});
 render();
 </script>
 </body>
