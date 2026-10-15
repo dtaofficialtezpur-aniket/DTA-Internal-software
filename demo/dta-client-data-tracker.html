@@ -128,9 +128,9 @@ const T=()=>dept?tx.filter(t=>t.seg==dept):tx;
 try{const s=JSON.parse(localStorage.getItem('dta-demo7')||'null');if(s){clients=s.clients;tx=s.tx;if(s.leads)leads=s.leads;deleted=s.deleted||[]}}catch(e){}
 const save=()=>{try{localStorage.setItem('dta-demo7',JSON.stringify({clients,tx,leads,deleted}))}catch(e){}};
 const CATS={
- accounts:['GST','ITR','TDS','PAN','PROVIDENT FUND','ESI','Professional Tax','Accounting & Bookkeeping','Audit','ROC / MCA Filing','Digital Signature (DSC)','Other'],
- trading:['Trade License','FSSAI License','Shop & Establishment','Udyam (MSME)','Import Export Code (IEC)','Drug License','Trademark','ISO Certification','Company / LLP Registration','Partnership / Society Registration','Other License']};
-const PFX={GST:'G',ITR:'I',TDS:'T',PAN:'P','PROVIDENT FUND':'PF',ESI:'ES','Professional Tax':'PT','Accounting & Bookkeeping':'AB',Audit:'AU','ROC / MCA Filing':'RC','Digital Signature (DSC)':'DS',Other:'O','Trade License':'TL','FSSAI License':'FS','Shop & Establishment':'SE','Udyam (MSME)':'UD','Import Export Code (IEC)':'IE','Drug License':'DL',Trademark:'TM','ISO Certification':'IS','Company / LLP Registration':'CR','Partnership / Society Registration':'PS','Other License':'OL'};
+ accounts:['GST','ITR','TDS','PAN','PROVIDENT FUND','ESI','Professional Tax','Accounting & Bookkeeping','Audit','Other'],
+ trading:['Trade License','FSSAI License','Shop & Establishment','Udyam (MSME)','Import Export Code (IEC)','Drug License','Trademark','ISO Certification','Digital Signature (DSC)','Company / LLP Registration','Partnership / Society Registration','Other License']};
+const PFX={GST:'G',ITR:'I',TDS:'T',PAN:'P','PROVIDENT FUND':'PF',ESI:'ES','Professional Tax':'PT','Accounting & Bookkeeping':'AB',Audit:'AU','Digital Signature (DSC)':'DS',Other:'O','Trade License':'TL','FSSAI License':'FS','Shop & Establishment':'SE','Udyam (MSME)':'UD','Import Export Code (IEC)':'IE','Drug License':'DL',Trademark:'TM','ISO Certification':'IS','Company / LLP Registration':'CR','Partnership / Society Registration':'PS','Other License':'OL'};
 const LBL=S=>S=='PROVIDENT FUND'?'Provident Fund':S;
 const isCat=c=>c.type=='accounts'||(c.type=='trading'&&!!c.service);
 const hasCat=()=>!!CATS[dept];
