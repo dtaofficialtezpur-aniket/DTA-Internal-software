@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { computeStatus, fmtDate, fmtMoney } from '../utils.js';
-import StatusPill from '../components/StatusPill.jsx';
+import StatusPill, { WorkStatusPill } from '../components/StatusPill.jsx';
 
 export default function Clients({ initialTab }){
   const { clients, normalClients, settings, setAddClientOpen, setSelectedClientId, setSelectedNormalClientId } = useApp();
@@ -83,7 +83,7 @@ export default function Clients({ initialTab }){
                       <td><div className="cell-name">{c.client}</div><div className="cell-sub">{c.contact || c.address || '—'}</div></td>
                       <td>Normal</td>
                       <td className="tabular">{fmtMoney(c.remainingPayment)} <span style={{color:'var(--ink-faint)'}}>remaining</span></td>
-                      <td>—</td>
+                      <td><WorkStatusPill status={c.workStatus} /></td>
                       <td className="row-actions"><button className="btn btn-secondary btn-sm" onClick={() => setSelectedNormalClientId(c.id)}>View</button></td>
                     </tr>
                   )
@@ -142,13 +142,14 @@ export default function Clients({ initialTab }){
           </div>
 
           <div className="table-wrap">
-            <table><thead><tr><th>Client</th><th>Contact</th><th>Total</th><th>Advance</th><th>Remaining</th><th></th></tr></thead>
+            <table><thead><tr><th>Client</th><th>Contact</th><th>Status</th><th>Total</th><th>Advance</th><th>Remaining</th><th></th></tr></thead>
               <tbody>
-                {normalRows.length === 0 && <tr><td colSpan="6" className="empty">No normal clients match this search.</td></tr>}
+                {normalRows.length === 0 && <tr><td colSpan="7" className="empty">No normal clients match this search.</td></tr>}
                 {normalRows.map((c) => (
                   <tr key={c.id}>
                     <td><div className="cell-name">{c.client}</div><div className="cell-sub">{c.address}</div></td>
                     <td>{c.contact || '—'}</td>
+                    <td><WorkStatusPill status={c.workStatus} /></td>
                     <td className="tabular">{fmtMoney(c.totalAmount)}</td>
                     <td className="tabular">{fmtMoney(c.advancePayment)}</td>
                     <td className="tabular">{fmtMoney(c.remainingPayment)}</td>

@@ -110,6 +110,7 @@ code, .mono{font-family:"IBM Plex Mono",ui-monospace,monospace;}
 .pill-active{background:var(--good-soft);color:var(--good);}
 .pill-due{background:var(--warn-soft);color:var(--warn);}
 .pill-overdue{background:var(--crit-soft);color:var(--crit);}
+.pill-info{background:var(--accent-soft);color:var(--accent);}
 .pill-paused{background:var(--surface-sunken);color:var(--ink-muted);}
 .pill-removed{background:var(--surface-sunken);color:var(--ink-muted);}
 
