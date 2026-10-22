@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS clients (
     domain VARCHAR(255) NULL,
     website_url VARCHAR(500) NULL,
     domain_expiry DATE NULL,
+    domain_start DATE NULL,
+    created_at DATETIME NULL,
     INDEX (api_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -55,6 +57,7 @@ CREATE TABLE IF NOT EXISTS normal_clients (
     domain VARCHAR(255) NULL,
     website_url VARCHAR(500) NULL,
     domain_expiry DATE NULL,
+    domain_start DATE NULL,
     -- advance_received | in_progress | domain_bought | work_done | handover_done
     work_status VARCHAR(32) NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
