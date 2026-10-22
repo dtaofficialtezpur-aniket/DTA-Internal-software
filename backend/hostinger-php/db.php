@@ -208,6 +208,34 @@ function ensure_schema(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 
+    // Extra links per client (website, Instagram, ...) with a custom name,
+    // and documents (contracts etc.) kept for future reference. Both are
+    // keyed by the client's id string, same as 'history'/'invoices', so they
+    // stay attached when a client is converted between types. Document bytes
+    // live in uploads/ (see ensure_upload_dir()), named by storage_name.
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS client_links (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            client_id VARCHAR(32) NOT NULL,
+            label VARCHAR(100) NOT NULL,
+            url VARCHAR(500) NOT NULL,
+            created_at DATETIME NOT NULL,
+            INDEX (client_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS client_documents (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            client_id VARCHAR(32) NOT NULL,
+            filename VARCHAR(255) NOT NULL,
+            storage_name VARCHAR(64) NOT NULL,
+            size_bytes BIGINT NOT NULL,
+            uploaded_by INT NOT NULL,
+            uploaded_at DATETIME NOT NULL,
+            INDEX (client_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
     $hasDefaults = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'agencyName'")->fetchColumn();
     if ($hasDefaults === false) {
         $insert = $pdo->prepare('INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)');
