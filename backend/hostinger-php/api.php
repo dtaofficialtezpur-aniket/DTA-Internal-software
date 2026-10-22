@@ -261,6 +261,7 @@ function normal_client_to_json(array $c): array
         'notes' => $c['notes'],
         'createdAt' => $c['created_at'],
         'archivedSubscriptionData' => decode_archived_data($c),
+        'workStatus' => $c['work_status'] ?? null,
         'domain' => $c['domain'] ?? null,
         'websiteUrl' => $c['website_url'] ?? null,
         'domainExpiry' => $c['domain_expiry'] ?? null,
@@ -564,6 +565,10 @@ if ($method === 'GET') {
         case 'addNormalClient':
             require_session($pdo, $body['token'] ?? null);
             handle_add_normal_client($pdo, $body);
+            break;
+        case 'setNormalClientStatus':
+            require_session($pdo, $body['token'] ?? null);
+            handle_set_normal_client_status($pdo, $body);
             break;
         case 'updateNormalClient':
             require_session($pdo, $body['token'] ?? null);
@@ -1046,6 +1051,28 @@ function handle_add_normal_client(PDO $pdo, array $body): void
     json_out(['ok' => true, 'client' => normal_client_to_json($c)]);
 }
 
+const NORMAL_WORK_STATUSES = [
+    'advance_received' => 'Advance payment received',
+    'in_progress' => 'Work in progress',
+    'domain_bought' => 'Domain bought',
+    'work_done' => 'Work done',
+    'handover_done' => 'Handover done',
+];
+
+function handle_set_normal_client_status(PDO $pdo, array $body): void
+{
+    $id = (string) ($body['id'] ?? '');
+    if (!find_normal_client($pdo, $id)) json_out(['error' => 'Client not found: ' . $id]);
+
+    $status = (string) ($body['status'] ?? '');
+    if ($status !== '' && !isset(NORMAL_WORK_STATUSES[$status])) {
+        json_out(['error' => 'Unknown status.']);
+    }
+    $pdo->prepare('UPDATE normal_clients SET work_status = ? WHERE id = ?')->execute([$status !== '' ? $status : null, $id]);
+    log_event($pdo, $id, 'updated', $status !== '' ? 'Status set to ' . NORMAL_WORK_STATUSES[$status] : 'Status cleared');
+    json_out(['ok' => true, 'client' => normal_client_to_json(find_normal_client($pdo, $id))]);
+}
+
 function handle_update_normal_client(PDO $pdo, array $body): void
 {
     $id = $body['id'] ?? '';
@@ -1186,7 +1213,7 @@ function handle_convert_to_subscription(PDO $pdo, array $body): void
         '_type' => 'normal',
         'address' => $c['address'], 'contact' => $c['contact'],
         'totalAmount' => (float) $c['total_amount'], 'advancePayment' => (float) $c['advance_payment'],
-        'notes' => $c['notes'], 'createdAt' => $c['created_at'],
+        'notes' => $c['notes'], 'createdAt' => $c['created_at'], 'workStatus' => $c['work_status'] ?? null,
     ]);
 
     $pdo->beginTransaction();
@@ -1216,7 +1243,9 @@ function handle_convert_to_normal(PDO $pdo, array $body): void
         $advancePayment = (float) $archived['advancePayment'];
         $notes = $archived['notes'];
         $createdAt = $archived['createdAt'] ?? null;
+        $workStatus = $archived['workStatus'] ?? null;
     } else {
+        $workStatus = null;
         $address = substr((string) ($body['address'] ?? ''), 0, 2000);
         $contact = substr((string) ($body['contact'] ?? ''), 0, 255);
         $totalAmount = max(0, (float) ($body['totalAmount'] ?? $c['amount']));
@@ -1239,10 +1268,10 @@ function handle_convert_to_normal(PDO $pdo, array $body): void
     $pdo->beginTransaction();
     $pdo->prepare('DELETE FROM clients WHERE id = ?')->execute([$id]);
     $stmt = $pdo->prepare('
-        INSERT INTO normal_clients (id, client_name, address, contact, total_amount, advance_payment, remaining_payment, notes, created_at, archived_data, domain, website_url, domain_expiry)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO normal_clients (id, client_name, address, contact, total_amount, advance_payment, remaining_payment, notes, created_at, archived_data, domain, website_url, domain_expiry, work_status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ');
-    $stmt->execute([$id, $c['client_name'], $address, $contact, $totalAmount, $advancePayment, $remainingPayment, $notes, $createdAt ?? date('Y-m-d H:i:s'), $archiveSub, $c['domain'], $c['website_url'], $c['domain_expiry']]);
+    $stmt->execute([$id, $c['client_name'], $address, $contact, $totalAmount, $advancePayment, $remainingPayment, $notes, $createdAt ?? date('Y-m-d H:i:s'), $archiveSub, $c['domain'], $c['website_url'], $c['domain_expiry'], $workStatus]);
     $pdo->commit();
 
     log_event($pdo, $id, 'converted', 'Converted from subscription client to normal client');

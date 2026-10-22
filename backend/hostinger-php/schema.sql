@@ -54,7 +54,9 @@ CREATE TABLE IF NOT EXISTS normal_clients (
     -- Optional domain/website details and when the domain expires.
     domain VARCHAR(255) NULL,
     website_url VARCHAR(500) NULL,
-    domain_expiry DATE NULL
+    domain_expiry DATE NULL,
+    -- advance_received | in_progress | domain_bought | work_done | handover_done
+    work_status VARCHAR(32) NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS settings (
