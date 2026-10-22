@@ -136,6 +136,8 @@ CREATE TABLE IF NOT EXISTS invoices (
     amount DECIMAL(12,2) NOT NULL DEFAULT 0,
     issued_date DATETIME NOT NULL,
     created_by INT NOT NULL,
+    -- e.g. DTA-D002-01 (client id + a per-client counter); NULL on older invoices.
+    invoice_number VARCHAR(64) NULL,
     INDEX (client_type, client_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

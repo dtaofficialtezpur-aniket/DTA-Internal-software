@@ -80,6 +80,12 @@ export async function buildInvoicePdf(invoice, billTo){
   doc.setFontSize(10);
   let y = 60;
   doc.text(billTo.name, margin, y);
+  if (invoice.clientId){
+    y += 5;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Client ID: ' + invoice.clientId, margin, y);
+    doc.setFont('helvetica', 'normal');
+  }
   for (const line of billTo.extraLines || []){
     y += 5;
     doc.text(line, margin, y);
