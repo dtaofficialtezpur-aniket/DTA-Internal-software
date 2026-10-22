@@ -211,3 +211,23 @@ input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:foc
 .auth-error{background:var(--crit-soft);color:var(--crit);border-radius:var(--radius-s);padding:9px 12px;font-size:.82rem;}
 
 [hidden]{display:none !important;}
+
+/* Overview: two half-width colour-coded cards per row */
+.ov-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;align-items:start;}
+@media (max-width:1000px){.ov-grid{grid-template-columns:1fr;}}
+.ov-card{--tone:var(--accent);--tone-soft:var(--accent-soft);background:var(--surface-raised);border:1px solid var(--border);border-top:3px solid var(--tone);border-radius:var(--radius-m);overflow:hidden;min-width:0;}
+.ov-card.tone-warn{--tone:var(--warn);--tone-soft:var(--warn-soft);}
+.ov-card.tone-crit{--tone:var(--crit);--tone-soft:var(--crit-soft);}
+.ov-card.tone-good{--tone:var(--good);--tone-soft:var(--good-soft);}
+.ov-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:var(--tone-soft);}
+.ov-title{display:flex;align-items:center;gap:8px;font-size:.95rem;font-weight:700;color:var(--ink);min-width:0;}
+.ov-count{font-size:.72rem;font-weight:700;color:var(--tone);background:var(--surface-raised);border:1px solid var(--tone);border-radius:99px;padding:1px 8px;}
+.ov-row{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:11px 16px;background:transparent;border:none;border-bottom:1px solid var(--border);text-align:left;color:inherit;font:inherit;cursor:pointer;}
+.ov-row:last-child{border-bottom:none;}
+.ov-row:hover{background:var(--surface-sunken);}
+.ov-row-main{min-width:0;}
+.ov-row-name{font-weight:600;font-size:.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ov-row-sub{color:var(--ink-muted);font-size:.76rem;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ov-row-side{text-align:right;flex-shrink:0;font-size:.84rem;}
+.ov-empty{padding:22px 16px;text-align:center;color:var(--ink-muted);font-size:.84rem;}
+.ov-more{padding:8px 16px;font-size:.74rem;color:var(--ink-muted);border-top:1px solid var(--border);}

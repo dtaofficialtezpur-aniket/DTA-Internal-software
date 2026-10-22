@@ -18,6 +18,8 @@ import Toast from './components/Toast.jsx';
 export default function App(){
   const { isLoggedIn, auth, clients, normalClients, showToast, refreshFromBackend, selectedClientId, selectedNormalClientId, addClientOpen, accessModalFile, closeOverlays } = useApp();
   const [view, setView] = useState('overview');
+  const [clientsTab, setClientsTab] = useState(null);
+  const navigate = (v, tab = null) => { setClientsTab(tab); setView(v); };
 
   useEffect(() => {
     if (isLoggedIn){
@@ -52,11 +54,11 @@ export default function App(){
 
   return (
     <div className="app">
-      <Sidebar view={view} setView={setView} />
+      <Sidebar view={view} setView={(v) => navigate(v)} />
       <main className="main">
         <div className="main-inner">
-          {view === 'overview' && <Overview />}
-          {view === 'clients' && <Clients />}
+          {view === 'overview' && <Overview onNavigate={navigate} />}
+          {view === 'clients' && <Clients initialTab={clientsTab} />}
           {view === 'activity' && <Activity />}
           {view === 'team' && isAdmin && <Team />}
           {view === 'files' && <Files />}
