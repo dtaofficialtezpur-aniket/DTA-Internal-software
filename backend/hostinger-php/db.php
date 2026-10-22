@@ -236,6 +236,26 @@ function ensure_schema(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 
+    // Every amount received from a client, one row per payment, so revenue
+    // can be broken down by month/year/client. client_type is the kind of
+    // work the money was for (a subscription renewal vs. a normal project
+    // payment). client_name is a snapshot; when a client is deleted its rows
+    // are kept (money already earned) with client_id prefixed "deleted:".
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS payments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            client_id VARCHAR(48) NOT NULL,
+            client_type VARCHAR(16) NOT NULL,
+            client_name VARCHAR(255) NOT NULL,
+            amount DECIMAL(12,2) NOT NULL,
+            paid_at DATETIME NOT NULL,
+            kind VARCHAR(16) NOT NULL,
+            note VARCHAR(255) NULL,
+            INDEX (client_id),
+            INDEX (paid_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ");
+
     $hasDefaults = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'agencyName'")->fetchColumn();
     if ($hasDefaults === false) {
         $insert = $pdo->prepare('INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)');
@@ -279,6 +299,8 @@ function ensure_schema(PDO $pdo): void
         SET created_at = COALESCE((SELECT MIN(h.ts) FROM history h WHERE h.client_id = c.id), c.start_date)
         WHERE c.created_at IS NULL
     ');
+
+    backfill_payments($pdo);
 }
 
 // Gives invoices issued before client-id numbering existed the same style of
@@ -302,6 +324,66 @@ function backfill_invoice_numbers(PDO $pdo): void
         $update->execute([$number, $r['id']]);
         $next[$r['client_id']] = $n + 1;
     }
+}
+
+// One-time: builds the payments ledger from what was recorded before it
+// existed -- normal clients' advance (whatever part of advance_payment isn't
+// explained by later "Payment of X recorded" history entries) at the date
+// they were added, those recorded payments at their dates, and each
+// subscription "Marked as paid" renewal at the plan amount. A client
+// converted between types keeps both eras: its archived_data supplies the
+// other era's plan amount / advance. Runs once, flagged in settings.
+function backfill_payments(PDO $pdo): void
+{
+    $done = $pdo->query("SELECT 1 FROM settings WHERE setting_key = 'paymentsBackfilled'")->fetchColumn();
+    if ($done) return;
+
+    $ins = $pdo->prepare('INSERT INTO payments (client_id, client_type, client_name, amount, paid_at, kind, note) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    $hist = $pdo->prepare("SELECT ts, note FROM history WHERE client_id = ? AND action = 'paid' ORDER BY ts");
+
+    $all = [];
+    foreach ($pdo->query('SELECT * FROM normal_clients')->fetchAll() as $c) $all[] = ['normal', $c];
+    foreach ($pdo->query('SELECT * FROM clients')->fetchAll() as $c) $all[] = ['subscription', $c];
+
+    foreach ($all as [$type, $c]) {
+        $archived = !empty($c['archived_data']) ? json_decode($c['archived_data'], true) : null;
+        $subAmount = $type === 'subscription' ? (float) $c['amount']
+            : (($archived['_type'] ?? '') === 'subscription' ? (float) $archived['amount'] : null);
+        if ($type === 'normal') {
+            $advance = (float) $c['advance_payment'];
+            $addedAt = $c['created_at'];
+        } elseif (($archived['_type'] ?? '') === 'normal') {
+            $advance = (float) $archived['advancePayment'];
+            $addedAt = $archived['createdAt'] ?? $c['start_date'];
+        } else {
+            $advance = null;
+            $addedAt = null;
+        }
+
+        $hist->execute([$c['id']]);
+        $recorded = 0.0;
+        $rows = [];
+        foreach ($hist->fetchAll() as $h) {
+            if (preg_match('/Payment of ([\d,]+(?:\.\d+)?) recorded/', $h['note'], $m)) {
+                $amt = (float) str_replace(',', '', $m[1]);
+                $recorded += $amt;
+                $rows[] = ['normal', $amt, $h['ts'], 'payment', 'Payment'];
+            } elseif ($subAmount !== null) {
+                $rows[] = ['subscription', $subAmount, $h['ts'], 'renewal', 'Subscription renewal'];
+            }
+        }
+        if ($advance !== null) {
+            $initial = round($advance - $recorded, 2);
+            if (abs($initial) >= 0.01) {
+                $ins->execute([$c['id'], 'normal', $c['client_name'], $initial, $addedAt, $initial > 0 ? 'advance' : 'adjustment', $initial > 0 ? 'Advance payment' : 'Adjustment']);
+            }
+        }
+        foreach ($rows as [$t, $amt, $ts, $kind, $note]) {
+            $ins->execute([$c['id'], $t, $c['client_name'], $amt, $ts, $kind, $note]);
+        }
+    }
+
+    $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('paymentsBackfilled', '1')")->execute();
 }
 
 function ensure_column(PDO $pdo, string $table, string $column, string $definition): void

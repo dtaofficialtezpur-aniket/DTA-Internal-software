@@ -165,3 +165,18 @@ CREATE TABLE IF NOT EXISTS client_documents (
     uploaded_at DATETIME NOT NULL,
     INDEX (client_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Every amount received, for revenue reports. client_type = the kind of work
+-- the money was for; kind = advance | payment | renewal | adjustment.
+CREATE TABLE IF NOT EXISTS payments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    client_id VARCHAR(48) NOT NULL,
+    client_type VARCHAR(16) NOT NULL,
+    client_name VARCHAR(255) NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    paid_at DATETIME NOT NULL,
+    kind VARCHAR(16) NOT NULL,
+    note VARCHAR(255) NULL,
+    INDEX (client_id),
+    INDEX (paid_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
