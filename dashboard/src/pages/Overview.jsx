@@ -38,7 +38,7 @@ export default function Overview(){
     { label: 'Payment due / overdue', value: counts.due + counts.overdue, note: counts.overdue + ' overdue', tone: counts.overdue ? 'tone-crit' : '' },
     { label: 'Paused', value: counts.paused, note: 'access currently locked', tone: counts.paused ? 'tone-warn' : '' },
     { label: 'Monthly recurring', value: fmtMoney(Math.round(mrr)), note: 'from ' + billed + ' running plan' + (billed === 1 ? '' : 's') },
-    { label: 'Outstanding balance', value: fmtMoney(Math.round(outstanding)), note: owing.length + ' normal client' + (owing.length === 1 ? '' : 's') + ' still owe', tone: owing.length ? 'tone-warn' : '' },
+    { label: 'Pending balance', value: fmtMoney(Math.round(outstanding)), note: owing.length + ' normal client' + (owing.length === 1 ? '' : 's') + ' still owe', tone: owing.length ? 'tone-warn' : '' },
     { label: 'Domains expiring', value: domains.length, note: domainsExpired ? domainsExpired + ' already expired' : 'within 30 days', tone: domainsExpired ? 'tone-crit' : domains.length ? 'tone-warn' : '' },
   ];
 
