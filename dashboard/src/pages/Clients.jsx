@@ -7,16 +7,12 @@ const TABS = [
   { key: 'all', label: 'All active clients' },
   { key: 'subscription', label: 'Subscription clients' },
   { key: 'normal', label: 'Normal clients' },
-  { key: 'handover', label: 'Handed over' },
 ];
 const SUB_STATUSES = [
   { key: 'active', label: 'Active' }, { key: 'due', label: 'Due soon' },
   { key: 'overdue', label: 'Overdue' }, { key: 'paused', label: 'Paused' },
 ];
-const OPEN_WORK_STATUSES = [
-  { key: 'none', label: 'Not set' },
-  ...WORK_STATUSES.filter((w) => w.key !== 'handover_done'),
-];
+const ALL_WORK_STATUSES = [{ key: 'none', label: 'Not set' }, ...WORK_STATUSES];
 
 const isHandedOver = (r) => r.kind === 'normal' && r.c.workStatus === 'handover_done';
 const monthLabel = (d) => d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
@@ -35,13 +31,13 @@ export default function Clients({ initialTab }){
   ];
 
   // Which clients belong on each tab. "Active" leaves out paused
-  // subscriptions and normal clients whose work has been handed over --
-  // those finished projects live on their own "Handed over" tab.
+  // subscriptions and normal clients whose work has been handed over; the
+  // Normal clients tab always lists every normal client (use the work
+  // status filter to narrow it down, e.g. to "Handover done").
   const inTab = {
     all: (r) => !isHandedOver(r) && r.status !== 'sub:paused',
     subscription: (r) => r.kind === 'subscription',
-    normal: (r) => r.kind === 'normal' && !isHandedOver(r),
-    handover: (r) => isHandedOver(r),
+    normal: (r) => r.kind === 'normal',
   };
   const counts = Object.fromEntries(TABS.map((t) => [t.key, all.filter(inTab[t.key]).length]));
 
@@ -113,9 +109,8 @@ export default function Clients({ initialTab }){
             <option value="normal">Normal</option>
           </select>
         )}
-        {tab !== 'handover' && (
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Status">
-            <option value="all">All statuses</option>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Status">
+            <option value="all">{tab === 'normal' ? 'All work statuses' : 'All statuses'}</option>
             {showSubStatuses && typeFilter !== 'normal' && (
               <optgroup label="Subscription">
                 {SUB_STATUSES.filter((s) => tab === 'subscription' || s.key !== 'paused')
@@ -123,12 +118,12 @@ export default function Clients({ initialTab }){
               </optgroup>
             )}
             {showWorkStatuses && typeFilter !== 'subscription' && (
-              <optgroup label="Normal clients">
-                {OPEN_WORK_STATUSES.map((w) => <option key={w.key} value={'work:' + w.key}>{w.label}</option>)}
+              <optgroup label="Normal clients — work status">
+                {ALL_WORK_STATUSES.filter((w) => tab === 'normal' || w.key !== 'handover_done')
+                  .map((w) => <option key={w.key} value={'work:' + w.key}>{w.label}</option>)}
               </optgroup>
             )}
           </select>
-        )}
       </div>
 
       <div className="table-wrap">
@@ -140,7 +135,7 @@ export default function Clients({ initialTab }){
           <tbody>
             {rows.length === 0 && (
               <tr><td colSpan={columns} className="empty">
-                {tab === 'handover' ? 'No handed-over projects yet. Set a normal client’s work status to “Handover done” to move it here.' : 'No clients match these filters.'}
+                No clients match these filters.
               </td></tr>
             )}
             {body.map((r) => r.group ? (
