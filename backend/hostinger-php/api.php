@@ -232,6 +232,9 @@ function client_to_json(array $c): array
         'status' => $c['status'],
         'pausedAt' => $c['paused_at'],
         'archivedNormalData' => decode_archived_data($c),
+        'domain' => $c['domain'] ?? null,
+        'websiteUrl' => $c['website_url'] ?? null,
+        'domainExpiry' => $c['domain_expiry'] ?? null,
     ];
 }
 
@@ -258,6 +261,9 @@ function normal_client_to_json(array $c): array
         'notes' => $c['notes'],
         'createdAt' => $c['created_at'],
         'archivedSubscriptionData' => decode_archived_data($c),
+        'domain' => $c['domain'] ?? null,
+        'websiteUrl' => $c['website_url'] ?? null,
+        'domainExpiry' => $c['domain_expiry'] ?? null,
     ];
 }
 
@@ -495,6 +501,10 @@ if ($method === 'GET') {
         case 'convertToNormal':
             require_session($pdo, $body['token'] ?? null);
             handle_convert_to_normal($pdo, $body);
+            break;
+        case 'updateClientDomain':
+            require_session($pdo, $body['token'] ?? null);
+            handle_update_client_domain($pdo, $body);
             break;
         case 'addNormalClient':
             require_session($pdo, $body['token'] ?? null);
@@ -1116,10 +1126,10 @@ function handle_convert_to_subscription(PDO $pdo, array $body): void
     $pdo->beginTransaction();
     $pdo->prepare('DELETE FROM normal_clients WHERE id = ?')->execute([$id]);
     $stmt = $pdo->prepare('
-        INSERT INTO clients (id, api_key, client_name, software, cycle, amount, start_date, next_due, grace_days, status, paused_at, archived_data)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO clients (id, api_key, client_name, software, cycle, amount, start_date, next_due, grace_days, status, paused_at, archived_data, domain, website_url, domain_expiry)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ');
-    $stmt->execute([$id, $apiKey, $c['client_name'], $software, $cycle, $amount, $start, $nextDue, $grace, $status, $pausedAt, $archiveNormal]);
+    $stmt->execute([$id, $apiKey, $c['client_name'], $software, $cycle, $amount, $start, $nextDue, $grace, $status, $pausedAt, $archiveNormal, $c['domain'], $c['website_url'], $c['domain_expiry']]);
     $pdo->commit();
 
     log_event($pdo, $id, 'converted', 'Converted from normal client to subscription client');
@@ -1163,14 +1173,55 @@ function handle_convert_to_normal(PDO $pdo, array $body): void
     $pdo->beginTransaction();
     $pdo->prepare('DELETE FROM clients WHERE id = ?')->execute([$id]);
     $stmt = $pdo->prepare('
-        INSERT INTO normal_clients (id, client_name, address, contact, total_amount, advance_payment, remaining_payment, notes, created_at, archived_data)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO normal_clients (id, client_name, address, contact, total_amount, advance_payment, remaining_payment, notes, created_at, archived_data, domain, website_url, domain_expiry)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ');
-    $stmt->execute([$id, $c['client_name'], $address, $contact, $totalAmount, $advancePayment, $remainingPayment, $notes, $createdAt ?? date('Y-m-d H:i:s'), $archiveSub]);
+    $stmt->execute([$id, $c['client_name'], $address, $contact, $totalAmount, $advancePayment, $remainingPayment, $notes, $createdAt ?? date('Y-m-d H:i:s'), $archiveSub, $c['domain'], $c['website_url'], $c['domain_expiry']]);
     $pdo->commit();
 
     log_event($pdo, $id, 'converted', 'Converted from subscription client to normal client');
     json_out(['ok' => true, 'client' => normal_client_to_json(find_normal_client($pdo, $id))]);
+}
+
+// Domain/website details for either client type. The website link is shown
+// as a clickable href in the dashboard, so only plain http(s) links are
+// accepted -- never javascript:/data: or anything with spaces/quotes.
+function handle_update_client_domain(PDO $pdo, array $body): void
+{
+    $clientType = ($body['clientType'] ?? '') === 'normal' ? 'normal' : 'subscription';
+    $id = (string) ($body['id'] ?? '');
+    $c = $clientType === 'normal' ? find_normal_client($pdo, $id) : find_client($pdo, $id);
+    if (!$c) json_out(['error' => 'Client not found: ' . $id]);
+
+    $domain = strtolower(trim((string) ($body['domain'] ?? '')));
+    if ($domain !== '' && (strlen($domain) > 255 || !preg_match('/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/', $domain))) {
+        json_out(['error' => 'Domain looks invalid. Use just the name, e.g. example.com']);
+    }
+
+    $url = trim((string) ($body['websiteUrl'] ?? ''));
+    if ($url !== '') {
+        $p = parse_url($url);
+        if (strlen($url) > 500 || preg_match('/[\s"\'<>\\\\]/', $url) || !$p
+            || !in_array(strtolower($p['scheme'] ?? ''), ['http', 'https'], true) || empty($p['host'])) {
+            json_out(['error' => 'Website link must be a valid http:// or https:// address.']);
+        }
+    }
+
+    $expiry = trim((string) ($body['domainExpiry'] ?? ''));
+    if ($expiry !== '') {
+        $d = DateTime::createFromFormat('Y-m-d', $expiry);
+        if (!$d || $d->format('Y-m-d') !== $expiry) {
+            json_out(['error' => 'Domain expiry must be a date (YYYY-MM-DD).']);
+        }
+    }
+
+    $table = $clientType === 'normal' ? 'normal_clients' : 'clients';
+    $pdo->prepare("UPDATE {$table} SET domain = ?, website_url = ?, domain_expiry = ? WHERE id = ?")
+        ->execute([$domain !== '' ? $domain : null, $url !== '' ? $url : null, $expiry !== '' ? $expiry : null, $id]);
+
+    log_event($pdo, $id, 'updated', 'Domain details updated');
+    $updated = $clientType === 'normal' ? find_normal_client($pdo, $id) : find_client($pdo, $id);
+    json_out(['ok' => true, 'client' => $clientType === 'normal' ? normal_client_to_json($updated) : client_to_json($updated)]);
 }
 
 function handle_update_settings(PDO $pdo, array $body): void
