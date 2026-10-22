@@ -256,6 +256,7 @@ function ensure_schema(PDO $pdo): void
     // Invoice numbers are built from the client's id (e.g. DTA-D002-01); older
     // invoices have none stored and keep their original numbering.
     ensure_column($pdo, 'invoices', 'invoice_number', 'VARCHAR(64) NULL');
+    backfill_invoice_numbers($pdo);
 
     // Where a normal client's job stands (see NORMAL_WORK_STATUSES in api.php).
     ensure_column($pdo, 'normal_clients', 'work_status', 'VARCHAR(32) NULL');
@@ -266,6 +267,29 @@ function ensure_schema(PDO $pdo): void
         ensure_column($pdo, $t, 'domain', 'VARCHAR(255) NULL');
         ensure_column($pdo, $t, 'website_url', 'VARCHAR(500) NULL');
         ensure_column($pdo, $t, 'domain_expiry', 'DATE NULL');
+    }
+}
+
+// Gives invoices issued before client-id numbering existed the same style of
+// number (e.g. DTA-D002-01), oldest first per client. Does nothing once every
+// invoice has one, so it only ever does work the first time after an upgrade.
+function backfill_invoice_numbers(PDO $pdo): void
+{
+    $rows = $pdo->query('SELECT id, client_id FROM invoices WHERE invoice_number IS NULL ORDER BY id')->fetchAll();
+    if (!$rows) return;
+    $taken = $pdo->prepare('SELECT 1 FROM invoices WHERE invoice_number = ?');
+    $update = $pdo->prepare('UPDATE invoices SET invoice_number = ? WHERE id = ?');
+    $next = [];
+    foreach ($rows as $r) {
+        $n = $next[$r['client_id']] ?? 1;
+        while (true) {
+            $number = $r['client_id'] . '-' . str_pad((string) $n, 2, '0', STR_PAD_LEFT);
+            $taken->execute([$number]);
+            if (!$taken->fetchColumn()) break;
+            $n++;
+        }
+        $update->execute([$number, $r['id']]);
+        $next[$r['client_id']] = $n + 1;
     }
 }
 
