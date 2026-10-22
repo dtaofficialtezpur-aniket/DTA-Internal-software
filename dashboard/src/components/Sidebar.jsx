@@ -20,6 +20,9 @@ const NAV_ITEMS = [
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="10" cy="10" r="2.6"/><path d="M10 2.8v2.1M10 15.1v2.1M17.2 10h-2.1M4.9 10H2.8M15 5l-1.5 1.5M6.5 13.5 5 15M15 15l-1.5-1.5M6.5 6.5 5 5"/></svg>
   ) },
 ];
+const REVENUE_ITEM = { key: 'revenue', label: 'Revenue', icon: (
+  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 16.5h14"/><rect x="4" y="10" width="2.6" height="5" rx=".6"/><rect x="8.7" y="6.5" width="2.6" height="8.5" rx=".6"/><rect x="13.4" y="3.5" width="2.6" height="11.5" rx=".6"/></svg>
+) };
 const TEAM_ITEM = { key: 'team', label: 'Team', icon: (
   <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="7" cy="6.5" r="2.6"/><path d="M2.3 16c.7-3 2.4-4.6 4.7-4.6s4 1.6 4.7 4.6"/><circle cx="14.3" cy="7.3" r="2.1"/><path d="M12.7 11.7c1.9.2 3.3 1.6 3.9 4"/><path d="M17 6.5v4M15 8.5h4" strokeLinecap="round"/></svg>
 ) };
@@ -78,6 +81,7 @@ export default function Sidebar({ view, setView }){
           <>
             <div className="nav-group-label">Admin</div>
             <div className="nav">
+              <NavBtn item={REVENUE_ITEM} active={view === 'revenue'} onClick={() => setView('revenue')} />
               <NavBtn item={TEAM_ITEM} active={view === 'team'} onClick={() => setView('team')} />
             </div>
           </>
