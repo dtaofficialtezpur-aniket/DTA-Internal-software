@@ -136,3 +136,25 @@ CREATE TABLE IF NOT EXISTS invoices (
     created_by INT NOT NULL,
     INDEX (client_type, client_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Extra named links per client (website, social profiles, ...).
+CREATE TABLE IF NOT EXISTS client_links (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    client_id VARCHAR(32) NOT NULL,
+    label VARCHAR(100) NOT NULL,
+    url VARCHAR(500) NOT NULL,
+    created_at DATETIME NOT NULL,
+    INDEX (client_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Documents kept per client (contracts etc.). Bytes live in uploads/.
+CREATE TABLE IF NOT EXISTS client_documents (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    client_id VARCHAR(32) NOT NULL,
+    filename VARCHAR(255) NOT NULL,
+    storage_name VARCHAR(64) NOT NULL,
+    size_bytes BIGINT NOT NULL,
+    uploaded_by INT NOT NULL,
+    uploaded_at DATETIME NOT NULL,
+    INDEX (client_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

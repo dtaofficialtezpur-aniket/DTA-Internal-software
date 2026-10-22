@@ -6,6 +6,8 @@ import InvoiceSection from './InvoiceSection.jsx';
 import ConvertClientSection from './ConvertClientSection.jsx';
 import EditClientIdButton from './EditClientIdButton.jsx';
 import DomainSection from './DomainSection.jsx';
+import ClientLinksSection from './ClientLinksSection.jsx';
+import ClientDocumentsSection from './ClientDocumentsSection.jsx';
 
 export default function ClientDetailPanel(){
   const { clients, settings, selectedClientId, setSelectedClientId, call, refreshFromBackend, showToast } = useApp();
@@ -58,15 +60,16 @@ export default function ClientDetailPanel(){
           <div className="panel-body">
             <div id="d-status-pill"><StatusPill status={s} /></div>
 
-            <div>
+            <div className="panel-section">
+              <div className="section-head"><div className="section-head-title">Plan</div></div>
               <div className="field-row"><span>Plan</span><span className="tabular">{fmtMoney(c.amount)} / {c.cycle === 'Monthly' ? 'month' : 'year'}</span></div>
               <div className="field-row"><span>Started</span><span>{fmtDate(c.start)}</span></div>
               <div className="field-row"><span>Next due</span><span>{fmtDate(c.nextDue)}</span></div>
               <div className="field-row"><span>Grace period</span><span>{c.grace} days</span></div>
             </div>
 
-            <div>
-              <div style={{fontSize:'.78rem', fontWeight:700, color:'var(--ink-muted)', marginBottom:'6px'}}>Client ID</div>
+            <div className="panel-section">
+              <div className="section-head"><div className="section-head-title">Client ID</div></div>
               <div className="key-box"><code>{c.id}</code></div>
               <EditClientIdButton c={c} clientType="subscription" />
               <div style={{fontSize:'.78rem', fontWeight:700, color:'var(--ink-muted)', margin:'12px 0 6px'}}>API key</div>
@@ -91,6 +94,10 @@ export default function ClientDetailPanel(){
 
             <DomainSection c={c} clientType="subscription" />
 
+            <ClientLinksSection c={c} />
+
+            <ClientDocumentsSection clientId={c.id} />
+
             <InvoiceSection
               clientType="subscription"
               clientId={c.id}
@@ -101,8 +108,8 @@ export default function ClientDetailPanel(){
 
             <ConvertClientSection c={c} direction="toNormal" />
 
-            <div>
-              <div style={{fontSize:'.78rem', fontWeight:700, color:'var(--ink-muted)', marginBottom:'8px'}}>History</div>
+            <div className="panel-section">
+              <div className="section-head"><div className="section-head-title">History</div></div>
               <div className="log-list">
                 {c.history.slice().sort((a, b) => b.t - a.t).map((h, i) => (
                   <div className="log-row" key={i}>

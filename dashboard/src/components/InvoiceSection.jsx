@@ -39,10 +39,10 @@ export default function InvoiceSection({ clientType, clientId, defaultAmount, de
   }
 
   return (
-    <div>
-      <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px'}}>
-        <div style={{fontSize:'.78rem', fontWeight:700, color:'var(--ink-muted)'}}>Invoices</div>
-        <button className="btn btn-ghost btn-sm" type="button" onClick={generate} disabled={busy}>{busy ? 'Preparing…' : 'Download invoice'}</button>
+    <div className="panel-section">
+      <div className="section-head">
+        <div className="section-head-title">Invoices</div>
+        <button className="btn btn-primary btn-sm" type="button" onClick={generate} disabled={busy}>{busy ? 'Preparing…' : 'Download invoice'}</button>
       </div>
 
       {invoices.length === 0
