@@ -440,6 +440,42 @@ function purge_client_extras(PDO $pdo, string $id): void
     $pdo->prepare('DELETE FROM client_documents WHERE client_id = ?')->execute([$id]);
 }
 
+/* ---------------- constants ----------------
+ * Must be declared before the request handling below: top-level const
+ * statements only run when execution reaches them, and every request
+ * ends (exit) inside that handling.
+ */
+
+const NORMAL_WORK_STATUSES = [
+    'advance_received' => 'Advance payment received',
+    'in_progress' => 'Work in progress',
+    'domain_bought' => 'Domain bought',
+    'work_done' => 'Work done',
+    'handover_done' => 'Handover done',
+];
+
+const CLIENT_DOC_MAX_BYTES = 25 * 1024 * 1024;
+const CLIENT_DOC_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'rtf',
+    'jpg', 'jpeg', 'png', 'gif', 'webp', 'zip'];
+
+const CLIENT_DOC_FIELD_LABELS = [
+    'subscription' => [
+        'clientName' => ['Client Name', 'Client', 'Customer Name', 'Customer', 'Company', 'Company Name', 'Name'],
+        'softwareName' => ['Software Name', 'Software', 'Product', 'Product Name', 'Service'],
+        'amount' => ['Plan Amount', 'Amount', 'Price', 'Fee', 'Subscription Amount'],
+        'cycle' => ['Billing Cycle', 'Cycle'],
+        'startDate' => ['Start Date', 'Date'],
+    ],
+    'normal' => [
+        'clientName' => ['Client Name', 'Name', 'Customer Name', 'Customer'],
+        'address' => ['Address'],
+        'contact' => ['Contact', 'Contact Details', 'Phone', 'Mobile', 'Email'],
+        'totalAmount' => ['Total Amount', 'Total', 'Amount'],
+        'advancePayment' => ['Advance Payment', 'Advance', 'Paid', 'Amount Paid'],
+        'notes' => ['Notes', 'Remarks', 'Other Details', 'Details'],
+    ],
+];
+
 /* ---------------- request handling ---------------- */
 
 $pdo = get_pdo();
@@ -1051,14 +1087,6 @@ function handle_add_normal_client(PDO $pdo, array $body): void
     json_out(['ok' => true, 'client' => normal_client_to_json($c)]);
 }
 
-const NORMAL_WORK_STATUSES = [
-    'advance_received' => 'Advance payment received',
-    'in_progress' => 'Work in progress',
-    'domain_bought' => 'Domain bought',
-    'work_done' => 'Work done',
-    'handover_done' => 'Handover done',
-];
-
 function handle_set_normal_client_status(PDO $pdo, array $body): void
 {
     $id = (string) ($body['id'] ?? '');
@@ -1350,10 +1378,6 @@ function handle_delete_client_link(PDO $pdo, array $body): void
     json_out(['ok' => true]);
 }
 
-const CLIENT_DOC_MAX_BYTES = 25 * 1024 * 1024;
-const CLIENT_DOC_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'rtf',
-    'jpg', 'jpeg', 'png', 'gif', 'webp', 'zip'];
-
 function client_document_to_json(array $d): array
 {
     return [
@@ -1603,24 +1627,6 @@ function handle_upload_file(PDO $pdo, array $body, ?array $uploadedFile, array $
  * effort by nature -- always shown to the user to review before creating
  * the client, never submitted on its own.
  */
-
-const CLIENT_DOC_FIELD_LABELS = [
-    'subscription' => [
-        'clientName' => ['Client Name', 'Client', 'Customer Name', 'Customer', 'Company', 'Company Name', 'Name'],
-        'softwareName' => ['Software Name', 'Software', 'Product', 'Product Name', 'Service'],
-        'amount' => ['Plan Amount', 'Amount', 'Price', 'Fee', 'Subscription Amount'],
-        'cycle' => ['Billing Cycle', 'Cycle'],
-        'startDate' => ['Start Date', 'Date'],
-    ],
-    'normal' => [
-        'clientName' => ['Client Name', 'Name', 'Customer Name', 'Customer'],
-        'address' => ['Address'],
-        'contact' => ['Contact', 'Contact Details', 'Phone', 'Mobile', 'Email'],
-        'totalAmount' => ['Total Amount', 'Total', 'Amount'],
-        'advancePayment' => ['Advance Payment', 'Advance', 'Paid', 'Amount Paid'],
-        'notes' => ['Notes', 'Remarks', 'Other Details', 'Details'],
-    ],
-];
 
 function pdf_extract_text(string $bytes): string
 {
