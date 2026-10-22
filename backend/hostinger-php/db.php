@@ -253,6 +253,9 @@ function ensure_schema(PDO $pdo): void
     ensure_column($pdo, 'clients', 'archived_data', 'JSON NULL');
     ensure_column($pdo, 'normal_clients', 'archived_data', 'JSON NULL');
 
+    // Where a normal client's job stands (see NORMAL_WORK_STATUSES in api.php).
+    ensure_column($pdo, 'normal_clients', 'work_status', 'VARCHAR(32) NULL');
+
     // Optional domain/website details, on both client types, with the date
     // the domain registration runs out (the dashboard warns before it does).
     foreach (['clients', 'normal_clients'] as $t) {
