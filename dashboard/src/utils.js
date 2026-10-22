@@ -65,3 +65,12 @@ export function domainLabel(days){
   if (days === 0) return 'Expires today';
   return 'Expires in ' + days + ' day' + (days === 1 ? '' : 's');
 }
+
+// Where a normal client's job stands. Keys match NORMAL_WORK_STATUSES in api.php.
+export const WORK_STATUSES = [
+  { key: 'advance_received', label: 'Advance payment received', cls: 'pill-info' },
+  { key: 'in_progress',      label: 'Work in progress',         cls: 'pill-due' },
+  { key: 'domain_bought',    label: 'Domain bought',            cls: 'pill-info' },
+  { key: 'work_done',        label: 'Work done',                cls: 'pill-active' },
+  { key: 'handover_done',    label: 'Handover done',            cls: 'pill-active' },
+];

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
-import { actionColor, fmtDateTime, fmtMoney } from '../utils.js';
+import { WORK_STATUSES, actionColor, fmtDateTime, fmtMoney } from '../utils.js';
 import InvoiceSection from './InvoiceSection.jsx';
 import ConvertClientSection from './ConvertClientSection.jsx';
 import EditClientIdButton from './EditClientIdButton.jsx';
@@ -61,6 +61,14 @@ export default function NormalClientDetailPanel(){
     }).catch((err) => showToast('Failed: ' + err.message));
   }
 
+  function changeStatus(e){
+    const status = e.target.value;
+    call('setNormalClientStatus', { id: c.id, status }).then(() => {
+      showToast('Status updated');
+      return refreshFromBackend();
+    }).catch((err) => showToast('Failed: ' + err.message));
+  }
+
   function del(){
     if (!confirmDelete){ setConfirmDelete(true); return; }
     call('deleteNormalClient', { id: c.id }).then(() => {
@@ -89,6 +97,14 @@ export default function NormalClientDetailPanel(){
               <div className="section-head"><div className="section-head-title">Client ID</div></div>
               <div className="key-box"><code>{c.id}</code></div>
               <EditClientIdButton c={c} clientType="normal" />
+            </div>
+
+            <div className="panel-section">
+              <div className="section-head"><div className="section-head-title">Work status</div></div>
+              <select value={c.workStatus || ''} onChange={changeStatus} style={{width:'100%'}} aria-label="Work status">
+                <option value="">Not set</option>
+                {WORK_STATUSES.map((w) => <option key={w.key} value={w.key}>{w.label}</option>)}
+              </select>
             </div>
 
             <div className="panel-section">
