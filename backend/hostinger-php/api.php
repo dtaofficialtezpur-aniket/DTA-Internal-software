@@ -281,6 +281,7 @@ function invoice_to_json(array $i, array $settings): array
         'description' => $i['description'],
         'amount' => (float) $i['amount'],
         'issuedAt' => $i['issued_date'],
+        'createdBy' => (int) $i['created_by'],
     ];
 }
 
@@ -355,6 +356,23 @@ function handle_list_invoices(PDO $pdo, array $body): void
     $settings = get_all_settings($pdo);
     $rows = array_map(function ($i) use ($settings) { return invoice_to_json($i, $settings); }, $stmt->fetchAll());
     json_out(['ok' => true, 'invoices' => $rows]);
+}
+
+// The person who generated an invoice, or the admin, can delete it. Only the
+// record goes (the PDF is never stored); it's noted in the client's history.
+function handle_delete_invoice(PDO $pdo, array $body, array $user): void
+{
+    $stmt = $pdo->prepare('SELECT * FROM invoices WHERE id = ?');
+    $stmt->execute([(int) ($body['invoiceId'] ?? 0)]);
+    $inv = $stmt->fetch();
+    if (!$inv) json_out(['error' => 'Invoice not found.']);
+    if ($user['role'] !== 'admin' && (int) $inv['created_by'] !== (int) $user['id']) {
+        json_out(['error' => 'Only the admin or the person who generated this invoice can delete it.']);
+    }
+    $pdo->prepare('DELETE FROM invoices WHERE id = ?')->execute([$inv['id']]);
+    $number = invoice_to_json($inv, get_all_settings($pdo))['number'];
+    log_event($pdo, $inv['client_id'], 'updated', 'Invoice ' . $number . ' deleted');
+    json_out(['ok' => true]);
 }
 
 /* ---------------- admin: id format + direct id edits ---------------- */
@@ -656,6 +674,9 @@ if ($method === 'GET') {
         case 'nextInvoiceNumber':
             require_session($pdo, $body['token'] ?? null);
             handle_next_invoice_number($pdo, $body);
+            break;
+        case 'deleteInvoice':
+            handle_delete_invoice($pdo, $body, require_session($pdo, $body['token'] ?? null));
             break;
         case 'listInvoices':
             require_session($pdo, $body['token'] ?? null);

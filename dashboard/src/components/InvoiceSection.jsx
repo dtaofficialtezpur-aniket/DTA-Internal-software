@@ -12,7 +12,9 @@ import { renderPdfPreview } from '../invoices/renderPdfPreview.js';
 // downloads the PDF. Past invoices can be previewed or re-downloaded; the
 // PDF itself is never stored, just the record, and is rebuilt from it.
 export default function InvoiceSection({ clientType, clientId, defaultAmount, defaultDescription, billTo }){
-  const { call, showToast } = useApp();
+  const { auth, call, showToast } = useApp();
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const isAdmin = auth.user.role === 'admin';
   const [invoices, setInvoices] = useState([]);
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(null); // { invoice, saved, img }
@@ -61,6 +63,17 @@ export default function InvoiceSection({ clientType, clientId, defaultAmount, de
       .finally(() => setBusy(false));
   }
 
+  function deleteInvoice(inv){
+    if (confirmDeleteId !== inv.id){ setConfirmDeleteId(inv.id); return; }
+    call('deleteInvoice', { invoiceId: inv.id })
+      .then(() => {
+        setInvoices((list) => list.filter((i) => i.id !== inv.id));
+        setConfirmDeleteId(null);
+        showToast('Invoice ' + inv.number + ' deleted');
+      })
+      .catch((err) => showToast('Could not delete invoice: ' + err.message));
+  }
+
   function confirmDownload(){
     const { invoice, saved } = preview;
     setBusy(true);
@@ -93,6 +106,9 @@ export default function InvoiceSection({ clientType, clientId, defaultAmount, de
                   <div className="log-time">{fmtDate(new Date(inv.issuedAt))}{inv.description ? ' · ' + inv.description : ''}</div>
                 </div>
                 <button className="btn btn-secondary btn-sm" type="button" disabled={busy} onClick={() => previewSaved(inv)}>Preview</button>
+                {(isAdmin || inv.createdBy === auth.user.id) && (
+                  <button className="btn btn-danger btn-sm" type="button" onClick={() => deleteInvoice(inv)}>{confirmDeleteId === inv.id ? 'Confirm?' : 'Delete'}</button>
+                )}
               </div>
             ))}
           </div>
