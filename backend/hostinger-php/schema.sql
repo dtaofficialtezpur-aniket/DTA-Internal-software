@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS normal_clients (
     address TEXT NULL,
     contact VARCHAR(255) NULL,
     total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
-    advance_payment DECIMAL(12,2) NOT NULL DEFAULT 0,
+    advance_payment DECIMAL(12,2) NOT NULL DEFAULT 0,  -- the advance only
+    paid_amount DECIMAL(12,2) NOT NULL DEFAULT 0,      -- payments recorded after the advance
     remaining_payment DECIMAL(12,2) NOT NULL DEFAULT 0,
     notes TEXT NULL,
     created_at DATETIME NOT NULL,

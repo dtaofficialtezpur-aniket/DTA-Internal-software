@@ -7,6 +7,7 @@ import EditClientIdButton from './EditClientIdButton.jsx';
 import DomainSection from './DomainSection.jsx';
 import ClientLinksSection from './ClientLinksSection.jsx';
 import ClientDocumentsSection from './ClientDocumentsSection.jsx';
+import PaymentsSection from './PaymentsSection.jsx';
 
 export default function NormalClientDetailPanel(){
   const { normalClients, selectedNormalClientId, setSelectedNormalClientId, call, refreshFromBackend, showToast } = useApp();
@@ -14,6 +15,7 @@ export default function NormalClientDetailPanel(){
   const [form, setForm] = useState(null);
   const [payAmount, setPayAmount] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [paying, setPaying] = useState(false);
 
   const open = !!selectedNormalClientId;
   const c = normalClients.find((x) => x.id === selectedNormalClientId);
@@ -28,7 +30,8 @@ export default function NormalClientDetailPanel(){
 
   if (!c || !form) return <aside className={'panel' + (open ? ' open' : '')} aria-label="Client detail" />;
 
-  const remainingPreview = Math.max(0, (Number(form.totalAmount) || 0) - (Number(form.advancePayment) || 0));
+  const paidSoFar = c.paidAmount || 0;
+  const remainingPreview = Math.max(0, (Number(form.totalAmount) || 0) - (Number(form.advancePayment) || 0) - paidSoFar);
 
   function saveEdit(e){
     e.preventDefault();
@@ -37,7 +40,7 @@ export default function NormalClientDetailPanel(){
     const totalAmount = Number(form.totalAmount) || 0;
     const advancePayment = Number(form.advancePayment) || 0;
     if (totalAmount < 0 || advancePayment < 0){ showToast('Amounts cannot be negative'); return; }
-    if (advancePayment > totalAmount){ showToast('Advance payment cannot be more than the total amount'); return; }
+    if (advancePayment + paidSoFar > totalAmount){ showToast('Advance plus amount already paid cannot be more than the total amount'); return; }
 
     call('updateNormalClient', {
       id: c.id, client: clientName, address: form.address.trim(), contact: form.contact.trim(),
@@ -53,12 +56,15 @@ export default function NormalClientDetailPanel(){
   function recordPayment(e){
     e.preventDefault();
     const amount = Number(payAmount) || 0;
-    if (amount <= 0) return;
+    if (amount <= 0 || paying) return;
+    if (amount > c.remainingPayment){ showToast('Payment is more than the remaining amount (' + fmtMoney(c.remainingPayment) + ')'); return; }
+    setPaying(true);
     call('recordNormalClientPayment', { id: c.id, amount }).then(() => {
       setPayAmount('');
       showToast('Payment recorded for ' + c.client);
       return refreshFromBackend();
-    }).catch((err) => showToast('Failed: ' + err.message));
+    }).catch((err) => showToast('Failed: ' + err.message))
+      .finally(() => setPaying(false));
   }
 
   function changeStatus(e){
@@ -113,7 +119,8 @@ export default function NormalClientDetailPanel(){
               <div className="field-row"><span>Address</span><span>{c.address || '—'}</span></div>
               <div className="field-row"><span>Contact</span><span>{c.contact || '—'}</span></div>
               <div className="field-row"><span>Total amount</span><span className="tabular">{fmtMoney(c.totalAmount)}</span></div>
-              <div className="field-row"><span>Advance paid</span><span className="tabular">{fmtMoney(c.advancePayment)}</span></div>
+              <div className="field-row"><span>Advance amount</span><span className="tabular">{fmtMoney(c.advancePayment)}</span></div>
+              <div className="field-row"><span>Paid amount (after advance)</span><span className="tabular">{fmtMoney(c.paidAmount || 0)}</span></div>
               <div className="field-row"><span>Remaining</span><span className="tabular">{fmtMoney(c.remainingPayment)}</span></div>
               {c.notes && <div className="field-row"><span>Notes</span><span>{c.notes}</span></div>}
             </div>
@@ -128,10 +135,12 @@ export default function NormalClientDetailPanel(){
                 <div className="section-head"><div className="section-head-title">Record a payment</div></div>
                 <div style={{display:'flex', gap:'8px'}}>
                   <input type="number" min="0" step="0.01" placeholder="Amount (₹)" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} style={{flex:1}} />
-                  <button type="submit" className="btn btn-primary btn-sm">Add</button>
+                  <button type="submit" className="btn btn-primary btn-sm" disabled={paying}>{paying ? 'Saving…' : 'Add'}</button>
                 </div>
               </form>
             )}
+
+            <PaymentsSection clientId={c.id} refreshKey={c.history.length} />
 
             <DomainSection c={c} clientType="normal" />
 
@@ -166,8 +175,11 @@ export default function NormalClientDetailPanel(){
               <label>Total amount (₹)
                 <input type="number" min="0" step="0.01" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} />
               </label>
-              <label>Advance payment (₹)
-                <input type="number" min="0" step="0.01" max={form.totalAmount || undefined} value={form.advancePayment} onChange={(e) => setForm({ ...form, advancePayment: e.target.value })} />
+              <label>Advance amount (₹)
+                <input type="number" min="0" step="0.01" value={form.advancePayment} onChange={(e) => setForm({ ...form, advancePayment: e.target.value })} />
+              </label>
+              <label className="full">Paid amount after advance (₹) — add new payments with “Record a payment”
+                <input type="text" disabled value={'₹' + paidSoFar.toLocaleString('en-IN')} />
               </label>
               <label className="full">Remaining payment (₹)
                 <input type="text" disabled value={'₹' + remainingPreview.toLocaleString('en-IN')} />
