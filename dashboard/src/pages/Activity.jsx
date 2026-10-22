@@ -2,10 +2,13 @@ import { useApp } from '../state/AppContext.jsx';
 import { actionColor, timeAgo } from '../utils.js';
 
 export default function Activity(){
-  const { clients } = useApp();
+  const { clients, normalClients } = useApp();
   const events = [];
   clients.forEach((c) => {
     c.history.forEach((h) => events.push({ ...h, client: c.client, software: c.software }));
+  });
+  normalClients.forEach((c) => {
+    c.history.forEach((h) => events.push({ ...h, client: c.client, software: 'Normal client' }));
   });
   events.sort((a, b) => b.t - a.t);
 
@@ -14,7 +17,7 @@ export default function Activity(){
       <div className="page-head">
         <div>
           <h1>Activity log</h1>
-          <div className="page-sub">Every onboarding, payment, pause and resume event, across all clients.</div>
+          <div className="page-sub">Every onboarding, payment, pause, resume and update event, across all clients.</div>
         </div>
       </div>
       <div className="card" style={{padding:'6px 16px'}}>
