@@ -8,14 +8,14 @@
 // from a CDN at runtime) so this keeps working offline after first use
 // and doesn't need any CSP exception beyond 'self' -- see index.html and
 // vite.config.js's runtimeCaching rule, which caches them after first use.
-function assetUrl(relPath){
+export function assetUrl(relPath){
   return new URL(relPath, document.baseURI).href;
 }
 
 const MAX_PDF_PAGES = 5; // a long scanned PDF would otherwise take minutes to OCR
 
 async function renderPdfPagesToCanvases(file){
-  const pdfjs = await import('pdfjs-dist');
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
   pdfjs.GlobalWorkerOptions.workerSrc = assetUrl('pdfjs/pdf.worker.min.mjs');
 
   const data = await file.arrayBuffer();
