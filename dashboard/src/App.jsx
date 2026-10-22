@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { domainAlerts } from './utils.js';
 import { useApp } from './state/AppContext.jsx';
 import AuthScreen from './components/AuthScreen.jsx';
 import Sidebar from './components/Sidebar.jsx';
@@ -15,7 +16,7 @@ import ManageAccessModal from './components/ManageAccessModal.jsx';
 import Toast from './components/Toast.jsx';
 
 export default function App(){
-  const { isLoggedIn, auth, refreshFromBackend, selectedClientId, selectedNormalClientId, addClientOpen, accessModalFile, closeOverlays } = useApp();
+  const { isLoggedIn, auth, clients, normalClients, showToast, refreshFromBackend, selectedClientId, selectedNormalClientId, addClientOpen, accessModalFile, closeOverlays } = useApp();
   const [view, setView] = useState('overview');
 
   useEffect(() => {
@@ -25,6 +26,18 @@ export default function App(){
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn]);
+
+  // One heads-up per login when any domain is expiring soon or already expired.
+  const domainNoticeShown = useRef(false);
+  useEffect(() => {
+    if (!isLoggedIn){ domainNoticeShown.current = false; return; }
+    if (domainNoticeShown.current) return;
+    const n = domainAlerts(clients, normalClients).length;
+    if (n > 0){
+      domainNoticeShown.current = true;
+      showToast(n + (n === 1 ? ' domain is' : ' domains are') + ' expiring soon — see Overview');
+    }
+  }, [isLoggedIn, clients, normalClients, showToast]);
 
   useEffect(() => {
     function onEscape(e){ if (e.key === 'Escape') closeOverlays(); }

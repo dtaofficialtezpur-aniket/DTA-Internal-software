@@ -1,9 +1,9 @@
 import { useApp } from '../state/AppContext.jsx';
-import { computeStatus, diffDays, fmtDate, fmtMoney } from '../utils.js';
+import { computeStatus, diffDays, domainAlerts, domainLabel, fmtDate, fmtMoney, parseDateOnly } from '../utils.js';
 import StatusPill from '../components/StatusPill.jsx';
 
 export default function Overview(){
-  const { clients, settings, setAddClientOpen, setSelectedClientId } = useApp();
+  const { clients, normalClients, settings, setAddClientOpen, setSelectedClientId, setSelectedNormalClientId } = useApp();
   const today = new Date();
 
   const counts = { active: 0, due: 0, overdue: 0, paused: 0 };
@@ -22,6 +22,8 @@ export default function Overview(){
   const attention = clients
     .filter((c) => ['due', 'overdue'].includes(computeStatus(c, settings.lead)))
     .sort((a, b) => diffDays(a.nextDue, today) - diffDays(b.nextDue, today));
+
+  const domains = domainAlerts(clients, normalClients);
 
   return (
     <section>
@@ -50,6 +52,27 @@ export default function Overview(){
           <div className="stat-note">from active + due plans</div>
         </div>
       </div>
+
+      {domains.length > 0 && (
+        <>
+          <div className="section-title"><h2>Domain renewals</h2></div>
+          <div className="table-wrap">
+            <table><thead><tr><th>Client</th><th>Domain</th><th>Expiry</th><th></th></tr></thead>
+              <tbody>
+                {domains.map(({ kind, c, days }) => (
+                  <tr key={c.id}>
+                    <td className="cell-name">{c.client}</td>
+                    <td>{c.domain || '—'}</td>
+                    <td className="tabular">{fmtDate(parseDateOnly(c.domainExpiry))}
+                      <div className="cell-sub" style={{color: days < 0 ? 'var(--crit)' : 'var(--warn)'}}>{domainLabel(days)}</div></td>
+                    <td className="row-actions"><button className="btn btn-secondary btn-sm" onClick={() => (kind === 'normal' ? setSelectedNormalClientId(c.id) : setSelectedClientId(c.id))}>View</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       <div className="section-title"><h2>Needs attention</h2></div>
       <div className="table-wrap">

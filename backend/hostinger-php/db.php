@@ -224,6 +224,14 @@ function ensure_schema(PDO $pdo): void
     // exists from before this column existed.
     ensure_column($pdo, 'clients', 'archived_data', 'JSON NULL');
     ensure_column($pdo, 'normal_clients', 'archived_data', 'JSON NULL');
+
+    // Optional domain/website details, on both client types, with the date
+    // the domain registration runs out (the dashboard warns before it does).
+    foreach (['clients', 'normal_clients'] as $t) {
+        ensure_column($pdo, $t, 'domain', 'VARCHAR(255) NULL');
+        ensure_column($pdo, $t, 'website_url', 'VARCHAR(500) NULL');
+        ensure_column($pdo, $t, 'domain_expiry', 'DATE NULL');
+    }
 }
 
 function ensure_column(PDO $pdo, string $table, string $column, string $definition): void
