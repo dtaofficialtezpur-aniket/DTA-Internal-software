@@ -301,6 +301,11 @@ function ensure_schema(PDO $pdo): void
     ');
 
     backfill_payments($pdo);
+
+    // Normal clients keep the advance and later payments apart: advance_payment
+    // is only the advance, paid_amount is everything recorded after it.
+    ensure_column($pdo, 'normal_clients', 'paid_amount', 'DECIMAL(12,2) NOT NULL DEFAULT 0');
+    split_paid_amounts($pdo);
 }
 
 // Gives invoices issued before client-id numbering existed the same style of
@@ -384,6 +389,23 @@ function backfill_payments(PDO $pdo): void
     }
 
     $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('paymentsBackfilled', '1')")->execute();
+}
+
+// One-time: before paid_amount existed, recorded payments were added into
+// advance_payment. Moves them out (using the payments ledger) so advance is
+// just the advance again. Totals don't change.
+function split_paid_amounts(PDO $pdo): void
+{
+    $done = $pdo->query("SELECT 1 FROM settings WHERE setting_key = 'paidSplitDone'")->fetchColumn();
+    if ($done) return;
+    $sumStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE client_id = ? AND client_type = 'normal' AND kind = 'payment'");
+    $upd = $pdo->prepare('UPDATE normal_clients SET advance_payment = ?, paid_amount = ? WHERE id = ?');
+    foreach ($pdo->query('SELECT id, advance_payment FROM normal_clients')->fetchAll() as $c) {
+        $sumStmt->execute([$c['id']]);
+        $paid = min((float) $sumStmt->fetchColumn(), (float) $c['advance_payment']);
+        $upd->execute([round((float) $c['advance_payment'] - $paid, 2), round($paid, 2), $c['id']]);
+    }
+    $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('paidSplitDone', '1')")->execute();
 }
 
 function ensure_column(PDO $pdo, string $table, string $column, string $definition): void
