@@ -63,6 +63,7 @@ export default function ClientDetailPanel(){
             <div className="panel-section">
               <div className="section-head"><div className="section-head-title">Plan</div></div>
               <div className="field-row"><span>Plan</span><span className="tabular">{fmtMoney(c.amount)} / {c.cycle === 'Monthly' ? 'month' : 'year'}</span></div>
+              <div className="field-row"><span>Created on</span><span>{fmtDate(c.createdAt)}</span></div>
               <div className="field-row"><span>Started</span><span>{fmtDate(c.start)}</span></div>
               <div className="field-row"><span>Next due</span><span>{fmtDate(c.nextDue)}</span></div>
               <div className="field-row"><span>Grace period</span><span>{c.grace} days</span></div>
