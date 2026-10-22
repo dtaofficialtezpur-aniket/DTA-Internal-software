@@ -253,6 +253,10 @@ function ensure_schema(PDO $pdo): void
     ensure_column($pdo, 'clients', 'archived_data', 'JSON NULL');
     ensure_column($pdo, 'normal_clients', 'archived_data', 'JSON NULL');
 
+    // Invoice numbers are built from the client's id (e.g. DTA-D002-01); older
+    // invoices have none stored and keep their original numbering.
+    ensure_column($pdo, 'invoices', 'invoice_number', 'VARCHAR(64) NULL');
+
     // Where a normal client's job stands (see NORMAL_WORK_STATUSES in api.php).
     ensure_column($pdo, 'normal_clients', 'work_status', 'VARCHAR(32) NULL');
 

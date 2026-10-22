@@ -274,7 +274,7 @@ function invoice_to_json(array $i, array $settings): array
 {
     return [
         'id' => (int) $i['id'],
-        'number' => format_display_id($settings, (int) $i['id']),
+        'number' => !empty($i['invoice_number']) ? $i['invoice_number'] : format_display_id($settings, (int) $i['id']),
         'clientType' => $i['client_type'],
         'clientId' => $i['client_id'],
         'client' => $i['client_name'],
@@ -282,6 +282,29 @@ function invoice_to_json(array $i, array $settings): array
         'amount' => (float) $i['amount'],
         'issuedAt' => $i['issued_date'],
     ];
+}
+
+// Invoice numbers are the client's own id plus a per-client counter, e.g.
+// DTA-D002-01, DTA-D002-02 -- so the number alone says which client it is for.
+function next_invoice_number(PDO $pdo, string $clientId): string
+{
+    $count = $pdo->prepare('SELECT COUNT(*) FROM invoices WHERE client_id = ?');
+    $count->execute([$clientId]);
+    $n = (int) $count->fetchColumn() + 1;
+    $taken = $pdo->prepare('SELECT 1 FROM invoices WHERE invoice_number = ?');
+    while (true) {
+        $number = $clientId . '-' . str_pad((string) $n, 2, '0', STR_PAD_LEFT);
+        $taken->execute([$number]);
+        if (!$taken->fetchColumn()) return $number;
+        $n++;
+    }
+}
+
+function handle_next_invoice_number(PDO $pdo, array $body): void
+{
+    $clientId = (string) ($body['clientId'] ?? '');
+    if (!client_exists($pdo, $clientId)) json_out(['error' => 'Client not found: ' . $clientId]);
+    json_out(['ok' => true, 'number' => next_invoice_number($pdo, $clientId)]);
 }
 
 function handle_create_invoice(PDO $pdo, array $body, array $user): void
@@ -307,15 +330,16 @@ function handle_create_invoice(PDO $pdo, array $body, array $user): void
     }
     $description = substr((string) ($body['description'] ?? ''), 0, 255);
 
+    $number = next_invoice_number($pdo, $clientId);
     $stmt = $pdo->prepare('
-        INSERT INTO invoices (client_type, client_id, client_name, description, amount, issued_date, created_by)
-        VALUES (?, ?, ?, ?, ?, NOW(), ?)
+        INSERT INTO invoices (client_type, client_id, client_name, description, amount, issued_date, created_by, invoice_number)
+        VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)
     ');
-    $stmt->execute([$clientType, $clientId, $clientName, $description, $amount, (int) $user['id']]);
+    $stmt->execute([$clientType, $clientId, $clientName, $description, $amount, (int) $user['id'], $number]);
     $id = (int) $pdo->lastInsertId();
 
     $settings = get_all_settings($pdo);
-    log_event($pdo, $clientId, 'invoiced', 'Invoice ' . format_display_id($settings, $id) . ' generated for ' . number_format($amount, 2));
+    log_event($pdo, $clientId, 'invoiced', 'Invoice ' . $number . ' generated for ' . number_format($amount, 2));
 
     $stmt = $pdo->prepare('SELECT * FROM invoices WHERE id = ?');
     $stmt->execute([$id]);
@@ -628,6 +652,10 @@ if ($method === 'GET') {
             break;
         case 'createInvoice':
             handle_create_invoice($pdo, $body, require_session($pdo, $body['token'] ?? null));
+            break;
+        case 'nextInvoiceNumber':
+            require_session($pdo, $body['token'] ?? null);
+            handle_next_invoice_number($pdo, $body);
             break;
         case 'listInvoices':
             require_session($pdo, $body['token'] ?? null);
