@@ -12,12 +12,13 @@ export default function DomainSection({ c, clientType }){
   const [domain, setDomain] = useState('');
   const [url, setUrl] = useState('');
   const [expiry, setExpiry] = useState('');
+  const [started, setStarted] = useState('');
 
   useEffect(() => {
     setEditing(false);
-    setDomain(c.domain || ''); setUrl(c.websiteUrl || ''); setExpiry(c.domainExpiry || '');
+    setDomain(c.domain || ''); setUrl(c.websiteUrl || ''); setExpiry(c.domainExpiry || ''); setStarted(c.domainStart || '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [c.id, c.domain, c.websiteUrl, c.domainExpiry]);
+  }, [c.id, c.domain, c.websiteUrl, c.domainExpiry, c.domainStart]);
 
   const days = domainDaysLeft(c);
   const pill = days === null ? null : days < 0 ? 'pill-overdue' : days <= DOMAIN_WARN_DAYS ? 'pill-due' : 'pill-active';
@@ -27,13 +28,13 @@ export default function DomainSection({ c, clientType }){
     let link = url.trim();
     if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
     setBusy(true);
-    call('updateClientDomain', { clientType, id: c.id, domain: domain.trim(), websiteUrl: link, domainExpiry: expiry })
+    call('updateClientDomain', { clientType, id: c.id, domain: domain.trim(), websiteUrl: link, domainExpiry: expiry, domainStart: started })
       .then(() => { showToast('Domain details saved'); setEditing(false); return refreshFromBackend(); })
       .catch((err) => showToast('Failed: ' + err.message))
       .finally(() => setBusy(false));
   }
 
-  const hasAny = c.domain || c.websiteUrl || c.domainExpiry;
+  const hasAny = c.domain || c.websiteUrl || c.domainExpiry || c.domainStart;
 
   return (
     <div className="panel-section">
@@ -50,6 +51,9 @@ export default function DomainSection({ c, clientType }){
             <span>{c.websiteUrl
               ? <a href={c.websiteUrl} target="_blank" rel="noopener noreferrer" style={{color:'var(--accent)'}}>{c.websiteUrl}</a>
               : '—'}</span>
+          </div>
+          <div className="field-row"><span>Registered on</span>
+            <span>{c.domainStart ? fmtDate(parseDateOnly(c.domainStart)) : '—'}</span>
           </div>
           <div className="field-row"><span>Domain expires</span>
             <span>{c.domainExpiry
@@ -68,7 +72,10 @@ export default function DomainSection({ c, clientType }){
             <label className="full">Website link
               <input type="text" autoComplete="off" maxLength={500} placeholder="https://example.com" value={url} onChange={(e) => setUrl(e.target.value)} />
             </label>
-            <label className="full">Domain expiry date
+            <label>Registered on (start date)
+              <input type="date" value={started} onChange={(e) => setStarted(e.target.value)} />
+            </label>
+            <label>Domain expiry date
               <input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
             </label>
           </div>

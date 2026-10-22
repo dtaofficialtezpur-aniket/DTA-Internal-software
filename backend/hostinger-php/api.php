@@ -231,10 +231,12 @@ function client_to_json(array $c): array
         'grace' => (int) $c['grace_days'],
         'status' => $c['status'],
         'pausedAt' => $c['paused_at'],
+        'createdAt' => $c['created_at'] ?? null,
         'archivedNormalData' => decode_archived_data($c),
         'domain' => $c['domain'] ?? null,
         'websiteUrl' => $c['website_url'] ?? null,
         'domainExpiry' => $c['domain_expiry'] ?? null,
+        'domainStart' => $c['domain_start'] ?? null,
     ];
 }
 
@@ -265,6 +267,7 @@ function normal_client_to_json(array $c): array
         'domain' => $c['domain'] ?? null,
         'websiteUrl' => $c['website_url'] ?? null,
         'domainExpiry' => $c['domain_expiry'] ?? null,
+        'domainStart' => $c['domain_start'] ?? null,
     ];
 }
 
@@ -1031,8 +1034,8 @@ function handle_add(PDO $pdo, array $body): void
     $nextDue = date('Y-m-d', strtotime("{$start} +{$days} days"));
 
     $stmt = $pdo->prepare('
-        INSERT INTO clients (id, api_key, client_name, software, cycle, amount, start_date, next_due, grace_days, status, paused_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+        INSERT INTO clients (id, api_key, client_name, software, cycle, amount, start_date, next_due, grace_days, status, paused_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NOW())
     ');
     $stmt->execute([
         $id, $apiKey,
@@ -1296,10 +1299,10 @@ function handle_convert_to_subscription(PDO $pdo, array $body): void
     $pdo->beginTransaction();
     $pdo->prepare('DELETE FROM normal_clients WHERE id = ?')->execute([$id]);
     $stmt = $pdo->prepare('
-        INSERT INTO clients (id, api_key, client_name, software, cycle, amount, start_date, next_due, grace_days, status, paused_at, archived_data, domain, website_url, domain_expiry)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO clients (id, api_key, client_name, software, cycle, amount, start_date, next_due, grace_days, status, paused_at, archived_data, domain, website_url, domain_expiry, domain_start, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ');
-    $stmt->execute([$id, $apiKey, $c['client_name'], $software, $cycle, $amount, $start, $nextDue, $grace, $status, $pausedAt, $archiveNormal, $c['domain'], $c['website_url'], $c['domain_expiry']]);
+    $stmt->execute([$id, $apiKey, $c['client_name'], $software, $cycle, $amount, $start, $nextDue, $grace, $status, $pausedAt, $archiveNormal, $c['domain'], $c['website_url'], $c['domain_expiry'], $c['domain_start'] ?? null, $c['created_at']]);
     $pdo->commit();
 
     log_event($pdo, $id, 'converted', 'Converted from normal client to subscription client');
@@ -1345,10 +1348,10 @@ function handle_convert_to_normal(PDO $pdo, array $body): void
     $pdo->beginTransaction();
     $pdo->prepare('DELETE FROM clients WHERE id = ?')->execute([$id]);
     $stmt = $pdo->prepare('
-        INSERT INTO normal_clients (id, client_name, address, contact, total_amount, advance_payment, remaining_payment, notes, created_at, archived_data, domain, website_url, domain_expiry, work_status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO normal_clients (id, client_name, address, contact, total_amount, advance_payment, remaining_payment, notes, created_at, archived_data, domain, website_url, domain_expiry, domain_start, work_status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ');
-    $stmt->execute([$id, $c['client_name'], $address, $contact, $totalAmount, $advancePayment, $remainingPayment, $notes, $createdAt ?? date('Y-m-d H:i:s'), $archiveSub, $c['domain'], $c['website_url'], $c['domain_expiry'], $workStatus]);
+    $stmt->execute([$id, $c['client_name'], $address, $contact, $totalAmount, $advancePayment, $remainingPayment, $notes, $createdAt ?? $c['created_at'] ?? date('Y-m-d H:i:s'), $archiveSub, $c['domain'], $c['website_url'], $c['domain_expiry'], $c['domain_start'] ?? null, $workStatus]);
     $pdo->commit();
 
     log_event($pdo, $id, 'converted', 'Converted from subscription client to normal client');
@@ -1385,9 +1388,20 @@ function handle_update_client_domain(PDO $pdo, array $body): void
         }
     }
 
+    $started = trim((string) ($body['domainStart'] ?? ''));
+    if ($started !== '') {
+        $d = DateTime::createFromFormat('Y-m-d', $started);
+        if (!$d || $d->format('Y-m-d') !== $started) {
+            json_out(['error' => 'Domain registration date must be a date (YYYY-MM-DD).']);
+        }
+        if ($expiry !== '' && $started > $expiry) {
+            json_out(['error' => 'Domain registration date must be before the expiry date.']);
+        }
+    }
+
     $table = $clientType === 'normal' ? 'normal_clients' : 'clients';
-    $pdo->prepare("UPDATE {$table} SET domain = ?, website_url = ?, domain_expiry = ? WHERE id = ?")
-        ->execute([$domain !== '' ? $domain : null, $url !== '' ? $url : null, $expiry !== '' ? $expiry : null, $id]);
+    $pdo->prepare("UPDATE {$table} SET domain = ?, website_url = ?, domain_expiry = ?, domain_start = ? WHERE id = ?")
+        ->execute([$domain !== '' ? $domain : null, $url !== '' ? $url : null, $expiry !== '' ? $expiry : null, $started !== '' ? $started : null, $id]);
 
     log_event($pdo, $id, 'updated', 'Domain details updated');
     $updated = $clientType === 'normal' ? find_normal_client($pdo, $id) : find_client($pdo, $id);

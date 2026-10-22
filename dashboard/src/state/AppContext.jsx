@@ -135,6 +135,7 @@ export function AppProvider({ children }){
       const nextClients = data.clients.map((c) => ({
         ...c,
         start: new Date(c.start), nextDue: new Date(c.nextDue),
+        createdAt: new Date(c.createdAt || c.start),
         pausedAt: c.pausedAt ? new Date(c.pausedAt) : null,
         history: (c.history || []).map((h) => ({ ...h, t: new Date(h.timestamp) }))
           .sort((a, b) => b.t - a.t),
@@ -185,6 +186,7 @@ export function AppProvider({ children }){
         setClients(cached.clients.map((c) => ({
           ...c,
           start: new Date(c.start), nextDue: new Date(c.nextDue),
+          createdAt: new Date(c.createdAt || c.start),
           pausedAt: c.pausedAt ? new Date(c.pausedAt) : null,
           history: (c.history || []).map((h) => ({ ...h, t: new Date(h.timestamp) })).sort((a, b) => b.t - a.t),
           pendingSync: pendingIds.has(c.id),
