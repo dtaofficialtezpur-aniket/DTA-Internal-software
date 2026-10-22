@@ -18,6 +18,10 @@ CREATE TABLE IF NOT EXISTS clients (
     -- Holds the normal-client fields when this row was converted from a
     -- normal client, so converting back restores them. NULL otherwise.
     archived_data JSON NULL,
+    -- Optional domain/website details and when the domain expires.
+    domain VARCHAR(255) NULL,
+    website_url VARCHAR(500) NULL,
+    domain_expiry DATE NULL,
     INDEX (api_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -46,7 +50,11 @@ CREATE TABLE IF NOT EXISTS normal_clients (
     -- Holds the subscription-client fields (API key included) when this
     -- row was converted from a subscription client, so converting back
     -- restores them exactly. NULL otherwise.
-    archived_data JSON NULL
+    archived_data JSON NULL,
+    -- Optional domain/website details and when the domain expires.
+    domain VARCHAR(255) NULL,
+    website_url VARCHAR(500) NULL,
+    domain_expiry DATE NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS settings (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import logo from '../assets/dta-logo.png';
+import { domainAlerts } from '../utils.js';
 
 const NAV_ITEMS = [
   { key: 'overview', label: 'Overview', group: 'Manage', icon: (
@@ -42,7 +43,8 @@ function useAppVersion(){
 }
 
 export default function Sidebar({ view, setView }){
-  const { auth, doLogout, pendingCount } = useApp();
+  const { auth, doLogout, pendingCount, clients, normalClients } = useApp();
+  const domainCount = domainAlerts(clients, normalClients).length;
   const isAdmin = auth.user.role === 'admin';
   const update = useUpdateReady();
   const version = useAppVersion();
@@ -63,7 +65,7 @@ export default function Sidebar({ view, setView }){
         <div className="nav-group-label">Manage</div>
         <div className="nav" role="tablist">
           {NAV_ITEMS.filter((i) => i.group === 'Manage').map((i) => (
-            <NavBtn key={i.key} item={i} active={view === i.key} onClick={() => setView(i.key)} />
+            <NavBtn key={i.key} item={i} active={view === i.key} badge={i.key === 'overview' ? domainCount : 0} onClick={() => setView(i.key)} />
           ))}
         </div>
         <div className="nav-group-label">Build</div>
@@ -101,11 +103,12 @@ export default function Sidebar({ view, setView }){
   );
 }
 
-function NavBtn({ item, active, onClick }){
+function NavBtn({ item, active, onClick, badge = 0 }){
   return (
     <button className="nav-btn" data-view={item.key} aria-current={active ? 'page' : undefined} onClick={onClick}>
       {item.icon}
       {item.label}
+      {badge > 0 && <span className="nav-badge" title="Domains expiring soon">{badge}</span>}
     </button>
   );
 }
