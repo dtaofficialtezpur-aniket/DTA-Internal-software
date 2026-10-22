@@ -236,3 +236,13 @@ input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:foc
 /* Clients list: month heading rows between groups */
 .group-row td{background:var(--surface-sunken);font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-muted);padding-top:8px;padding-bottom:8px;}
 .group-row td span{font-weight:500;text-transform:none;letter-spacing:0;}
+
+/* Revenue: month-wise bars (single series, one hue) */
+.rev-chart{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:6px;padding:18px 16px 12px;height:240px;}
+.rev-col{display:flex;flex-direction:column;align-items:center;min-width:0;}
+.rev-val{font-size:.66rem;color:var(--ink-muted);height:16px;white-space:nowrap;overflow:visible;}
+.rev-bar-track{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center;border-bottom:1px solid var(--border);}
+.rev-bar{width:min(28px,70%);background:var(--accent);border-radius:4px 4px 0 0;min-height:0;}
+.rev-col:hover .rev-bar{filter:brightness(1.15);}
+.rev-label{font-size:.7rem;color:var(--ink-muted);margin-top:6px;}
+@media (max-width:700px){.rev-val{display:none;}}

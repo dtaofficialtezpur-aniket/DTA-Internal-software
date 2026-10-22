@@ -9,6 +9,7 @@ import Activity from './pages/Activity.jsx';
 import Team from './pages/Team.jsx';
 import Files from './pages/Files.jsx';
 import Settings from './pages/Settings.jsx';
+import Revenue from './pages/Revenue.jsx';
 import ClientDetailPanel from './components/ClientDetailPanel.jsx';
 import NormalClientDetailPanel from './components/NormalClientDetailPanel.jsx';
 import AddClientModal from './components/AddClientModal.jsx';
@@ -61,6 +62,7 @@ export default function App(){
           {view === 'clients' && <Clients initialTab={clientsTab} />}
           {view === 'activity' && <Activity />}
           {view === 'team' && isAdmin && <Team />}
+          {view === 'revenue' && isAdmin && <Revenue />}
           {view === 'files' && <Files />}
           {view === 'settings' && <Settings />}
         </div>

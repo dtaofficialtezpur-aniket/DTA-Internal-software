@@ -69,7 +69,7 @@ export default function Clients({ initialTab }){
   const showType = tab === 'all';
   const showSubStatuses = tab === 'all' || tab === 'subscription';
   const showWorkStatuses = tab === 'all' || tab === 'normal';
-  const columns = 6 + (showType ? 1 : 0);
+  const columns = 5 + (showType ? 1 : 0);
 
   function switchTab(key){
     setTab(key); setTypeFilter('all'); setStatusFilter('all');
@@ -135,7 +135,7 @@ export default function Clients({ initialTab }){
         <table>
           <thead><tr>
             <th style={{width:'52px'}}>S.No.</th><th>Client</th>{showType && <th>Type</th>}
-            <th>Detail</th><th>Status</th><th>Created on</th><th></th>
+            <th>Detail</th><th>Status</th><th></th>
           </tr></thead>
           <tbody>
             {rows.length === 0 && (
@@ -161,7 +161,6 @@ export default function Clients({ initialTab }){
                     <div className="cell-sub">of {fmtMoney(r.c.totalAmount)} total</div></td>
                 )}
                 <td>{r.kind === 'subscription' ? <StatusPill status={subStatus(r.c)} /> : <WorkStatusPill status={r.c.workStatus} />}</td>
-                <td className="tabular">{fmtDate(r.c.createdAt)}</td>
                 <td className="row-actions"><button className="btn btn-secondary btn-sm" data-view-client={r.c.id} onClick={() => open(r)}>View</button></td>
               </tr>
             ))}
