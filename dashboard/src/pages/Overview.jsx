@@ -110,7 +110,7 @@ export default function Overview({ onNavigate }){
             <button type="button" className="ov-row" key={c.id} onClick={() => setSelectedNormalClientId(c.id)}>
               <div className="ov-row-main">
                 <div className="ov-row-name">{c.client}</div>
-                <div className="ov-row-sub">Paid {fmtMoney(c.advancePayment)} of {fmtMoney(c.totalAmount)}</div>
+                <div className="ov-row-sub">Paid {fmtMoney(c.advancePayment + (c.paidAmount || 0))} of {fmtMoney(c.totalAmount)}</div>
               </div>
               <div className="ov-row-side" style={{fontWeight:700, color:'var(--warn)'}}>{fmtMoney(c.remainingPayment)}</div>
             </button>

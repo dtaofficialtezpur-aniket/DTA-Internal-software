@@ -259,6 +259,7 @@ function normal_client_to_json(array $c): array
         'contact' => $c['contact'],
         'totalAmount' => (float) $c['total_amount'],
         'advancePayment' => (float) $c['advance_payment'],
+        'paidAmount' => (float) ($c['paid_amount'] ?? 0),
         'remainingPayment' => (float) $c['remaining_payment'],
         'notes' => $c['notes'],
         'createdAt' => $c['created_at'],
@@ -482,20 +483,61 @@ function record_payment(PDO $pdo, string $clientId, string $type, string $name, 
 function handle_list_payments(PDO $pdo): void
 {
     $rows = $pdo->query('SELECT * FROM payments ORDER BY paid_at DESC, id DESC')->fetchAll();
-    json_out(['ok' => true, 'payments' => array_map(function ($p) {
-        $deleted = str_starts_with($p['client_id'], 'deleted:');
-        return [
-            'id' => (int) $p['id'],
-            'clientId' => $deleted ? substr($p['client_id'], 8) : $p['client_id'],
-            'clientDeleted' => $deleted,
-            'clientType' => $p['client_type'],
-            'client' => $p['client_name'],
-            'amount' => (float) $p['amount'],
-            'paidAt' => $p['paid_at'],
-            'kind' => $p['kind'],
-            'note' => $p['note'],
-        ];
-    }, $rows)]);
+    json_out(['ok' => true, 'payments' => array_map('payment_to_json', $rows)]);
+}
+
+function payment_to_json(array $p): array
+{
+    $deleted = str_starts_with($p['client_id'], 'deleted:');
+    return [
+        'id' => (int) $p['id'],
+        'clientId' => $deleted ? substr($p['client_id'], 8) : $p['client_id'],
+        'clientDeleted' => $deleted,
+        'clientType' => $p['client_type'],
+        'client' => $p['client_name'],
+        'amount' => (float) $p['amount'],
+        'paidAt' => $p['paid_at'],
+        'kind' => $p['kind'],
+        'note' => $p['note'],
+    ];
+}
+
+function handle_list_client_payments(PDO $pdo, array $body): void
+{
+    $stmt = $pdo->prepare('SELECT * FROM payments WHERE client_id = ? ORDER BY paid_at DESC, id DESC');
+    $stmt->execute([(string) ($body['clientId'] ?? '')]);
+    json_out(['ok' => true, 'payments' => array_map('payment_to_json', $stmt->fetchAll())]);
+}
+
+// Admin-only: removes one payment record (e.g. one entered twice) and, for a
+// normal client, takes it back out of their paid/advance amount so the
+// client's balance and the revenue figures stay in step. A subscription
+// renewal's record is removed but its due date is left as it is.
+function handle_delete_payment(PDO $pdo, array $body): void
+{
+    $stmt = $pdo->prepare('SELECT * FROM payments WHERE id = ?');
+    $stmt->execute([(int) ($body['paymentId'] ?? 0)]);
+    $p = $stmt->fetch();
+    if (!$p) json_out(['error' => 'Payment not found.']);
+
+    $pdo->beginTransaction();
+    $pdo->prepare('DELETE FROM payments WHERE id = ?')->execute([$p['id']]);
+    $c = find_normal_client($pdo, $p['client_id']);
+    if ($c && $p['client_type'] === 'normal') {
+        $advance = (float) $c['advance_payment'];
+        $paid = (float) $c['paid_amount'];
+        if ($p['kind'] === 'payment') $paid = max(0, $paid - (float) $p['amount']);
+        else $advance = max(0, $advance - (float) $p['amount']);
+        $remaining = max(0, (float) $c['total_amount'] - $advance - $paid);
+        $pdo->prepare('UPDATE normal_clients SET advance_payment = ?, paid_amount = ?, remaining_payment = ? WHERE id = ?')
+            ->execute([$advance, $paid, $remaining, $c['id']]);
+    }
+    $pdo->commit();
+
+    if (!str_starts_with($p['client_id'], 'deleted:')) {
+        log_event($pdo, $p['client_id'], 'updated', 'Payment record of ' . number_format((float) $p['amount'], 2) . ' removed');
+    }
+    json_out(['ok' => true]);
 }
 
 // Removes a client's links and documents (including the files on disk).
@@ -715,6 +757,14 @@ if ($method === 'GET') {
             break;
 
         // Admin-only team management.
+        case 'listClientPayments':
+            require_session($pdo, $body['token'] ?? null);
+            handle_list_client_payments($pdo, $body);
+            break;
+        case 'deletePayment':
+            require_admin_session($pdo, $body['token'] ?? null);
+            handle_delete_payment($pdo, $body);
+            break;
         case 'listPayments':
             require_admin_session($pdo, $body['token'] ?? null);
             handle_list_payments($pdo);
@@ -1200,10 +1250,11 @@ function handle_update_normal_client(PDO $pdo, array $body): void
 
     $totalAmount = max(0, (float) ($body['totalAmount'] ?? 0));
     $advancePayment = max(0, (float) ($body['advancePayment'] ?? 0));
-    if ($advancePayment > $totalAmount) {
-        json_out(['error' => 'Advance payment cannot be more than the total amount.']);
+    $paidAmount = (float) $c['paid_amount'];
+    if ($advancePayment + $paidAmount > $totalAmount + 0.001) {
+        json_out(['error' => 'Advance plus amount already paid (' . number_format($paidAmount, 2) . ') cannot be more than the total amount.']);
     }
-    $remainingPayment = max(0, $totalAmount - $advancePayment);
+    $remainingPayment = max(0, $totalAmount - $advancePayment - $paidAmount);
 
     $stmt = $pdo->prepare('
         UPDATE normal_clients
@@ -1235,11 +1286,14 @@ function handle_record_normal_client_payment(PDO $pdo, array $body): void
         json_out(['error' => 'Payment amount must be greater than zero.']);
     }
 
-    $advancePayment = max(0, (float) $c['advance_payment'] + $amount);
-    $remainingPayment = max(0, (float) $c['total_amount'] - $advancePayment);
+    if ($amount > (float) $c['remaining_payment'] + 0.001) {
+        json_out(['error' => 'Payment is more than the remaining amount (' . number_format((float) $c['remaining_payment'], 2) . ').']);
+    }
+    $paidAmount = (float) $c['paid_amount'] + $amount;
+    $remainingPayment = max(0, (float) $c['total_amount'] - (float) $c['advance_payment'] - $paidAmount);
 
-    $stmt = $pdo->prepare('UPDATE normal_clients SET advance_payment = ?, remaining_payment = ? WHERE id = ?');
-    $stmt->execute([$advancePayment, $remainingPayment, $id]);
+    $stmt = $pdo->prepare('UPDATE normal_clients SET paid_amount = ?, remaining_payment = ? WHERE id = ?');
+    $stmt->execute([$paidAmount, $remainingPayment, $id]);
 
     log_event($pdo, $id, 'paid', 'Payment of ' . number_format($amount, 2) . ' recorded');
     record_payment($pdo, $id, 'normal', $c['client_name'], $amount, 'payment', 'Payment');
@@ -1329,6 +1383,7 @@ function handle_convert_to_subscription(PDO $pdo, array $body): void
         '_type' => 'normal',
         'address' => $c['address'], 'contact' => $c['contact'],
         'totalAmount' => (float) $c['total_amount'], 'advancePayment' => (float) $c['advance_payment'],
+        'paidAmount' => (float) ($c['paid_amount'] ?? 0),
         'notes' => $c['notes'], 'createdAt' => $c['created_at'], 'workStatus' => $c['work_status'] ?? null,
     ]);
 
@@ -1357,11 +1412,13 @@ function handle_convert_to_normal(PDO $pdo, array $body): void
         $contact = $archived['contact'];
         $totalAmount = (float) $archived['totalAmount'];
         $advancePayment = (float) $archived['advancePayment'];
+        $paidAmount = (float) ($archived['paidAmount'] ?? 0);
         $notes = $archived['notes'];
         $createdAt = $archived['createdAt'] ?? null;
         $workStatus = $archived['workStatus'] ?? null;
     } else {
         $workStatus = null;
+        $paidAmount = 0.0;
         $address = substr((string) ($body['address'] ?? ''), 0, 2000);
         $contact = substr((string) ($body['contact'] ?? ''), 0, 255);
         $totalAmount = max(0, (float) ($body['totalAmount'] ?? $c['amount']));
@@ -1372,7 +1429,7 @@ function handle_convert_to_normal(PDO $pdo, array $body): void
         $notes = substr((string) ($body['notes'] ?? ''), 0, 2000);
         $createdAt = null;
     }
-    $remainingPayment = max(0, $totalAmount - $advancePayment);
+    $remainingPayment = max(0, $totalAmount - $advancePayment - $paidAmount);
 
     $archiveSub = json_encode([
         '_type' => 'subscription',
@@ -1384,10 +1441,10 @@ function handle_convert_to_normal(PDO $pdo, array $body): void
     $pdo->beginTransaction();
     $pdo->prepare('DELETE FROM clients WHERE id = ?')->execute([$id]);
     $stmt = $pdo->prepare('
-        INSERT INTO normal_clients (id, client_name, address, contact, total_amount, advance_payment, remaining_payment, notes, created_at, archived_data, domain, website_url, domain_expiry, domain_start, work_status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO normal_clients (id, client_name, address, contact, total_amount, advance_payment, paid_amount, remaining_payment, notes, created_at, archived_data, domain, website_url, domain_expiry, domain_start, work_status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ');
-    $stmt->execute([$id, $c['client_name'], $address, $contact, $totalAmount, $advancePayment, $remainingPayment, $notes, $createdAt ?? $c['created_at'] ?? date('Y-m-d H:i:s'), $archiveSub, $c['domain'], $c['website_url'], $c['domain_expiry'], $c['domain_start'] ?? null, $workStatus]);
+    $stmt->execute([$id, $c['client_name'], $address, $contact, $totalAmount, $advancePayment, $paidAmount, $remainingPayment, $notes, $createdAt ?? $c['created_at'] ?? date('Y-m-d H:i:s'), $archiveSub, $c['domain'], $c['website_url'], $c['domain_expiry'], $c['domain_start'] ?? null, $workStatus]);
     $pdo->commit();
 
     if (!($archived && ($archived['_type'] ?? '') === 'normal')) {
