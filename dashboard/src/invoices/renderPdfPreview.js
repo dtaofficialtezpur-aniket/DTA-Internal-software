@@ -6,7 +6,7 @@ import { assetUrl } from '../ocr/runOcr.js';
 // local copies already used for document autofill).
 export async function renderPdfPreview(arrayBuffer, scale = 1.6){
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  pdfjs.GlobalWorkerOptions.workerSrc = assetUrl('pdfjs/pdf.worker.min.mjs');
+  pdfjs.GlobalWorkerOptions.workerSrc = assetUrl('pdfjs/pdf.worker.legacy.min.mjs');
   const doc = await pdfjs.getDocument({ data: arrayBuffer }).promise;
   const page = await doc.getPage(1);
   const viewport = page.getViewport({ scale });

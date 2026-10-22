@@ -16,7 +16,7 @@ const MAX_PDF_PAGES = 5; // a long scanned PDF would otherwise take minutes to O
 
 async function renderPdfPagesToCanvases(file){
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  pdfjs.GlobalWorkerOptions.workerSrc = assetUrl('pdfjs/pdf.worker.min.mjs');
+  pdfjs.GlobalWorkerOptions.workerSrc = assetUrl('pdfjs/pdf.worker.legacy.min.mjs');
 
   const data = await file.arrayBuffer();
   const doc = await pdfjs.getDocument({ data }).promise;
