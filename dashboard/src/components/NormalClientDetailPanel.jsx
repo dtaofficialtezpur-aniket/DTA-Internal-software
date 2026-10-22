@@ -5,6 +5,8 @@ import InvoiceSection from './InvoiceSection.jsx';
 import ConvertClientSection from './ConvertClientSection.jsx';
 import EditClientIdButton from './EditClientIdButton.jsx';
 import DomainSection from './DomainSection.jsx';
+import ClientLinksSection from './ClientLinksSection.jsx';
+import ClientDocumentsSection from './ClientDocumentsSection.jsx';
 
 export default function NormalClientDetailPanel(){
   const { normalClients, selectedNormalClientId, setSelectedNormalClientId, call, refreshFromBackend, showToast } = useApp();
@@ -83,13 +85,14 @@ export default function NormalClientDetailPanel(){
       <div className="panel-body">
         {!editing && (
           <>
-            <div>
-              <div style={{fontSize:'.78rem', fontWeight:700, color:'var(--ink-muted)', marginBottom:'6px'}}>Client ID</div>
+            <div className="panel-section">
+              <div className="section-head"><div className="section-head-title">Client ID</div></div>
               <div className="key-box"><code>{c.id}</code></div>
               <EditClientIdButton c={c} clientType="normal" />
             </div>
 
-            <div>
+            <div className="panel-section">
+              <div className="section-head"><div className="section-head-title">Details</div></div>
               <div className="field-row"><span>Address</span><span>{c.address || '—'}</span></div>
               <div className="field-row"><span>Contact</span><span>{c.contact || '—'}</span></div>
               <div className="field-row"><span>Total amount</span><span className="tabular">{fmtMoney(c.totalAmount)}</span></div>
@@ -104,8 +107,8 @@ export default function NormalClientDetailPanel(){
             </div>
 
             {c.remainingPayment > 0 && (
-              <form onSubmit={recordPayment}>
-                <div style={{fontSize:'.78rem', fontWeight:700, color:'var(--ink-muted)', marginBottom:'6px'}}>Record a payment</div>
+              <form onSubmit={recordPayment} className="panel-section">
+                <div className="section-head"><div className="section-head-title">Record a payment</div></div>
                 <div style={{display:'flex', gap:'8px'}}>
                   <input type="number" min="0" step="0.01" placeholder="Amount (₹)" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} style={{flex:1}} />
                   <button type="submit" className="btn btn-primary btn-sm">Add</button>
@@ -114,6 +117,10 @@ export default function NormalClientDetailPanel(){
             )}
 
             <DomainSection c={c} clientType="normal" />
+
+            <ClientLinksSection c={c} />
+
+            <ClientDocumentsSection clientId={c.id} />
 
             <InvoiceSection
               clientType="normal"
@@ -159,8 +166,8 @@ export default function NormalClientDetailPanel(){
           </form>
         )}
 
-        <div>
-          <div style={{fontSize:'.78rem', fontWeight:700, color:'var(--ink-muted)', marginBottom:'8px'}}>History</div>
+        <div className="panel-section">
+          <div className="section-head"><div className="section-head-title">History</div></div>
           <div className="log-list">
             {c.history.slice().sort((a, b) => b.t - a.t).map((h, i) => (
               <div className="log-row" key={i}>

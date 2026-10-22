@@ -36,10 +36,10 @@ export default function DomainSection({ c, clientType }){
   const hasAny = c.domain || c.websiteUrl || c.domainExpiry;
 
   return (
-    <div>
-      <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px'}}>
-        <div style={{fontSize:'.78rem', fontWeight:700, color:'var(--ink-muted)'}}>Domain &amp; website</div>
-        {!editing && <button className="btn btn-ghost btn-sm" type="button" onClick={() => setEditing(true)}>{hasAny ? 'Edit' : 'Add domain'}</button>}
+    <div className="panel-section">
+      <div className="section-head">
+        <div className="section-head-title">Domain &amp; website</div>
+        {!editing && <button className={'btn btn-sm ' + (hasAny ? 'btn-secondary' : 'btn-primary')} type="button" onClick={() => setEditing(true)}>{hasAny ? 'Edit' : '+ Add domain'}</button>}
       </div>
 
       {!editing && !hasAny && <div className="page-sub">No domain added yet.</div>}
