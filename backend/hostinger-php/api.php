@@ -394,6 +394,8 @@ function handle_update_client_id(PDO $pdo, array $body): void
         $pdo->prepare("UPDATE {$table} SET id = ? WHERE id = ?")->execute([$newId, $oldId]);
         $pdo->prepare('UPDATE history SET client_id = ? WHERE client_id = ?')->execute([$newId, $oldId]);
         $pdo->prepare('UPDATE invoices SET client_id = ? WHERE client_id = ? AND client_type = ?')->execute([$newId, $oldId, $clientType]);
+        $pdo->prepare('UPDATE client_links SET client_id = ? WHERE client_id = ?')->execute([$newId, $oldId]);
+        $pdo->prepare('UPDATE client_documents SET client_id = ? WHERE client_id = ?')->execute([$newId, $oldId]);
         $pdo->commit();
     } catch (Throwable $e) {
         $pdo->rollBack();
@@ -404,6 +406,37 @@ function handle_update_client_id(PDO $pdo, array $body): void
 
     $updated = $clientType === 'normal' ? find_normal_client($pdo, $newId) : find_client($pdo, $newId);
     json_out(['ok' => true, 'client' => $clientType === 'normal' ? normal_client_to_json($updated) : client_to_json($updated)]);
+}
+
+// Links are rendered as clickable hrefs in the dashboard, so only plain
+// http(s) addresses are accepted -- never javascript:/data: or anything with
+// spaces or quote characters.
+function valid_http_url(string $url): bool
+{
+    $p = parse_url($url);
+    return strlen($url) <= 500 && !preg_match('/[\s"\'<>\\\\]/', $url) && $p
+        && in_array(strtolower($p['scheme'] ?? ''), ['http', 'https'], true) && !empty($p['host']);
+}
+
+function client_exists(PDO $pdo, string $id): bool
+{
+    $stmt = $pdo->prepare('SELECT 1 FROM clients WHERE id = ? UNION SELECT 1 FROM normal_clients WHERE id = ?');
+    $stmt->execute([$id, $id]);
+    return (bool) $stmt->fetchColumn();
+}
+
+// Removes a client's links and documents (including the files on disk).
+// Called when the client itself is deleted.
+function purge_client_extras(PDO $pdo, string $id): void
+{
+    $pdo->prepare('DELETE FROM client_links WHERE client_id = ?')->execute([$id]);
+    $stmt = $pdo->prepare('SELECT storage_name FROM client_documents WHERE client_id = ?');
+    $stmt->execute([$id]);
+    foreach ($stmt->fetchAll() as $d) {
+        $path = UPLOAD_DIR . '/' . $d['storage_name'];
+        if (is_file($path)) unlink($path);
+    }
+    $pdo->prepare('DELETE FROM client_documents WHERE client_id = ?')->execute([$id]);
 }
 
 /* ---------------- request handling ---------------- */
@@ -425,6 +458,9 @@ if ($method === 'GET') {
     if ($action === 'uploadFile') {
         $user = require_admin_session($pdo, $_POST['token'] ?? null);
         handle_upload_file($pdo, $_POST, $_FILES['file'] ?? null, $user);
+    } elseif ($action === 'uploadClientDocument') {
+        $user = require_session($pdo, $_POST['token'] ?? null);
+        handle_upload_client_document($pdo, $_POST, $_FILES['file'] ?? null, $user);
     } elseif ($action === 'extractClientDocument') {
         require_session($pdo, $_POST['token'] ?? null);
         handle_extract_client_document($pdo, $_POST, $_FILES['file'] ?? null);
@@ -501,6 +537,25 @@ if ($method === 'GET') {
         case 'convertToNormal':
             require_session($pdo, $body['token'] ?? null);
             handle_convert_to_normal($pdo, $body);
+            break;
+        case 'addClientLink':
+            require_session($pdo, $body['token'] ?? null);
+            handle_add_client_link($pdo, $body);
+            break;
+        case 'deleteClientLink':
+            require_session($pdo, $body['token'] ?? null);
+            handle_delete_client_link($pdo, $body);
+            break;
+        case 'listClientDocuments':
+            require_session($pdo, $body['token'] ?? null);
+            handle_list_client_documents($pdo, $body);
+            break;
+        case 'downloadClientDocument':
+            require_session($pdo, $body['token'] ?? null);
+            handle_download_client_document($pdo, $body);
+            break;
+        case 'deleteClientDocument':
+            handle_delete_client_document($pdo, $body, require_session($pdo, $body['token'] ?? null));
             break;
         case 'updateClientDomain':
             require_session($pdo, $body['token'] ?? null);
@@ -840,6 +895,14 @@ function handle_list(PDO $pdo): void
         $out[] = $json;
     }
 
+    $linksByClient = [];
+    foreach ($pdo->query('SELECT id, client_id, label, url FROM client_links ORDER BY id ASC')->fetchAll() as $l) {
+        $linksByClient[$l['client_id']][] = ['id' => (int) $l['id'], 'label' => $l['label'], 'url' => $l['url']];
+    }
+    foreach ($out as $i => $row) {
+        $out[$i]['links'] = $linksByClient[$row['id']] ?? [];
+    }
+
     $normalClients = $pdo->query('SELECT * FROM normal_clients ORDER BY created_at DESC')->fetchAll();
     $normalOut = [];
     foreach ($normalClients as $c) {
@@ -848,6 +911,7 @@ function handle_list(PDO $pdo): void
         $json['history'] = array_map(function ($h) {
             return ['clientId' => $h['client_id'], 'timestamp' => $h['ts'], 'action' => $h['action'], 'note' => $h['note']];
         }, $historyStmt->fetchAll());
+        $json['links'] = $linksByClient[$c['id']] ?? [];
         $normalOut[] = $json;
     }
 
@@ -1045,6 +1109,7 @@ function handle_delete_normal_client(PDO $pdo, array $body): void
     $c = find_normal_client($pdo, $id);
     if (!$c) json_out(['error' => 'Client not found: ' . $id]);
 
+    purge_client_extras($pdo, $id);
     $stmt = $pdo->prepare('DELETE FROM normal_clients WHERE id = ?');
     $stmt->execute([$id]);
     $del = $pdo->prepare('DELETE FROM history WHERE client_id = ?');
@@ -1059,6 +1124,7 @@ function handle_delete_client(PDO $pdo, array $body): void
     $c = find_client($pdo, $id);
     if (!$c) json_out(['error' => 'Client not found: ' . $id]);
 
+    purge_client_extras($pdo, $id);
     $stmt = $pdo->prepare('DELETE FROM clients WHERE id = ?');
     $stmt->execute([$id]);
     $del = $pdo->prepare('DELETE FROM history WHERE client_id = ?');
@@ -1200,9 +1266,7 @@ function handle_update_client_domain(PDO $pdo, array $body): void
 
     $url = trim((string) ($body['websiteUrl'] ?? ''));
     if ($url !== '') {
-        $p = parse_url($url);
-        if (strlen($url) > 500 || preg_match('/[\s"\'<>\\\\]/', $url) || !$p
-            || !in_array(strtolower($p['scheme'] ?? ''), ['http', 'https'], true) || empty($p['host'])) {
+        if (!valid_http_url($url)) {
             json_out(['error' => 'Website link must be a valid http:// or https:// address.']);
         }
     }
@@ -1222,6 +1286,125 @@ function handle_update_client_domain(PDO $pdo, array $body): void
     log_event($pdo, $id, 'updated', 'Domain details updated');
     $updated = $clientType === 'normal' ? find_normal_client($pdo, $id) : find_client($pdo, $id);
     json_out(['ok' => true, 'client' => $clientType === 'normal' ? normal_client_to_json($updated) : client_to_json($updated)]);
+}
+
+/* ---------------- client links + documents ---------------- */
+
+function handle_add_client_link(PDO $pdo, array $body): void
+{
+    $id = (string) ($body['id'] ?? '');
+    if (!client_exists($pdo, $id)) json_out(['error' => 'Client not found: ' . $id]);
+
+    $label = trim((string) ($body['label'] ?? ''));
+    if ($label === '' || mb_strlen($label) > 100) {
+        json_out(['error' => 'Give the link a name (up to 100 characters).']);
+    }
+    $url = trim((string) ($body['url'] ?? ''));
+    if (!valid_http_url($url)) {
+        json_out(['error' => 'Link must be a valid http:// or https:// address.']);
+    }
+
+    $pdo->prepare('INSERT INTO client_links (client_id, label, url, created_at) VALUES (?, ?, ?, NOW())')
+        ->execute([$id, $label, $url]);
+    log_event($pdo, $id, 'updated', 'Link added: ' . $label);
+    json_out(['ok' => true]);
+}
+
+function handle_delete_client_link(PDO $pdo, array $body): void
+{
+    $stmt = $pdo->prepare('SELECT * FROM client_links WHERE id = ?');
+    $stmt->execute([(int) ($body['linkId'] ?? 0)]);
+    $l = $stmt->fetch();
+    if (!$l) json_out(['error' => 'Link not found.']);
+    $pdo->prepare('DELETE FROM client_links WHERE id = ?')->execute([$l['id']]);
+    log_event($pdo, $l['client_id'], 'updated', 'Link removed: ' . $l['label']);
+    json_out(['ok' => true]);
+}
+
+const CLIENT_DOC_MAX_BYTES = 25 * 1024 * 1024;
+const CLIENT_DOC_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'rtf',
+    'jpg', 'jpeg', 'png', 'gif', 'webp', 'zip'];
+
+function client_document_to_json(array $d): array
+{
+    return [
+        'id' => (int) $d['id'],
+        'filename' => $d['filename'],
+        'size' => (int) $d['size_bytes'],
+        'uploadedAt' => $d['uploaded_at'],
+        'uploadedBy' => (int) $d['uploaded_by'],
+    ];
+}
+
+function find_client_document(PDO $pdo, int $id): ?array
+{
+    $stmt = $pdo->prepare('SELECT * FROM client_documents WHERE id = ?');
+    $stmt->execute([$id]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}
+
+function handle_list_client_documents(PDO $pdo, array $body): void
+{
+    $stmt = $pdo->prepare('SELECT * FROM client_documents WHERE client_id = ? ORDER BY uploaded_at DESC, id DESC');
+    $stmt->execute([(string) ($body['clientId'] ?? '')]);
+    json_out(['ok' => true, 'documents' => array_map('client_document_to_json', $stmt->fetchAll())]);
+}
+
+function handle_upload_client_document(PDO $pdo, array $body, ?array $uploadedFile, array $user): void
+{
+    $clientId = (string) ($body['clientId'] ?? '');
+    if (!client_exists($pdo, $clientId)) json_out(['error' => 'Client not found: ' . $clientId]);
+    if (!$uploadedFile || ($uploadedFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        json_out(['error' => 'No file uploaded, or the upload failed (it may be larger than the server allows).']);
+    }
+    if ((int) $uploadedFile['size'] > CLIENT_DOC_MAX_BYTES) {
+        json_out(['error' => 'That file is too large (25 MB maximum).']);
+    }
+
+    $originalName = substr(basename((string) $uploadedFile['name']), 0, 255);
+    $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+    if (!in_array($ext, CLIENT_DOC_EXTENSIONS, true)) {
+        json_out(['error' => 'That file type is not allowed. Use PDF, Word, Excel, PowerPoint, text, image or ZIP files.']);
+    }
+    $storageName = bin2hex(random_bytes(20)) . '.' . $ext;
+    if (!move_uploaded_file($uploadedFile['tmp_name'], UPLOAD_DIR . '/' . $storageName)) {
+        json_out(['error' => 'Could not save the uploaded file on the server.']);
+    }
+
+    $pdo->prepare('INSERT INTO client_documents (client_id, filename, storage_name, size_bytes, uploaded_by, uploaded_at) VALUES (?, ?, ?, ?, ?, NOW())')
+        ->execute([$clientId, $originalName, $storageName, (int) $uploadedFile['size'], (int) $user['id']]);
+    log_event($pdo, $clientId, 'updated', 'Document uploaded: ' . $originalName);
+    json_out(['ok' => true]);
+}
+
+function handle_download_client_document(PDO $pdo, array $body): void
+{
+    $d = find_client_document($pdo, (int) ($body['docId'] ?? 0));
+    if (!$d) json_out(['error' => 'Document not found.']);
+    $path = UPLOAD_DIR . '/' . $d['storage_name'];
+    if (!is_file($path)) json_out(['error' => 'File is missing on the server.']);
+
+    header('Content-Type: application/octet-stream');
+    header('Content-Disposition: attachment; filename="' . str_replace(['"', "\r", "\n"], '', $d['filename']) . '"');
+    header('Content-Length: ' . filesize($path));
+    readfile($path);
+    exit;
+}
+
+// The person who uploaded a document, or the admin, can delete it.
+function handle_delete_client_document(PDO $pdo, array $body, array $user): void
+{
+    $d = find_client_document($pdo, (int) ($body['docId'] ?? 0));
+    if (!$d) json_out(['error' => 'Document not found.']);
+    if ($user['role'] !== 'admin' && (int) $d['uploaded_by'] !== (int) $user['id']) {
+        json_out(['error' => 'Only the admin or the person who uploaded this can delete it.']);
+    }
+    $path = UPLOAD_DIR . '/' . $d['storage_name'];
+    if (is_file($path)) unlink($path);
+    $pdo->prepare('DELETE FROM client_documents WHERE id = ?')->execute([$d['id']]);
+    log_event($pdo, $d['client_id'], 'updated', 'Document removed: ' . $d['filename']);
+    json_out(['ok' => true]);
 }
 
 function handle_update_settings(PDO $pdo, array $body): void

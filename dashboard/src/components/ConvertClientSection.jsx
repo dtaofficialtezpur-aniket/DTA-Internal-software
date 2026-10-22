@@ -75,11 +75,11 @@ export default function ConvertClientSection({ c, direction }){
   }
 
   return (
-    <div>
-      <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px'}}>
-        <div style={{fontSize:'.78rem', fontWeight:700, color:'var(--ink-muted)'}}>Client type</div>
+ <div className="panel-section">
+      <div className="section-head">
+        <div className="section-head-title">Client type</div>
         {!open && (
-          <button className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={beginConvert}>
+          <button className="btn btn-secondary btn-sm" type="button" disabled={busy} onClick={beginConvert}>
             {direction === 'toSubscription' ? 'Convert to subscription client' : 'Convert to normal client'}
           </button>
         )}
