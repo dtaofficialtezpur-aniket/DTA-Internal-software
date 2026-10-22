@@ -42,3 +42,26 @@ export function actionColor(action){
   return 'var(--good)';
 }
 export function maskKey(k){ return k.slice(0,8) + '••••••••' + k.slice(-4); }
+
+// Domain renewals: warn this many days before a client's domain expires.
+export const DOMAIN_WARN_DAYS = 30;
+export function parseDateOnly(s){ return s ? new Date(s + 'T00:00:00') : null; }
+// Days until the domain expires (negative = already expired), or null if no date is set.
+export function domainDaysLeft(c){
+  const d = parseDateOnly(c.domainExpiry);
+  return d ? diffDays(d, new Date()) : null;
+}
+// Every client (either type) whose domain has expired or expires within DOMAIN_WARN_DAYS, soonest first.
+export function domainAlerts(clients, normalClients){
+  const rows = [
+    ...clients.map((c) => ({ kind: 'subscription', c })),
+    ...normalClients.map((c) => ({ kind: 'normal', c })),
+  ].map((r) => ({ ...r, days: domainDaysLeft(r.c) }))
+    .filter((r) => r.days !== null && r.days <= DOMAIN_WARN_DAYS);
+  return rows.sort((a, b) => a.days - b.days);
+}
+export function domainLabel(days){
+  if (days < 0) return 'Expired ' + Math.abs(days) + ' day' + (Math.abs(days) === 1 ? '' : 's') + ' ago';
+  if (days === 0) return 'Expires today';
+  return 'Expires in ' + days + ' day' + (days === 1 ? '' : 's');
+}

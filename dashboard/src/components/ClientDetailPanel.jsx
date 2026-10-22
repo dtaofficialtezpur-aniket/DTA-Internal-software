@@ -5,6 +5,7 @@ import StatusPill from './StatusPill.jsx';
 import InvoiceSection from './InvoiceSection.jsx';
 import ConvertClientSection from './ConvertClientSection.jsx';
 import EditClientIdButton from './EditClientIdButton.jsx';
+import DomainSection from './DomainSection.jsx';
 
 export default function ClientDetailPanel(){
   const { clients, settings, selectedClientId, setSelectedClientId, call, refreshFromBackend, showToast } = useApp();
@@ -87,6 +88,8 @@ export default function ClientDetailPanel(){
                   }}>{confirmPause ? 'Click again to confirm' : 'Pause access'}</button>}
               <button id="d-delete" className="btn btn-danger btn-sm" type="button" onClick={del}>{confirmDelete ? 'Click again to confirm' : 'Delete client'}</button>
             </div>
+
+            <DomainSection c={c} clientType="subscription" />
 
             <InvoiceSection
               clientType="subscription"

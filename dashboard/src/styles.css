@@ -66,6 +66,7 @@ code, .mono{font-family:"IBM Plex Mono",ui-monospace,monospace;}
 .nav{display:flex;flex-direction:column;gap:2px;}
 .nav-btn{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--radius-s);border:none;background:transparent;
   color:var(--ink-muted);font-size:.875rem;font-weight:600;text-align:left;cursor:pointer;width:100%;}
+.nav-badge{margin-left:auto;min-width:18px;height:18px;padding:0 6px;border-radius:99px;background:var(--crit);color:#fff;font-size:.68rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;}
 .nav-btn svg{width:17px;height:17px;flex-shrink:0;}
 .nav-btn:hover{background:var(--surface-sunken);color:var(--ink);}
 .nav-btn[aria-current="page"]{background:var(--accent-soft);color:var(--accent);}
