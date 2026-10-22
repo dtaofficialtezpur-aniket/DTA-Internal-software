@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { computeStatus, diffDays, fmtDate, fmtMoney } from '../utils.js';
 
-const KIND_LABELS = { advance: 'Advance', payment: 'Payment', renewal: 'Subscription renewal', adjustment: 'Adjustment' };
+const KIND_LABELS = { advance: 'Advance', payment: 'Payment', renewal: 'Subscription renewal', adjustment: 'Advance change' };
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // What a client still owes right now: a normal client's remaining balance, or
@@ -16,7 +16,8 @@ function pendingFor(kind, c, lead){
 }
 
 export default function Revenue(){
-  const { call, clients, normalClients, settings, showToast, setSelectedClientId, setSelectedNormalClientId } = useApp();
+  const { call, clients, normalClients, settings, showToast, refreshFromBackend, setSelectedClientId, setSelectedNormalClientId } = useApp();
+  const [confirmId, setConfirmId] = useState(null);
   const [payments, setPayments] = useState(null);
   const [year, setYear] = useState('all');
   const [type, setType] = useState('all');
@@ -28,6 +29,13 @@ export default function Revenue(){
       .catch((err) => { setPayments([]); showToast('Could not load revenue: ' + err.message); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function removePayment(p){
+    if (confirmId !== p.id){ setConfirmId(p.id); return; }
+    call('deletePayment', { paymentId: p.id })
+      .then(() => { setPayments((list) => list.filter((x) => x.id !== p.id)); setConfirmId(null); showToast('Payment record removed'); return refreshFromBackend(); })
+      .catch((err) => showToast('Failed: ' + err.message));
+  }
 
   if (payments === null) return <section><div className="page-head"><div><h1>Revenue</h1><div className="page-sub">Loading…</div></div></div></section>;
 
@@ -158,12 +166,15 @@ export default function Revenue(){
         </div>
 
         <div className="ov-card tone-warn">
-          <div className="ov-head"><div className="ov-title">Recent payments</div></div>
+          <div className="ov-head"><div className="ov-title">Recent payments</div><div className="page-sub" style={{margin:0}}>Remove a record entered twice</div></div>
           {filtered.length === 0 && <div className="ov-empty">No payments match these filters.</div>}
-          {filtered.slice(0, 8).map((p) => (
+          {filtered.slice(0, 10).map((p) => (
             <div className="ov-row" key={p.id} style={{cursor:'default'}}>
               <div className="ov-row-main"><div className="ov-row-name">{p.client}</div><div className="ov-row-sub">{KIND_LABELS[p.kind] || p.kind} · {fmtDate(p.at)}</div></div>
-              <div className="ov-row-side tabular" style={{fontWeight:700, color: p.amount < 0 ? 'var(--crit)' : 'var(--ink)'}}>{fmtMoney(Math.round(p.amount))}</div>
+              <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                <div className="ov-row-side tabular" style={{fontWeight:700, color: p.amount < 0 ? 'var(--crit)' : 'var(--ink)'}}>{fmtMoney(Math.round(p.amount))}</div>
+                <button className="btn btn-ghost btn-sm" type="button" onClick={() => removePayment(p)}>{confirmId === p.id ? 'Confirm?' : 'Remove'}</button>
+              </div>
             </div>
           ))}
         </div>

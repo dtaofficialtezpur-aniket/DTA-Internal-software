@@ -5,6 +5,7 @@ import StatusPill from './StatusPill.jsx';
 import InvoiceSection from './InvoiceSection.jsx';
 import ConvertClientSection from './ConvertClientSection.jsx';
 import EditClientIdButton from './EditClientIdButton.jsx';
+import PaymentsSection from './PaymentsSection.jsx';
 import DomainSection from './DomainSection.jsx';
 import ClientLinksSection from './ClientLinksSection.jsx';
 import ClientDocumentsSection from './ClientDocumentsSection.jsx';
@@ -14,18 +15,24 @@ export default function ClientDetailPanel(){
   const [revealed, setRevealed] = useState(false);
   const [confirmPause, setConfirmPause] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => { setRevealed(false); setConfirmPause(false); setConfirmDelete(false); }, [selectedClientId]);
 
   const open = !!selectedClientId;
   const c = clients.find((x) => x.id === selectedClientId);
 
+  // One request at a time, so a double click can't e.g. mark a plan paid twice.
   function act(action, payload, successMsg){
+    if (busy) return Promise.resolve();
+    setBusy(true);
     return call(action, { id: c.id, ...payload }).then(() => {
       showToast(successMsg);
       return refreshFromBackend();
-    }).catch((err) => showToast('Failed: ' + err.message));
+    }).catch((err) => showToast('Failed: ' + err.message))
+      .finally(() => setBusy(false));
   }
+
 
   function copyKey(){
     try { navigator.clipboard.writeText(c.apiKey); showToast('API key copied'); }
@@ -83,7 +90,7 @@ export default function ClientDetailPanel(){
             </div>
 
             <div style={{display:'flex', gap:'8px', flexWrap:'wrap'}}>
-              <button id="d-markpaid" className="btn btn-secondary btn-sm" type="button" onClick={() => act('markPaid', {}, 'Payment recorded for ' + c.client)}>Mark as paid</button>
+              <button id="d-markpaid" className="btn btn-secondary btn-sm" type="button" disabled={busy} onClick={() => act('markPaid', {}, 'Payment recorded for ' + c.client)}>Mark as paid</button>
               {s === 'paused'
                 ? <button id="d-resume" className="btn btn-secondary btn-sm" type="button" onClick={() => act('resume', {}, c.client + ' resumed')}>Resume access</button>
                 : <button id="d-pause" className="btn btn-danger btn-sm" type="button" onClick={() => {
@@ -92,6 +99,8 @@ export default function ClientDetailPanel(){
                   }}>{confirmPause ? 'Click again to confirm' : 'Pause access'}</button>}
               <button id="d-delete" className="btn btn-danger btn-sm" type="button" onClick={del}>{confirmDelete ? 'Click again to confirm' : 'Delete client'}</button>
             </div>
+
+            <PaymentsSection clientId={c.id} refreshKey={c.history.length} />
 
             <DomainSection c={c} clientType="subscription" />
 

@@ -16,7 +16,10 @@ const RECORD_ID_ACTIONS = new Set([
   'pause', 'resume', 'markPaid', 'regenerateKey',
   'updateNormalClient', 'recordNormalClientPayment', 'deleteNormalClient',
 ]);
+// Money actions are never queued offline: replaying one later could record the same payment twice.
 const OFFLINE_QUEUEABLE = new Set([...RECORD_ID_ACTIONS, 'add', 'addNormalClient', 'updateSettings']);
+OFFLINE_QUEUEABLE.delete('recordNormalClientPayment');
+OFFLINE_QUEUEABLE.delete('markPaid');
 
 function isNetworkError(err){
   // fetch() rejects with a generic TypeError ("Failed to fetch" / "Load
