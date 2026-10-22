@@ -442,6 +442,7 @@ function handle_update_client_id(PDO $pdo, array $body): void
         $pdo->prepare('UPDATE invoices SET client_id = ? WHERE client_id = ? AND client_type = ?')->execute([$newId, $oldId, $clientType]);
         $pdo->prepare('UPDATE client_links SET client_id = ? WHERE client_id = ?')->execute([$newId, $oldId]);
         $pdo->prepare('UPDATE client_documents SET client_id = ? WHERE client_id = ?')->execute([$newId, $oldId]);
+        $pdo->prepare('UPDATE payments SET client_id = ? WHERE client_id = ?')->execute([$newId, $oldId]);
         $pdo->commit();
     } catch (Throwable $e) {
         $pdo->rollBack();
@@ -471,10 +472,37 @@ function client_exists(PDO $pdo, string $id): bool
     return (bool) $stmt->fetchColumn();
 }
 
+function record_payment(PDO $pdo, string $clientId, string $type, string $name, float $amount, string $kind, string $note): void
+{
+    if (abs($amount) < 0.01) return;
+    $pdo->prepare('INSERT INTO payments (client_id, client_type, client_name, amount, paid_at, kind, note) VALUES (?, ?, ?, ?, NOW(), ?, ?)')
+        ->execute([$clientId, $type, $name, round($amount, 2), $kind, $note]);
+}
+
+function handle_list_payments(PDO $pdo): void
+{
+    $rows = $pdo->query('SELECT * FROM payments ORDER BY paid_at DESC, id DESC')->fetchAll();
+    json_out(['ok' => true, 'payments' => array_map(function ($p) {
+        $deleted = str_starts_with($p['client_id'], 'deleted:');
+        return [
+            'id' => (int) $p['id'],
+            'clientId' => $deleted ? substr($p['client_id'], 8) : $p['client_id'],
+            'clientDeleted' => $deleted,
+            'clientType' => $p['client_type'],
+            'client' => $p['client_name'],
+            'amount' => (float) $p['amount'],
+            'paidAt' => $p['paid_at'],
+            'kind' => $p['kind'],
+            'note' => $p['note'],
+        ];
+    }, $rows)]);
+}
+
 // Removes a client's links and documents (including the files on disk).
 // Called when the client itself is deleted.
 function purge_client_extras(PDO $pdo, string $id): void
 {
+    $pdo->prepare("UPDATE payments SET client_id = CONCAT('deleted:', client_id) WHERE client_id = ?")->execute([$id]);
     $pdo->prepare('DELETE FROM client_links WHERE client_id = ?')->execute([$id]);
     $stmt = $pdo->prepare('SELECT storage_name FROM client_documents WHERE client_id = ?');
     $stmt->execute([$id]);
@@ -687,6 +715,10 @@ if ($method === 'GET') {
             break;
 
         // Admin-only team management.
+        case 'listPayments':
+            require_admin_session($pdo, $body['token'] ?? null);
+            handle_list_payments($pdo);
+            break;
         case 'listTeam':
             require_admin_session($pdo, $body['token'] ?? null);
             handle_list_team($pdo);
@@ -1088,6 +1120,7 @@ function handle_mark_paid(PDO $pdo, array $body): void
     $stmt = $pdo->prepare('UPDATE clients SET next_due = ? WHERE id = ?');
     $stmt->execute([$nextDue, $id]);
     log_event($pdo, $id, 'paid', "Marked as paid by DTA Admin — renewed to {$nextDue}");
+    record_payment($pdo, $id, 'subscription', $c['client_name'], (float) $c['amount'], 'renewal', 'Subscription renewal');
     json_out(['ok' => true, 'nextDue' => $nextDue]);
 }
 
@@ -1134,6 +1167,7 @@ function handle_add_normal_client(PDO $pdo, array $body): void
     ]);
 
     log_event($pdo, $id, 'onboarded', 'Client added');
+    record_payment($pdo, $id, 'normal', substr($clientName, 0, 255), $advancePayment, 'advance', 'Advance payment');
 
     $c = find_normal_client($pdo, $id);
     json_out(['ok' => true, 'client' => normal_client_to_json($c)]);
@@ -1186,6 +1220,7 @@ function handle_update_normal_client(PDO $pdo, array $body): void
     ]);
 
     log_event($pdo, $id, 'updated', 'Client details updated');
+    record_payment($pdo, $id, 'normal', substr($clientName, 0, 255), $advancePayment - (float) $c['advance_payment'], 'adjustment', 'Advance changed in client details');
     json_out(['ok' => true, 'client' => normal_client_to_json(find_normal_client($pdo, $id))]);
 }
 
@@ -1207,6 +1242,7 @@ function handle_record_normal_client_payment(PDO $pdo, array $body): void
     $stmt->execute([$advancePayment, $remainingPayment, $id]);
 
     log_event($pdo, $id, 'paid', 'Payment of ' . number_format($amount, 2) . ' recorded');
+    record_payment($pdo, $id, 'normal', $c['client_name'], $amount, 'payment', 'Payment');
     json_out(['ok' => true, 'client' => normal_client_to_json(find_normal_client($pdo, $id))]);
 }
 
@@ -1354,6 +1390,9 @@ function handle_convert_to_normal(PDO $pdo, array $body): void
     $stmt->execute([$id, $c['client_name'], $address, $contact, $totalAmount, $advancePayment, $remainingPayment, $notes, $createdAt ?? $c['created_at'] ?? date('Y-m-d H:i:s'), $archiveSub, $c['domain'], $c['website_url'], $c['domain_expiry'], $c['domain_start'] ?? null, $workStatus]);
     $pdo->commit();
 
+    if (!($archived && ($archived['_type'] ?? '') === 'normal')) {
+        record_payment($pdo, $id, 'normal', $c['client_name'], $advancePayment, 'advance', 'Advance payment');
+    }
     log_event($pdo, $id, 'converted', 'Converted from subscription client to normal client');
     json_out(['ok' => true, 'client' => normal_client_to_json(find_normal_client($pdo, $id))]);
 }

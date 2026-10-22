@@ -30,8 +30,8 @@ export default function EditClientIdButton({ c, clientType }){
 
   if (!open){
     return (
-      <button className="btn btn-ghost btn-sm" type="button" onClick={() => { setValue(c.id); setOpen(true); }}>
-        Edit ID
+      <button className="btn btn-secondary btn-sm" type="button" style={{marginTop:'8px'}} onClick={() => { setValue(c.id); setOpen(true); }}>
+        Edit client ID (admin)
       </button>
     );
   }
