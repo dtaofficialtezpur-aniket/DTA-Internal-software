@@ -300,12 +300,13 @@ function ensure_schema(PDO $pdo): void
         WHERE c.created_at IS NULL
     ');
 
-    backfill_payments($pdo);
+    run_once($pdo, 'paymentsBackfilled', 'backfill_payments');
 
     // Normal clients keep the advance and later payments apart: advance_payment
     // is only the advance, paid_amount is everything recorded after it.
     ensure_column($pdo, 'normal_clients', 'paid_amount', 'DECIMAL(12,2) NOT NULL DEFAULT 0');
-    split_paid_amounts($pdo);
+    run_once($pdo, 'paidSplitDone', 'split_paid_amounts');
+    run_once($pdo, 'ledgerRepair1', 'repair_payment_ledger');
 }
 
 // Gives invoices issued before client-id numbering existed the same style of
@@ -340,9 +341,6 @@ function backfill_invoice_numbers(PDO $pdo): void
 // other era's plan amount / advance. Runs once, flagged in settings.
 function backfill_payments(PDO $pdo): void
 {
-    $done = $pdo->query("SELECT 1 FROM settings WHERE setting_key = 'paymentsBackfilled'")->fetchColumn();
-    if ($done) return;
-
     $ins = $pdo->prepare('INSERT INTO payments (client_id, client_type, client_name, amount, paid_at, kind, note) VALUES (?, ?, ?, ?, ?, ?, ?)');
     $hist = $pdo->prepare("SELECT ts, note FROM history WHERE client_id = ? AND action = 'paid' ORDER BY ts");
 
@@ -387,8 +385,6 @@ function backfill_payments(PDO $pdo): void
             $ins->execute([$c['id'], $t, $c['client_name'], $amt, $ts, $kind, $note]);
         }
     }
-
-    $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('paymentsBackfilled', '1')")->execute();
 }
 
 // One-time: before paid_amount existed, recorded payments were added into
@@ -396,8 +392,6 @@ function backfill_payments(PDO $pdo): void
 // just the advance again. Totals don't change.
 function split_paid_amounts(PDO $pdo): void
 {
-    $done = $pdo->query("SELECT 1 FROM settings WHERE setting_key = 'paidSplitDone'")->fetchColumn();
-    if ($done) return;
     $sumStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE client_id = ? AND client_type = 'normal' AND kind = 'payment'");
     $upd = $pdo->prepare('UPDATE normal_clients SET advance_payment = ?, paid_amount = ? WHERE id = ?');
     foreach ($pdo->query('SELECT id, advance_payment FROM normal_clients')->fetchAll() as $c) {
@@ -405,7 +399,70 @@ function split_paid_amounts(PDO $pdo): void
         $paid = min((float) $sumStmt->fetchColumn(), (float) $c['advance_payment']);
         $upd->execute([round((float) $c['advance_payment'] - $paid, 2), round($paid, 2), $c['id']]);
     }
-    $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('paidSplitDone', '1')")->execute();
+}
+
+// Runs a one-time data fix exactly once, even when several requests arrive at
+// the same moment (the dashboard sends a few at once on load). The key is
+// claimed inside a transaction first; a second request trying to claim it
+// waits for the first to finish, then gets a duplicate-key error and skips.
+// Without this, two requests could both run the fix (which is what doubled
+// some payment records before).
+function run_once(PDO $pdo, string $key, callable $work): void
+{
+    $check = $pdo->prepare('SELECT 1 FROM settings WHERE setting_key = ?');
+    $check->execute([$key]);
+    if ($check->fetchColumn()) return;
+
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, '1')")->execute([$key]);
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        if ((string) $e->getCode() === '23000') return;
+        throw $e;
+    }
+    try {
+        $work($pdo);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        throw $e;
+    }
+}
+
+// One-time repair: the payment records were sometimes built twice (two
+// requests running the first-time setup together), so drop exact duplicate
+// records, then set each normal client's advance and paid amounts from its
+// records -- the records are what the Revenue page shows, so the client's
+// balance and the revenue figures agree again.
+function repair_payment_ledger(PDO $pdo): void
+{
+    $pdo->exec('
+        DELETE FROM payments WHERE id IN (
+            SELECT id FROM (
+                SELECT p1.id FROM payments p1
+                JOIN payments p2 ON p1.client_id = p2.client_id AND p1.client_type = p2.client_type
+                    AND p1.amount = p2.amount AND p1.paid_at = p2.paid_at AND p1.kind = p2.kind
+                    AND p1.id > p2.id
+            ) dup
+        )
+    ');
+
+    $sums = $pdo->prepare("
+        SELECT COUNT(*) AS n,
+               COALESCE(SUM(CASE WHEN kind = 'payment' THEN amount ELSE 0 END), 0) AS paid,
+               COALESCE(SUM(CASE WHEN kind IN ('advance', 'adjustment') THEN amount ELSE 0 END), 0) AS advance
+        FROM payments WHERE client_id = ? AND client_type = 'normal'
+    ");
+    $upd = $pdo->prepare('UPDATE normal_clients SET advance_payment = ?, paid_amount = ?, remaining_payment = ? WHERE id = ?');
+    foreach ($pdo->query('SELECT id, total_amount FROM normal_clients')->fetchAll() as $c) {
+        $sums->execute([$c['id']]);
+        $r = $sums->fetch();
+        if ((int) $r['n'] === 0) continue;
+        $advance = max(0, round((float) $r['advance'], 2));
+        $paid = max(0, round((float) $r['paid'], 2));
+        $upd->execute([$advance, $paid, max(0, round((float) $c['total_amount'] - $advance - $paid, 2)), $c['id']]);
+    }
 }
 
 function ensure_column(PDO $pdo, string $table, string $column, string $definition): void
