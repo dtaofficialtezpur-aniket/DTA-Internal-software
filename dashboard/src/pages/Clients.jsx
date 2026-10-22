@@ -3,9 +3,9 @@ import { useApp } from '../state/AppContext.jsx';
 import { computeStatus, fmtDate, fmtMoney } from '../utils.js';
 import StatusPill from '../components/StatusPill.jsx';
 
-export default function Clients(){
+export default function Clients({ initialTab }){
   const { clients, normalClients, settings, setAddClientOpen, setSelectedClientId, setSelectedNormalClientId } = useApp();
-  const [tab, setTab] = useState('all');
+  const [tab, setTab] = useState(initialTab || 'all');
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all');
 

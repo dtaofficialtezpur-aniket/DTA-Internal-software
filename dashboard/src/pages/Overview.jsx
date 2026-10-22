@@ -2,7 +2,25 @@ import { useApp } from '../state/AppContext.jsx';
 import { actionColor, computeStatus, diffDays, domainAlerts, domainLabel, fmtDate, fmtMoney, parseDateOnly, timeAgo } from '../utils.js';
 import StatusPill from '../components/StatusPill.jsx';
 
-export default function Overview(){
+const LIMIT = 5;
+
+function OvCard({ tone, title, count, button, onButton, children }){
+  return (
+    <div className={'ov-card tone-' + tone}>
+      <div className="ov-head">
+        <div className="ov-title">{title}{count !== undefined && <span className="ov-count">{count}</span>}</div>
+        <button type="button" className="btn btn-primary btn-sm" onClick={onButton}>{button}</button>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function More({ shown, total }){
+  return total > shown ? <div className="ov-more">+ {total - shown} more — use the button above to see everything</div> : null;
+}
+
+export default function Overview({ onNavigate }){
   const { clients, normalClients, settings, setAddClientOpen, setSelectedClientId, setSelectedNormalClientId } = useApp();
   const today = new Date();
 
@@ -30,7 +48,7 @@ export default function Overview(){
   const recent = [
     ...clients.flatMap((c) => c.history.map((h) => ({ ...h, name: c.client, detail: c.software }))),
     ...normalClients.flatMap((c) => c.history.map((h) => ({ ...h, name: c.client, detail: 'Normal client' }))),
-  ].sort((a, b) => b.t - a.t).slice(0, 8);
+  ].sort((a, b) => b.t - a.t).slice(0, LIMIT);
 
   const tiles = [
     { label: 'Total clients', value: clients.length + normalClients.length, note: clients.length + ' subscription · ' + normalClients.length + ' normal' },
@@ -67,85 +85,70 @@ export default function Overview(){
         ))}
       </div>
 
-      <div className="section-title"><h2>Subscription payments</h2></div>
-      <div className="table-wrap">
-        <table><thead><tr><th>Client</th><th>Software</th><th>Status</th><th>Next due</th><th></th></tr></thead>
-          <tbody>
-            {attention.length === 0 && <tr><td colSpan="5" className="empty">Nothing needs attention — every subscription is current.</td></tr>}
-            {attention.map((c) => {
-              const s = computeStatus(c, settings.lead);
-              const d = diffDays(c.nextDue, today);
-              return (
-                <tr key={c.id}>
-                  <td className="cell-name">{c.client}</td>
-                  <td>{c.software}</td>
-                  <td><StatusPill status={s} /></td>
-                  <td className="tabular">{fmtDate(c.nextDue)}<div className="cell-sub">{d < 0 ? Math.abs(d) + ' days overdue' : d + ' days left'}</div></td>
-                  <td className="row-actions"><button className="btn btn-secondary btn-sm" data-view-client={c.id} onClick={() => setSelectedClientId(c.id)}>View</button></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="ov-grid">
+        <OvCard tone="accent" title="Subscription payments" count={attention.length} button="View subscriptions" onButton={() => onNavigate('clients', 'subscription')}>
+          {attention.length === 0 && <div className="ov-empty">Every subscription is current.</div>}
+          {attention.slice(0, LIMIT).map((c) => {
+            const s = computeStatus(c, settings.lead);
+            const d = diffDays(c.nextDue, today);
+            return (
+              <button type="button" className="ov-row" key={c.id} data-view-client={c.id} onClick={() => setSelectedClientId(c.id)}>
+                <div className="ov-row-main">
+                  <div className="ov-row-name">{c.client}</div>
+                  <div className="ov-row-sub">{c.software} · {d < 0 ? Math.abs(d) + ' days overdue' : d + ' days left'}</div>
+                </div>
+                <div className="ov-row-side"><StatusPill status={s} /></div>
+              </button>
+            );
+          })}
+          <More shown={LIMIT} total={attention.length} />
+        </OvCard>
+
+        <OvCard tone="warn" title="Pending payments" count={owing.length} button="View normal clients" onButton={() => onNavigate('clients', 'normal')}>
+          {owing.length === 0 && <div className="ov-empty">No pending balances.</div>}
+          {owing.slice(0, LIMIT).map((c) => (
+            <button type="button" className="ov-row" key={c.id} onClick={() => setSelectedNormalClientId(c.id)}>
+              <div className="ov-row-main">
+                <div className="ov-row-name">{c.client}</div>
+                <div className="ov-row-sub">Paid {fmtMoney(c.advancePayment)} of {fmtMoney(c.totalAmount)}</div>
+              </div>
+              <div className="ov-row-side" style={{fontWeight:700, color:'var(--warn)'}}>{fmtMoney(c.remainingPayment)}</div>
+            </button>
+          ))}
+          <More shown={LIMIT} total={owing.length} />
+        </OvCard>
       </div>
 
-      {owing.length > 0 && (
-        <>
-          <div className="section-title"><h2>Pending payments (normal clients)</h2></div>
-          <div className="table-wrap">
-            <table><thead><tr><th>Client</th><th>Total</th><th>Paid</th><th>Remaining</th><th></th></tr></thead>
-              <tbody>
-                {owing.slice(0, 8).map((c) => (
-                  <tr key={c.id}>
-                    <td className="cell-name">{c.client}<div className="cell-sub">{c.contact || c.id}</div></td>
-                    <td className="tabular">{fmtMoney(c.totalAmount)}</td>
-                    <td className="tabular">{fmtMoney(c.advancePayment)}</td>
-                    <td className="tabular" style={{fontWeight:700}}>{fmtMoney(c.remainingPayment)}</td>
-                    <td className="row-actions"><button className="btn btn-secondary btn-sm" onClick={() => setSelectedNormalClientId(c.id)}>View</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {owing.length > 8 && <div className="page-sub" style={{marginTop:'6px'}}>Showing the 8 largest of {owing.length} — see the Clients page for the rest.</div>}
-        </>
-      )}
-
-      {domains.length > 0 && (
-        <>
-          <div className="section-title"><h2>Domain renewals</h2></div>
-          <div className="table-wrap">
-            <table><thead><tr><th>Client</th><th>Domain</th><th>Expiry</th><th></th></tr></thead>
-              <tbody>
-                {domains.map(({ kind, c, days }) => (
-                  <tr key={c.id}>
-                    <td className="cell-name">{c.client}</td>
-                    <td>{c.domain || '—'}</td>
-                    <td className="tabular">{fmtDate(parseDateOnly(c.domainExpiry))}
-                      <div className="cell-sub" style={{color: days < 0 ? 'var(--crit)' : 'var(--warn)'}}>{domainLabel(days)}</div></td>
-                    <td className="row-actions"><button className="btn btn-secondary btn-sm" onClick={() => openClient(kind, c.id)}>View</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-
-      <div className="section-title"><h2>Recent activity</h2></div>
-      <div className="card" style={{padding:'6px 16px'}}>
-        <div className="log-list">
-          {recent.length === 0 && <div className="empty">No activity yet.</div>}
-          {recent.map((e, i) => (
-            <div className="log-row" key={i}>
-              <div className="log-dot" style={{background: actionColor(e.action)}} />
-              <div>
-                <div className="log-text"><b>{e.name}</b> — {e.note}</div>
-                <div className="log-time">{e.detail} · {timeAgo(e.t)}</div>
+      <div className="ov-grid">
+        <OvCard tone="crit" title="Domain renewals" count={domains.length} button="View clients" onButton={() => onNavigate('clients', 'all')}>
+          {domains.length === 0 && <div className="ov-empty">No domains expiring in the next 30 days.</div>}
+          {domains.slice(0, LIMIT).map(({ kind, c, days }) => (
+            <button type="button" className="ov-row" key={c.id} onClick={() => openClient(kind, c.id)}>
+              <div className="ov-row-main">
+                <div className="ov-row-name">{c.client}</div>
+                <div className="ov-row-sub">{c.domain || 'No domain name'} · {fmtDate(parseDateOnly(c.domainExpiry))}</div>
               </div>
+              <div className="ov-row-side" style={{fontWeight:600, color: days < 0 ? 'var(--crit)' : 'var(--warn)'}}>{domainLabel(days)}</div>
+            </button>
+          ))}
+          <More shown={LIMIT} total={domains.length} />
+        </OvCard>
+
+        <OvCard tone="good" title="Recent activity" button="View activity log" onButton={() => onNavigate('activity')}>
+          {recent.length === 0 && <div className="ov-empty">No activity yet.</div>}
+          {recent.slice(0, LIMIT).map((e, i) => (
+            <div className="ov-row" key={i} style={{cursor:'default'}}>
+              <div style={{display:'flex', gap:'10px', alignItems:'center', minWidth:0}}>
+                <div className="log-dot" style={{background: actionColor(e.action), marginTop:0}} />
+                <div className="ov-row-main">
+                  <div className="ov-row-name">{e.name}</div>
+                  <div className="ov-row-sub">{e.note}</div>
+                </div>
+              </div>
+              <div className="ov-row-side" style={{color:'var(--ink-muted)', fontSize:'.74rem'}}>{timeAgo(e.t)}</div>
             </div>
           ))}
-        </div>
+        </OvCard>
       </div>
     </section>
   );
