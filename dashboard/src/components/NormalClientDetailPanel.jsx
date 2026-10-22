@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
-import { WORK_STATUSES, actionColor, fmtDateTime, fmtMoney } from '../utils.js';
+import { WORK_STATUSES, actionColor, fmtDate, fmtDateTime, fmtMoney } from '../utils.js';
 import InvoiceSection from './InvoiceSection.jsx';
 import ConvertClientSection from './ConvertClientSection.jsx';
 import EditClientIdButton from './EditClientIdButton.jsx';
@@ -109,6 +109,7 @@ export default function NormalClientDetailPanel(){
 
             <div className="panel-section">
               <div className="section-head"><div className="section-head-title">Details</div></div>
+              <div className="field-row"><span>Created on</span><span>{fmtDate(c.createdAt)}</span></div>
               <div className="field-row"><span>Address</span><span>{c.address || '—'}</span></div>
               <div className="field-row"><span>Contact</span><span>{c.contact || '—'}</span></div>
               <div className="field-row"><span>Total amount</span><span className="tabular">{fmtMoney(c.totalAmount)}</span></div>

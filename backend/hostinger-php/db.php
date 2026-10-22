@@ -267,7 +267,18 @@ function ensure_schema(PDO $pdo): void
         ensure_column($pdo, $t, 'domain', 'VARCHAR(255) NULL');
         ensure_column($pdo, $t, 'website_url', 'VARCHAR(500) NULL');
         ensure_column($pdo, $t, 'domain_expiry', 'DATE NULL');
+        ensure_column($pdo, $t, 'domain_start', 'DATE NULL');
     }
+
+    // When a subscription client was first added (normal clients always had
+    // created_at). Older rows get their first history entry's time, or their
+    // plan start date if they have no history.
+    ensure_column($pdo, 'clients', 'created_at', 'DATETIME NULL');
+    $pdo->exec('
+        UPDATE clients c
+        SET created_at = COALESCE((SELECT MIN(h.ts) FROM history h WHERE h.client_id = c.id), c.start_date)
+        WHERE c.created_at IS NULL
+    ');
 }
 
 // Gives invoices issued before client-id numbering existed the same style of
