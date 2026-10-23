@@ -2,7 +2,7 @@
   "name": "dta-client-data-tracker",
   "version": "1.0.0",
   "private": true,
-  "description": "DTA Client Data Tracker \u2014 accounts, digital marketing and trading client management with Tally-style books. Offline-first PWA.",
+  "description": "DTA Client Data Tracker — accounts, digital marketing and trading client management with Tally-style books. Offline-first PWA.",
   "scripts": {
     "dev": "next dev",
     "build": "next build && node scripts/build-sw.mjs",
@@ -11,6 +11,7 @@
     "test": "node --import tsx --test tests/*.test.ts"
   },
   "dependencies": {
+    "lucide-react": "^1.61.0",
     "next": "^16.4.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
