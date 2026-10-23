@@ -11,6 +11,7 @@ import { searchAll } from '@/lib/search';
 import { useData, useHydrated } from '@/lib/store';
 import type { Dept } from '@/lib/types';
 import { cx, today } from '@/lib/utils';
+import type { LucideIcon } from 'lucide-react';
 import { isGroup, navFor } from './nav';
 import { Modal, ModalActions } from './ui';
 import { usePwa, useToast } from './Providers';
@@ -25,12 +26,17 @@ function useOutside(ref: React.RefObject<HTMLElement | null>, close: () => void)
 
 const linkCls = (on: boolean) =>
   cx(
-    'group flex items-center rounded-xl px-3.5 py-2 text-sm transition',
+    'group flex items-center rounded-xl px-2.5 py-1.5 text-sm transition',
     on ? 'bg-brand font-bold text-white shadow-[0_5px_0_var(--color-brand-dark),0_10px_18px_rgba(47,91,234,.3)] -translate-y-0.5' : 'text-ink hover:translate-x-1 hover:bg-soft',
   );
-const dot = (on: boolean) =>
-  cx('mr-2.5 inline-block size-2.5 shrink-0 rounded-full shadow-[0_2px_3px_rgba(0,0,0,.3)]',
-    on ? 'bg-[radial-gradient(circle_at_30%_28%,#fff,#bfd0ff_70%)]' : 'bg-[radial-gradient(circle_at_30%_28%,#fff,var(--color-brand)_60%,var(--color-brand-dark))]');
+/** Rounded icon tile shown before every menu label. */
+function NavIcon({ icon: Icon, on }: { icon: LucideIcon; on: boolean }) {
+  return (
+    <span className={cx('mr-2.5 grid size-[26px] shrink-0 place-items-center rounded-lg transition', on ? 'bg-white/20 text-white' : 'bg-brand-soft text-brand-dark group-hover:bg-white')}>
+      <Icon className="size-4" strokeWidth={2.1} aria-hidden="true" />
+    </span>
+  );
+}
 
 function Sidebar({ dept, onNavigate }: { dept: Dept; onNavigate: () => void }) {
   const pathname = usePathname();
@@ -76,12 +82,12 @@ function Sidebar({ dept, onNavigate }: { dept: Dept; onNavigate: () => void }) {
         {entries.map((e) =>
           isGroup(e) ? (
             <div key={e.title} className={cx('my-3 rounded-2xl border-[1.5px] border-edge bg-soft p-1.5 shadow-[0_4px_12px_rgba(31,41,55,.05)]', e.accent && 'border-l-[6px] border-l-brand bg-brand-soft/60')}>
-              <div className="mx-2 mb-1.5 mt-1.5 text-[11px] font-extrabold uppercase tracking-widest text-brand-dark">{e.accent && '▦ '}{e.title}</div>
+              <div className="mx-2 mb-1.5 mt-1.5 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-widest text-brand-dark"><e.icon className="size-3.5 shrink-0" strokeWidth={2.4} aria-hidden="true" />{e.title}</div>
               {e.items.map((it) => {
                 const on = active(it.href);
                 return (
                   <Link key={it.href} href={it.href} onClick={onNavigate} className={linkCls(on)} aria-current={on ? 'page' : undefined}>
-                    <span className={dot(on)} />
+                    <NavIcon icon={it.icon} on={on} />
                     <span className="flex-1">{it.label}</span>
                     {!!it.badge && <span className="rounded-full bg-bad px-1.5 text-[11px] font-bold text-white">{it.badge}</span>}
                   </Link>
@@ -90,7 +96,7 @@ function Sidebar({ dept, onNavigate }: { dept: Dept; onNavigate: () => void }) {
             </div>
           ) : (
             <Link key={e.href} href={e.href} onClick={onNavigate} className={cx(linkCls(active(e.href)), 'my-0.5')} aria-current={active(e.href) ? 'page' : undefined}>
-              <span className={dot(active(e.href))} />
+              <NavIcon icon={e.icon} on={active(e.href)} />
               {e.label}
             </Link>
           ),
