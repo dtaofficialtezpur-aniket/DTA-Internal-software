@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+@theme {
+  --color-page: #f7f8fa;
+  --color-card: #ffffff;
+  --color-ink: #1f2937;
+  --color-mute: #6b7280;
+  --color-line: #eef0f4;
+  --color-edge: #e1e5ec;
+  --color-soft: #f8f9fb;
+  --color-tint: #eef1f6;
+  --color-brand: #2f5bea;
+  --color-brand-dark: #2447c4;
+  --color-brand-soft: #e6ecff;
+  --color-good: #14864f;
+  --color-bad: #c93a3a;
+  --color-warn: #b7791f;
+  --font-sans: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+  --shadow-card: 0 1px 0 #fff inset, 0 2px 4px rgba(31, 41, 55, 0.05), 0 12px 28px rgba(31, 41, 55, 0.07);
+  --shadow-pop: 0 30px 70px rgba(31, 41, 55, 0.3), 0 6px 0 var(--color-edge);
+}
+
+html, body { height: 100%; }
+body {
+  @apply bg-page font-sans text-ink antialiased;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+@layer components {
+/* ---------- form controls ---------- */
+.inp {
+  @apply w-full rounded-[10px] border-[1.5px] border-line bg-card px-3 py-2 text-ink outline-none transition;
+}
+.inp:focus { @apply border-brand; box-shadow: 0 0 0 4px rgba(47, 91, 234, 0.14); }
+.inp-sm { @apply px-2 py-1 text-xs font-semibold; }
+select.inp { @apply cursor-pointer; }
+.lbl { @apply mb-1 mt-3 block text-xs text-mute; }
+
+/* ---------- buttons (raised 3D look) ---------- */
+.btn-pri, .btn-sec {
+  @apply inline-flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] px-4 py-2 font-semibold transition select-none;
+}
+.btn-pri {
+  @apply border-[1.5px] border-brand bg-brand text-white;
+  box-shadow: 0 4px 0 var(--color-brand-dark), 0 8px 14px rgba(47, 91, 234, 0.25);
+}
+.btn-pri:hover { transform: translateY(-1px); }
+.btn-pri:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--color-brand-dark), 0 3px 6px rgba(47, 91, 234, 0.25); }
+.btn-sec {
+  @apply border-[1.5px] border-edge bg-card text-brand-dark;
+  box-shadow: 0 3px 0 var(--color-edge), 0 6px 10px rgba(31, 41, 55, 0.06);
+}
+.btn-sec:hover { @apply bg-soft; }
+.btn-sec:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--color-edge); }
+.btn-pri.btn-xs, .btn-sec.btn-xs { @apply px-2.5 py-0.5 text-[12.5px]; box-shadow: 0 2px 0 var(--color-edge); }
+.btn-ic { @apply cursor-pointer rounded-md px-1.5 py-0.5 text-[15px] text-mute hover:text-brand; }
+.btn-pri:disabled, .btn-sec:disabled { @apply cursor-not-allowed opacity-50; }
+
+/* ---------- tables ---------- */
+.tbl { @apply w-full border-collapse; }
+.tbl th {
+  @apply whitespace-nowrap border-b-2 border-edge px-2.5 py-2 text-left text-xs font-extrabold uppercase tracking-wide text-[#374151];
+  background: linear-gradient(180deg, var(--color-soft), var(--color-tint));
+}
+.tbl th:first-child { border-top-left-radius: 10px; }
+.tbl th:last-child { border-top-right-radius: 10px; }
+.tbl td { @apply border-b border-line px-2.5 py-2 align-middle; }
+.tbl tbody tr:hover td { background: rgba(248, 249, 251, 0.9); }
+.tbl tbody tr:hover td:first-child { box-shadow: inset 4px 0 0 var(--color-brand); }
+.tbl .r { @apply text-right; }
+.tbl-compact th, .tbl-compact td { @apply px-1.5 py-1.5 text-[12.5px] whitespace-nowrap; }
+.tbl-compact td.wrap { white-space: normal; min-width: 120px; }
+.tbl tr.click { @apply cursor-pointer; }
+
+/* ---------- cards ---------- */
+.card {
+  @apply rounded-[18px] border-[1.5px] border-edge bg-card p-[18px] shadow-card;
+}
+
+}
+
+@layer components {
+dialog.modal {
+  @apply m-auto max-h-[92vh] w-[min(560px,94vw)] overflow-auto rounded-[20px] border-2 border-edge bg-card p-5 text-ink;
+  box-shadow: var(--shadow-pop);
+}
+dialog.modal[open] { animation: pop 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+dialog.modal::backdrop { background: rgba(31, 41, 55, 0.35); backdrop-filter: blur(2px); }
+
+}
+
+@keyframes pop { from { opacity: 0; transform: perspective(900px) rotateX(14deg) translateY(30px) scale(0.94); } to { opacity: 1; transform: none; } }
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.rise > * { animation: rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.rise > *:nth-child(2) { animation-delay: 0.05s; }
+.rise > *:nth-child(3) { animation-delay: 0.1s; }
+.rise > *:nth-child(4) { animation-delay: 0.15s; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+@media print {
+  aside, header.topbar, .no-print, button { display: none !important; }
+  body { background: #fff; }
+  .card { box-shadow: none !important; }
+}
