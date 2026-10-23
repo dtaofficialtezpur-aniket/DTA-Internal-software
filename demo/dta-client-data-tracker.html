@@ -126,6 +126,8 @@ dialog{border:2px solid var(--bline);border-radius:20px;background:var(--card);c
 @media print{aside,#topbar,.toast,.noprint,button{display:none!important}.wrap{margin:0}body{background:#fff}*{box-shadow:none!important;animation:none!important}}
 .logo{display:block;width:150px;height:auto;margin:0 auto 10px;filter:drop-shadow(0 6px 10px rgba(var(--sh),.25))}
 @media(max-width:900px){.logo{display:none}}
+.ah{font-weight:800;color:var(--brand2);margin:14px 0 4px;font-size:13px}.ah:first-child{margin-top:0}.ae{display:flex;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}.ae>span:not(.pill){flex:1}.ae small{color:var(--mute)}.ae .pill{min-width:62px;text-align:center}
+tr.click{cursor:pointer}tr.mute td{color:var(--mute)}
 </style>
 </head>
 <body>
@@ -189,12 +191,12 @@ let leads=[
  {id:221,dept:'trading',name:'P. Sharma',phone:'98640 99900',source:'Referral',service:'Trade License',value:3500,stage:'contacted',next:d(2),notes:[{d:d(-2),t:'Wants a trade license for a new shop.'}],cid:null},
  {id:222,dept:'trading',name:'K. Deka',phone:'94350 10101',source:'WhatsApp',service:'FSSAI License',value:6000,stage:'new',next:d(0),notes:[],cid:null},
  {id:223,dept:'trading',name:'A. Barman',phone:'70020 20202',source:'Referral',service:'Digital Signature (DSC)',value:1800,stage:'proposal',next:d(5),notes:[],cid:null}],
- crmQ='',deleted=[],ledgers=[],vouchers=[],vs=null,lgId=null,dbf={from:'',to:'',type:''},catQ='',catF='',fid=null,fyear=Y,nid=100,view='dash',portalCid=1,dept='accounts';
+ crmQ='',deleted=[],activity=[],per={m:'month',ref:today},ledgers=[],vouchers=[],vs=null,lgId=null,dbf={from:'',to:'',type:''},catQ='',catF='',fid=null,fyear=Y,nid=100,view='dash',portalCid=1,dept='accounts';
 const DN={accounts:'Accounts',marketing:'Digital Marketing',trading:'Trading'};
 const hasClients=()=>true;
 const ov=c=>c.status=='pending'&&c.due<today?'overdue':c.status;
-try{const s=JSON.parse(localStorage.getItem('dta-demo10')||'null');if(s){clients=s.clients;if(s.leads)leads=s.leads;deleted=s.deleted||[];if(s.ledgers)ledgers=s.ledgers;if(s.vouchers)vouchers=s.vouchers}}catch(e){}
-const save=()=>{try{localStorage.setItem('dta-demo10',JSON.stringify({clients,leads,deleted,ledgers,vouchers}))}catch(e){}};
+try{const s=JSON.parse(localStorage.getItem('dta-demo10')||'null');if(s){clients=s.clients;if(s.leads)leads=s.leads;deleted=s.deleted||[];if(s.ledgers)ledgers=s.ledgers;if(s.vouchers)vouchers=s.vouchers;activity=s.activity||[]}}catch(e){}
+const save=()=>{try{localStorage.setItem('dta-demo10',JSON.stringify({clients,leads,deleted,ledgers,vouchers,activity}))}catch(e){}};
 const CATS={
  accounts:['GST','ITR','TDS','PAN','PROVIDENT FUND','ESI','Professional Tax','Accounting & Bookkeeping','Audit','Other'],
  trading:['Trade License','FSSAI License','Digital Signature (DSC)']};
@@ -260,6 +262,24 @@ const names=(x,k)=>[...new Set(x.lines.filter(y=>y[k]>0).map(y=>esc(lname(y.l)))
 const vTable=(list,act)=>`<table><tr><th>Date</th><th>Particulars</th><th>Vch type</th><th>Vch no.</th><th class="r">Amount (₹)</th>${act?'<th></th>':''}</tr>${
   list.map(x=>`<tr><td>${x.date}</td><td><b>${names(x,'dr')}</b> <span class="sub" style="margin:0">to</span> ${names(x,'cr')}${x.narr?`<br><span class="sub" style="margin:0">${esc(x.narr)}</span>`:''}</td><td>${x.type}</td><td>${x.no}</td><td class="r">${m2(sum(x.lines,y=>y.dr))}</td>${act?`<td><button class="ic" title="Alter" onclick="editV(${x.id})">✎</button><button class="ic" title="Delete" onclick="delV(${x.id})">✕</button></td>`:''}</tr>`).join('')||'<tr><td colspan=6>No vouchers</td></tr>'}</table>`;
 function ledgerStmt(l){let b=l.open||0;const rows=[];sortV(VD().filter(x=>x.lines.some(y=>y.l==l.id))).forEach(x=>{const me=x.lines.filter(y=>y.l==l.id),dr=sum(me,y=>y.dr),cr=sum(me,y=>y.cr);b+=dr-cr;rows.push({x,dr,cr,bal:b,others:[...new Set(x.lines.filter(y=>y.l!=l.id).map(y=>esc(lname(y.l))))].join(', ')})});return{rows,close:b,tdr:sum(rows,r=>r.dr),tcr:sum(rows,r=>r.cr)}}
+const p2=n=>String(n).padStart(2,'0');
+const fmtD=x=>new Date(x+'T00:00:00Z').toLocaleDateString('en-IN',{weekday:'short',day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'});
+const ACT=()=>activity.filter(a=>a.dept==dept);
+const AK={Voucher:'today',Filing:'filed',Client:'active',Lead:'pending'};
+const rn=(x,k)=>[...new Set(x.lines.filter(y=>y[k]>0).map(y=>lname(y.l)))].join(', ');
+const vInc=x=>sum(x.lines.filter(y=>lg(y.l)&&nat(lg(y.l))=='I'),y=>y.cr-y.dr),vExp=x=>sum(x.lines.filter(y=>lg(y.l)&&nat(lg(y.l))=='E'),y=>y.dr-y.cr);
+const act=(k,x,date,dp_)=>{activity.push({id:nid++,dept:dp_||dept,d:date||today,t:new Date().toTimeString().slice(0,5),k,x})};
+const pr=()=>{const[y,m]=per.ref.split('-').map(Number);if(per.m=='day')return{from:per.ref,to:per.ref,label:fmtD(per.ref)};
+  if(per.m=='month')return{from:`${y}-${p2(m)}-01`,to:`${y}-${p2(m)}-${p2(new Date(Date.UTC(y,m,0)).getUTCDate())}`,label:MN[m-1]+' '+y};
+  return{from:y+'-01-01',to:y+'-12-31',label:'Year '+y}};
+const pStats=(from,to)=>{const V=VD().filter(x=>x.date>=from&&x.date<=to),A=ACT().filter(a=>a.d>=from&&a.d<=to);
+  return{v:V.length,inc:sum(V,vInc),exp:sum(V,vExp),f:A.filter(a=>a.k=='Filing').length,c:A.filter(a=>a.k=='Client').length,l:A.filter(a=>a.k=='Lead').length,n:A.length}};
+const actList=(A,limit,asc)=>{const L=[...A].sort((a,b)=>(asc?1:-1)*(a.d.localeCompare(b.d)||(a.t||'').localeCompare(b.t||'')||a.id-b.id)),sh=L.slice(0,limit);let last='';
+  return (sh.map(a=>{const h=!asc&&a.d!=last?(last=a.d,`<div class="ah">${fmtD(a.d)}</div>`):'';return h+`<div class="ae">${pillL(AK[a.k]||'na',a.k)}<span>${esc(a.x)}</span><small>${a.t||''}</small></div>`}).join('')+(L.length>limit?`<div class="sub" style="margin:8px 0 0">Showing latest ${limit} of ${L.length}</div>`:''))||'<div class="sub" style="margin:0">Nothing recorded for this period</div>'};
+function setPm(m){per.m=m;render()}
+function shiftP(n){const[y,m,dd]=per.ref.split('-').map(Number);per.ref=new Date(per.m=='day'?Date.UTC(y,m-1,dd+n):per.m=='month'?Date.UTC(y,m-1+n,1):Date.UTC(y+n,0,1)).toISOString().slice(0,10);render()}
+function setPref(v){if(!v)return;per.ref=per.m=='day'?v:per.m=='month'?v+'-01':(+v>=2000&&+v<=2100?v+'-01-01':per.ref);render()}
+function goP(m,ref){per={m,ref};render()}
 const catRows=S=>{
   const q=catQ.toLowerCase(),L=clients.filter(c=>c.type==dept&&c.service==S&&(!catF||c.status==catF)&&(!q||[c.name,c.businessName,c.serial,c.phone,c.loginId,c.regNo,c.detail,c.email,c.notes].join(' ').toLowerCase().includes(q))).reverse();
   const core=['GST','ITR','TDS','PAN'].includes(S),ex=!core?'<th>Payment</th>':S=='GST'?'<th>This month</th><th>Payment</th>':S=='ITR'?'<th>This year</th><th>Payment</th>':S=='TDS'?'<th>Challan · Return</th><th>Payment</th>':S=='PAN'?'<th>Application</th><th>Payment</th>':'';
@@ -276,13 +296,23 @@ const catRows=S=>{
   <div class="sub" style="margin:10px 0 0">${L.length} ${S} client record${L.length==1?'':'s'} (of ${clients.filter(c=>c.type==dept&&c.service).length} total)</div>`};
 const views={
 dash(){
-  const net=incTot()-expTot(),deb=LD().filter(l=>l.group=='Sundry Debtors'&&closing(l)>0.004);
-  return `<h2>${DN[dept]} · Dashboard</h2><div class="sub">Only ${DN[dept]} books are shown</div>
-  <div class="note">This is a clickable demo with sample data. Entries you add are kept in this browser only.</div>
-  <div class="grid">${kpi('Income',inr(incTot()),'good')}${kpi('Expenses',inr(expTot()),'bad')}${kpi('Net profit',inr(net),net>=0?'good':'bad')}${kpi('Outstanding (receivable)',inr(outstanding()),'warn')}</div>
-  <div class="two"><div class="card"><b>${hasCat()?'Clients by service':'Clients'}</b><div style="margin-top:10px">${(hasCat()?CATS[dept].map(a=>{const L=clients.filter(c=>c.type==dept&&c.service==a),o=L.filter(c=>accState(c)=='overdue').length;return L.length?`<div class="item"><span>${LBL(a)}</span><span>${L.length} client${L.length>1?'s':''} ${o?pill('overdue')+' '+o:''}</span></div>`:''}).join(''):clients.filter(c=>c.type==dept).map(c=>`<div class="item"><span>${c.name}</span>${pill(c.status)}</div>`).join('')||'No clients')}</div></div>
-  <div class="card"><b>Money to collect</b><div style="margin-top:10px">${deb.map(l=>`<div class="item"><span>${esc(l.name)}</span><b class="warn">${m2(closing(l))}</b></div>`).join('')||'All clear'}</div></div></div>
-  <div class="card tw" style="margin-top:14px"><b>Recent vouchers</b>${vTable(sortV(VD()).reverse().slice(0,6),false)}</div>`},
+  const r=pr(),S=pStats(r.from,r.to),net=S.inc-S.exp,A=ACT().filter(a=>a.d>=r.from&&a.d<=r.to),y=+per.ref.slice(0,4),mon=+per.ref.slice(5,7),last=new Date(Date.UTC(y,mon,0)).getUTCDate();
+  const ctl=`<div class="row"><div class="seg">${[['day','Day'],['month','Month'],['year','Year']].map(([k,l])=>`<button class="${per.m==k?'on':''}" onclick="setPm('${k}')">${l}</button>`).join('')}</div>
+   <button class="sec" onclick="shiftP(-1)">‹</button>${per.m=='day'?`<input type="date" value="${per.ref}" onchange="setPref(this.value)">`:per.m=='month'?`<input type="month" value="${per.ref.slice(0,7)}" onchange="setPref(this.value)">`:`<input type="number" min="2000" max="2100" value="${y}" style="width:96px" onchange="setPref(this.value)">`}<button class="sec" onclick="shiftP(1)">›</button><button class="sec" onclick="per.ref=today;render()">Today</button><span class="sp"></span><b style="font-size:16px;color:var(--brand2)">${r.label}</b></div>`;
+  let bd='';
+  if(per.m!='day'){const yr=per.m=='year',rows=yr?Array.from({length:12},(_,i)=>({lab:MN[i],from:`${y}-${p2(i+1)}-01`,to:`${y}-${p2(i+1)}-${p2(new Date(Date.UTC(y,i+1,0)).getUTCDate())}`,go:`${y}-${p2(i+1)}-01`})):Array.from({length:last},(_,i)=>{const dd=`${y}-${p2(mon)}-${p2(i+1)}`;return{lab:fmtD(dd),from:dd,to:dd,go:dd}});
+    const st=rows.map(x=>({x,s:pStats(x.from,x.to)})),mx=Math.max(1,...st.map(z=>z.s.n));
+    bd=`<div class="card tw" style="margin-top:14px"><b>${yr?'Month-wise':'Day-wise'} summary</b><div class="sub" style="margin:2px 0 8px">Click a row to open that ${yr?'month':'day'}.</div><table><tr><th>${yr?'Month':'Date'}</th><th class="r">Vouchers</th><th class="r">Income (₹)</th><th class="r">Expenses (₹)</th><th class="r">Filings</th><th class="r">Clients</th><th class="r">Leads</th><th style="min-width:120px">Activity</th></tr>${
+     st.map(({x,s})=>`<tr class="click ${s.n?'':'mute'}" onclick="goP('${yr?'month':'day'}','${x.go}')"><td>${x.lab}</td><td class="r">${s.v||'–'}</td><td class="r">${s.inc?m2(s.inc):'–'}</td><td class="r">${s.exp?m2(s.exp):'–'}</td><td class="r">${s.f||'–'}</td><td class="r">${s.c||'–'}</td><td class="r">${s.l||'–'}</td><td><div class="bar" style="height:10px"><i style="width:${s.n/mx*100}%;background:var(--brand)"></i></div></td></tr>`).join('')}
+     <tr><td><b>Total</b></td><td class="r"><b>${S.v}</b></td><td class="r"><b>${m2(S.inc)}</b></td><td class="r"><b>${m2(S.exp)}</b></td><td class="r"><b>${S.f}</b></td><td class="r"><b>${S.c}</b></td><td class="r"><b>${S.l}</b></td><td><b>${S.n} actions</b></td></tr></table></div>`}
+  else bd=`<div class="card tw" style="margin-top:14px"><b>Vouchers on this day</b>${vTable(sortV(VD().filter(x=>x.date==per.ref)),false)}</div>`;
+  const deb=LD().filter(l=>l.group=='Sundry Debtors'&&closing(l)>0.004);
+  return `<h2>${DN[dept]} · Dashboard</h2><div class="sub">What was done — by day, month and year. Only ${DN[dept]} is shown.</div>${ctl}
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">${kpi('Income',inr(S.inc),'good')}${kpi('Expenses',inr(S.exp),'bad')}${kpi('Net profit',inr(net),net>=0?'good':'bad')}${kpi('Outstanding (receivable now)',inr(outstanding()),'warn')}${kpi('Vouchers',S.v)}${kpi('Actions done',S.n)}</div>
+  ${bd}
+  <div class="card" style="margin-top:14px"><b>${per.m=='day'?'What was done on this day':per.m=='month'?'Activity this month':'Activity this year'}</b><div style="margin-top:8px">${actList(A,per.m=='day'?200:40,per.m=='day')}</div></div>
+  <div class="two" style="margin-top:14px"><div class="card"><b>${hasCat()?'Clients by service':'Clients'}</b><div style="margin-top:10px">${hasCat()?CATS[dept].map(a=>{const L=clients.filter(c=>c.type==dept&&c.service==a),o=L.filter(c=>accState(c)=='overdue').length;return L.length?`<div class="item"><span>${LBL(a)}</span><span>${L.length} client${L.length>1?'s':''} ${o?pill('overdue')+' '+o:''}</span></div>`:''}).join('')||'No clients':clients.filter(c=>c.type==dept).map(c=>`<div class="item"><span>${c.name}</span>${pill(c.status)}</div>`).join('')||'No clients'}</div></div>
+  <div class="card"><b>Money to collect</b><div style="margin-top:10px">${deb.map(l=>`<div class="item"><span>${esc(l.name)}</span><b class="warn">${m2(closing(l))}</b></div>`).join('')||'All clear'}</div></div></div>`},
 crm(){
   const L=leads.filter(l=>l.dept==dept),open=L.filter(l=>!['won','lost'].includes(l.stage));
   const due=open.filter(l=>['overdue','today'].includes(fu(l))).sort((a,b)=>a.next.localeCompare(b.next));
@@ -485,24 +515,24 @@ function addClient(type){const m=type=='marketing';openForm(`<h3 style="margin:0
   if(m)Object.assign(c,{service:v('f2')||'—',fee:+v('f3')||0,due:d(30)});else Object.assign(c,{capital:+v('f2')||0,share:+v('f3')||0,pnl:+v('f4')||0});
   clients.push(c);save();render()})}
 function setStage(l,k){l.stage=k;if(k=='won'&&!l.wonOn)l.wonOn=today;if(k=='won'||k=='lost')l.next=''}
-function dropLead(e,k){e.preventDefault();const l=leads.find(x=>x.id==e.dataTransfer.getData('text'));if(l){setStage(l,k);save();render()}}
+function dropLead(e,k){e.preventDefault();const l=leads.find(x=>x.id==e.dataTransfer.getData('text'));if(l){const o_=l.stage;setStage(l,k);if(o_!=k)act('Lead',l.name+': stage '+STAGES.find(z=>z[0]==o_)[1]+' → '+STAGES.find(z=>z[0]==k)[1],'',l.dept);save();render()}}
 function addLead(){openForm(`<h3 style="margin:0">Add lead · ${DN[dept]}</h3><label>Name</label><input id="a1"><label>Phone</label><input id="a2">
  <label>Source</label><select id="a3">${SRC.map(x=>`<option>${x}</option>`).join('')}</select>
  <label>Service wanted</label><select id="a4">${SVC[dept].map(x=>`<option>${x}</option>`).join('')}</select>
  <label>Expected fee (₹)</label><input id="a5" type="number">
  <label>Next follow-up</label><input id="a6" type="date" value="${d(2)}"><label>Note</label><input id="a7">`,
- ()=>{const n=v('a7');leads.push({id:nid++,dept,name:v('a1')||'New lead',phone:v('a2'),source:v('a3'),service:v('a4'),value:+v('a5')||0,stage:'new',next:v('a6'),notes:n?[{d:today,t:n}]:[],cid:null});save();render()})}
+ ()=>{const n=v('a7');leads.push({id:nid++,dept,name:v('a1')||'New lead',phone:v('a2'),source:v('a3'),service:v('a4'),value:+v('a5')||0,stage:'new',next:v('a6'),notes:n?[{d:today,t:n}]:[],cid:null});act('Lead','New lead added: '+(v('a1')||'New lead')+' ('+v('a4')+')');save();render()})}
 function leadOpen(id){const l=leads.find(x=>x.id==id);openForm(`<h3 style="margin:0">${l.name}</h3><div class="sub" style="margin:0">${l.phone} · ${l.service} · ${inr(l.value)} · ${l.source}</div>
  <label>Stage</label><select id="l1">${STAGES.map(([k,n])=>`<option value="${k}" ${k==l.stage?'selected':''}>${n}</option>`).join('')}</select>
  <label>Next follow-up</label><input id="l2" type="date" value="${l.next||''}"><label>Add note</label><input id="l3" placeholder="What happened on this call / message?">
  <div class="notes">${[...l.notes].reverse().map(n=>`<div><span class="sub">${n.d}</span> ${n.t}</div>`).join('')||'<div class="sub">No notes yet</div>'}</div>
  <div style="margin-top:12px">${l.cid?`<span class="pill paid">✓ Converted to client: ${cname(l.cid)}</span>`:`<button type="button" class="sec" onclick="convertLead(${l.id})">Convert to client</button>`}</div>`,
- ()=>{setStage(l,v('l1'));if(v('l1')=='new'||v('l1')=='contacted'||v('l1')=='proposal')l.next=v('l2');const n=v('l3');if(n)l.notes.push({d:today,t:n});save();render()})}
+ ()=>{const old_=l.stage;setStage(l,v('l1'));if(v('l1')=='new'||v('l1')=='contacted'||v('l1')=='proposal')l.next=v('l2');const n=v('l3');if(n)l.notes.push({d:today,t:n});if(old_!=l.stage)act('Lead',l.name+': stage '+STAGES.find(z=>z[0]==old_)[1]+' → '+STAGES.find(z=>z[0]==l.stage)[1]);if(n)act('Lead',l.name+': '+n);save();render()})}
 function convertLead(id){const l=leads.find(x=>x.id==id),c={id:nid++,type:l.dept,name:l.name};
   if(CATS[l.dept]&&CATS[l.dept].includes(l.service))Object.assign(c,{serial:genSerial(l.service),service:l.service,businessName:'',detail:'',dateGiven:today,loginId:'',password:'',status:'Active',dueDate:'',phone:l.phone,email:'',notes:'Converted from lead',lastUpdated:new Date().toISOString()});
   else if(l.dept=='marketing')Object.assign(c,{service:l.service,fee:l.value,due:d(30),status:'active'});
   else Object.assign(c,{capital:l.value,share:30,pnl:0});
-  if(!c.service||c.type=='marketing')c.status='active';clients.push(c);l.cid=c.id;setStage(l,'won');l.notes.push({d:today,t:'Converted to client'});save();dlg.close();render()}
+  if(!c.service||c.type=='marketing')c.status='active';clients.push(c);l.cid=c.id;setStage(l,'won');l.notes.push({d:today,t:'Converted to client'});act('Lead',l.name+' converted to a client ('+l.service+')','',l.dept);act('Client','Client added from lead: '+l.name,'',l.dept);save();dlg.close();render()}
 function toggle(id){const c=clients.find(x=>x.id==id);c.status=c.status=='active'?'paused':'active';save();render()}
 function setPay(id,val){const c=clients.find(x=>x.id==id);c.pay=val;c.lastUpdated=new Date().toISOString();save();render()}
 function setSt(id,val){const c=clients.find(x=>x.id==id);c.status=val;c.lastUpdated=new Date().toISOString();save();render()}
@@ -520,7 +550,7 @@ function accForm(S,id){const c=id?clients.find(x=>x.id==id):{},o=(x)=>esc(c[x]);
   <div><label>Status</label><select id="q8">${['Active','Pending','Completed','On Hold'].map(x=>`<option ${x==(c.status||'Active')?'selected':''}>${x}</option>`).join('')}</select></div><div><label>Phone</label><input id="q10" value="${o('phone')}"></div>
   <div><label>Email</label><input id="q11" value="${o('email')}"></div><div><label>Notes</label><input id="q12" value="${o('notes')}"></div></div>`,
   ()=>{const r={serial:v('q1')||genSerial(S),name:v('q2')||'New client',businessName:v('q3'),detail:v('q4'),dateGiven:v('q5'),dueDate:v('q9'),regNo:v('q13'),loginId:v('q6'),password:v('q7'),status:v('q8'),phone:v('q10'),email:v('q11'),notes:v('q12'),lastUpdated:new Date().toISOString()};
-   if(id)Object.assign(c,r);else clients.push({id:nid++,type:dept,service:S,...r});save();toast(id?'Client updated':'Client saved');render()})}
+   if(id)Object.assign(c,r);else clients.push({id:nid++,type:dept,service:S,...r});act('Client',LBL(S)+' client '+(id?'updated':'added')+': '+r.name);save();toast(id?'Client updated':'Client saved');render()})}
 function filingModal(id){fid=id;fyear=clients.find(x=>x.id==id).service=='TDS'?FY0:Y;drawFiling();if(!dlg2.open)dlg2.showModal()}
 function drawFiling(){const c=clients.find(x=>x.id==fid),sc=dlg2.scrollTop;
   const sel=(opts,val,fn)=>`<select onchange="${fn}(this.value)">${opts.map(x=>`<option ${x==val?'selected':''}>${x}</option>`).join('')}</select>`;
@@ -563,10 +593,11 @@ function setYr(id,y,f,val){const c=clients.find(x=>x.id==id);c.itrFiling=c.itrFi
 function dl(name,obj){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}));a.download=name;a.click()}
 function exportJson(S){const L=clients.filter(c=>c.type==dept&&c.service==S);if(!L.length){toast('No records to export yet');return}
   dl('DTA-'+dept+'-'+S.replace(/[^A-Za-z0-9]+/g,'-')+'-clients.json',{exportedOn:new Date().toISOString(),department:DN[dept],service:S,count:L.length,records:L});toast('Exported '+L.length+' record'+(L.length>1?'s':'')+' as JSON')}
-function backupAll(){dl('DTA-client-data-backup-'+today+'.json',{app:'DTA Client Data Tracker',exportedOn:new Date().toISOString(),clients,leads,deleted,ledgers,vouchers});toast('Full backup downloaded (JSON)')}
-function restoreAll(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const o=JSON.parse(r.result);if(!Array.isArray(o.clients)||!Array.isArray(o.ledgers)||!Array.isArray(o.vouchers))throw 0;if(!confirm('Replace all current data with this backup?'))return;clients=o.clients;leads=o.leads||[];deleted=o.deleted||[];ledgers=o.ledgers;vouchers=o.vouchers;nid=Math.max(100,...clients.map(x=>x.id+1),...deleted.map(x=>x.id+1),...leads.map(x=>x.id+1),...ledgers.map(x=>x.id+1),...vouchers.map(x=>x.id+1));vs=null;lgId=null;save();toast('Backup restored');render()}catch(e){toast('That file is not a valid DTA backup')}inp.value=''};r.readAsText(f)}
-nid=Math.max(100,...clients.map(x=>x.id+1),...deleted.map(x=>x.id+1),...leads.map(x=>x.id+1),...ledgers.map(x=>x.id+1),...vouchers.map(x=>x.id+1));
+function backupAll(){dl('DTA-client-data-backup-'+today+'.json',{app:'DTA Client Data Tracker',exportedOn:new Date().toISOString(),clients,leads,deleted,ledgers,vouchers,activity});toast('Full backup downloaded (JSON)')}
+function restoreAll(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const o=JSON.parse(r.result);if(!Array.isArray(o.clients)||!Array.isArray(o.ledgers)||!Array.isArray(o.vouchers))throw 0;if(!confirm('Replace all current data with this backup?'))return;clients=o.clients;leads=o.leads||[];deleted=o.deleted||[];ledgers=o.ledgers;vouchers=o.vouchers;activity=o.activity||[];if(!activity.length)seedActivity();nid=Math.max(100,...clients.map(x=>x.id+1),...deleted.map(x=>x.id+1),...leads.map(x=>x.id+1),...ledgers.map(x=>x.id+1),...vouchers.map(x=>x.id+1));vs=null;lgId=null;save();toast('Backup restored');render()}catch(e){toast('That file is not a valid DTA backup')}inp.value=''};r.readAsText(f)}
+nid=Math.max(100,...clients.map(x=>x.id+1),...deleted.map(x=>x.id+1),...leads.map(x=>x.id+1),...ledgers.map(x=>x.id+1),...vouchers.map(x=>x.id+1),...activity.map(x=>x.id+1));
 if(!ledgers.length)seedBooks();
+if(!activity.length)seedActivity();
 dpill.textContent=new Date().toLocaleDateString('en-IN',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
 function openClient(c){setDept(c.type);if(c.service&&CATS[c.type]&&CATS[c.type].includes(c.service)){view='cat:'+c.service;catQ=c.name;catF=''}else view='clients';render()}
 function gsRun(){const q=gsq.value.trim().toLowerCase();if(q.length<2){gsres.style.display='none';gsres._o=[];return}const out=[];
@@ -588,6 +619,31 @@ function alToggle(e){e.stopPropagation();qam.style.display='none';const o=alm.st
 alm.onclick=e=>{const el=e.target.closest('.gsi[data-i]');if(el){alm.style.display='none';alm._o[+el.dataset.i].f()}};
 document.addEventListener('click',e=>{if(!e.target.closest('.gsw'))gsres.style.display='none';if(!e.target.closest('.qw'))qam.style.display='none';if(!e.target.closest('.bw'))alm.style.display='none'});
 document.addEventListener('mousemove',e=>{const k=e.target.closest?e.target.closest('.kpi'):null;document.querySelectorAll('.kpi').forEach(x=>{if(x!==k){x.style.setProperty('--rx','0deg');x.style.setProperty('--ry','0deg')}});if(!k)return;const r=k.getBoundingClientRect(),px=(e.clientX-r.left)/r.width,py=(e.clientY-r.top)/r.height;k.style.setProperty('--ry',((px-.5)*10)+'deg');k.style.setProperty('--rx',((.5-py)*8)+'deg');k.style.setProperty('--mx',px*100+'%');k.style.setProperty('--my',py*100+'%')});
+(function(){const w=(n,f)=>{const o=window[n];window[n]=function(...a){return f(o,...a)}},C=id=>clients.find(x=>x.id==id)||{name:'?'};
+ w('setFil',(o,id,key,f,val)=>{const[y,m]=key.split('-').map(Number),both=gstTogether&&(f=='gstr1'||f=='gstr3b');act('Filing',C(id).name+' · GST '+MN[m-1]+' '+y+': '+(both?'GSTR-1 & GSTR-3B':f=='payment'?'client payment':f=='gstr1'?'GSTR-1':'GSTR-3B')+' → '+val);o(id,key,f,val)});
+ w('setYr',(o,id,y,f,val)=>{act('Filing',C(id).name+' · ITR FY '+(y-1)+'-'+String(y).slice(-2)+': '+(f=='filed'?'filing':'client payment')+' → '+val);o(id,y,f,val)});
+ w('setTq',(o,id,key,f,val)=>{const[fy,q]=key.split('-Q').map(Number);act('Filing',C(id).name+' · TDS '+qLabel(fy,q)+': '+(f=='ret'?'return':'client payment')+' → '+val);o(id,key,f,val)});
+ w('setTm',(o,id,key,val)=>{const[y,m]=key.split('-').map(Number);act('Filing',C(id).name+' · TDS challan '+MN[m-1]+' '+y+' → '+val);o(id,key,val)});
+ w('setPan',(o,id,f,val)=>{act('Filing',C(id).name+' · PAN '+({type:'application type',ack:'acknowledgement no.',applied:'applied on',status:'application status',delivered:'delivered on',payment:'client payment'}[f]||f)+' → '+val);o(id,f,val)});
+ w('setPay',(o,id,val)=>{act('Client',C(id).name+' · payment → '+val);o(id,val)});
+ w('setSt',(o,id,val)=>{act('Client',C(id).name+' · status → '+val);o(id,val)});
+ w('delAcc',(o,id)=>{const c=C(id);o(id);if(!clients.some(x=>x.id==id)){act('Client','Moved to Deleted: '+c.name);save()}});
+ w('restoreAcc',(o,i)=>{const c=deleted[i];o(i);if(c){act('Client','Restored: '+c.name);save()}});
+ w('delV',(o,id)=>{const x=vouchers.find(y=>y.id==id);o(id);if(x&&!vouchers.some(y=>y.id==id)){act('Voucher',x.type+' voucher no. '+x.no+' deleted',x.date);save()}});
+ w('saveV',o=>{const ed=vs&&vs.editId,n0=vouchers.length,snap=ed?JSON.stringify(vouchers.find(y=>y.id==ed)):'';o();
+   if(vouchers.length>n0){const x=vouchers[vouchers.length-1];act('Voucher',x.type+' voucher no. '+x.no+' saved — '+rn(x,'dr')+' to '+rn(x,'cr')+' · ₹'+m2(sum(x.lines,y=>y.dr)),x.date);save()}
+   else if(ed){const x=vouchers.find(y=>y.id==ed);if(x&&JSON.stringify(x)!=snap){act('Voucher',x.type+' voucher no. '+x.no+' altered — '+rn(x,'dr')+' to '+rn(x,'cr')+' · ₹'+m2(sum(x.lines,y=>y.dr)),x.date);save()}}})})();
+function seedActivity(){
+  const A=(dp_,k,date,x)=>{if(date&&date<=today)activity.push({id:nid++,dept:dp_,d:date,t:'',k,x})};
+  vouchers.forEach(x=>A(x.dept,'Voucher',x.date,x.type+' voucher no. '+x.no+' — '+rn(x,'dr')+' to '+rn(x,'cr')+' · ₹'+m2(sum(x.lines,y=>y.dr))));
+  clients.forEach(c=>{const dt=c.dateGiven||d(-60-c.id*7);A(c.type,'Client',dt,(c.service&&CATS[c.type]?LBL(c.service)+' client added: ':'Client added: ')+c.name);
+    Object.entries(c.gstFiling||{}).forEach(([k,v_])=>{const[y,m]=k.split('-').map(Number);['gstr1','gstr3b'].forEach(f=>{if(v_[f]=='Filed')A(c.type,'Filing',k+'-'+(f=='gstr1'?'09':'18'),c.name+' · GST '+MN[m-1]+' '+y+': '+(f=='gstr1'?'GSTR-1':'GSTR-3B')+' → Filed')});if(v_.payment=='Paid')A(c.type,'Filing',k+'-20',c.name+' · GST '+MN[m-1]+' '+y+': client payment → Paid')});
+    Object.entries(c.tdsFiling||{}).forEach(([k,v_])=>{const[y,m]=k.split('-').map(Number);if(v_.pay=='Paid')A(c.type,'Filing',k+'-28',c.name+' · TDS challan '+MN[m-1]+' '+y+' → Paid')});
+    Object.entries(c.tdsQtr||{}).forEach(([k,v_])=>{const[fy,q]=k.split('-Q').map(Number),u=qDue(fy,q);if(v_.ret=='Filed')A(c.type,'Filing',new Date(Date.UTC(u[0],u[1],u[2]-3)).toISOString().slice(0,10),c.name+' · TDS '+qLabel(fy,q)+': return → Filed')});
+    Object.entries(c.itrFiling||{}).forEach(([k,v_])=>{if(v_.filed=='Filed')A(c.type,'Filing',d(-12),c.name+' · ITR FY '+(k-1)+'-'+String(k).slice(-2)+': filing → Filed')});
+    if(c.panApp&&c.panApp.applied)A(c.type,'Filing',c.panApp.applied,c.name+' · PAN application → Applied');if(c.panApp&&c.panApp.delivered)A(c.type,'Filing',c.panApp.delivered,c.name+' · PAN application status → Delivered')});
+  leads.forEach(l=>(l.notes||[]).forEach(n=>A(l.dept,'Lead',n.d,l.name+': '+n.t)));
+}
 document.addEventListener('keydown',e=>{if(e.key=='/'&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&!dlg.open&&!dlg2.open){e.preventDefault();gsq.focus()}});
 document.addEventListener('keydown',e=>{
   if(view!='vch'||dlg.open)return;
