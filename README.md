@@ -44,6 +44,11 @@ need to point at a different backend.
   `dashboard/dist/` as a real downloadable desktop app (Windows/Mac/Linux),
   with auto-update checking and hardened security settings. See
   `desktop/README.md`.
+- **`tracker/`** — DTA Client Data Tracker: a Next.js + Tailwind
+  offline-first PWA for the team's day-to-day client work (Accounts,
+  Digital Marketing, Trading) with Tally-style books. It is a separate app
+  from the subscription dashboard above and stores everything on the
+  user's own device. See `tracker/README.md`.
 - **`backend/hostinger-php/`** — the backend: PHP + MySQL, built for
   Hostinger (or any PHP/MySQL) hosting. Handles both the client-software
   status check and the dashboard's accounts/clients/settings. See
