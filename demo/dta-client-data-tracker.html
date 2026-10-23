@@ -536,7 +536,7 @@ function drawFiling(){const c=clients.find(x=>x.id==fid),sc=dlg2.scrollTop;
   const sel=(opts,val,fn)=>`<select onchange="${fn}(this.value)">${opts.map(x=>`<option ${x==val?'selected':''}>${x}</option>`).join('')}</select>`;
   if(c.service=='GST'){
     d2.innerHTML=`<h3 style="margin:0">GST filing — ${esc(c.name)}</h3><div class="sub">GSTR-1 (Sales) is due on the <b>11th</b> and GSTR-3B (Purchase) on the <b>20th</b> of each month. Anything left Pending after its due date shows Overdue automatically.</div>
-    <div class="row"><button class="sec" onclick="fyear--;drawFiling()">‹</button><b>${fyear}</b><button class="sec" onclick="fyear++;drawFiling()">›</button></div>`+MN.map((n,i)=>{const key=fyear+'-'+String(i+1).padStart(2,'0'),f=monthFil(c,key);
+    <div class="row"><button class="sec" onclick="fyear--;drawFiling()">‹</button><b>${fyear}</b><button class="sec" onclick="fyear++;drawFiling()">›</button><span class="sp"></span><label style="display:flex;gap:8px;align-items:center;margin:0;cursor:pointer;font-size:13px;color:var(--ink)"><input type="checkbox" style="width:auto" ${gstTogether?'checked':''} onchange="setTog(this.checked)"> Fill GSTR-1 and GSTR-3B together</label></div>`+MN.map((n,i)=>{const key=fyear+'-'+String(i+1).padStart(2,'0'),f=monthFil(c,key);
       return `<div class="mrow"><b>${n} ${fyear}</b>${[['gstr1','GSTR-1 (Sales)',11],['gstr3b','GSTR-3B (Purchase)',20]].map(([k,l,dd])=>`<div class="rr"><span class="l">${l} <span class="sub" style="margin:0">due ${dd}th</span></span>${sel(['Filed','Pending','N/A'],f[k],`(function(v){setFil(${c.id},'${key}','${k}',v)})`)}${pill(retSt(f[k],fyear,i,dd))}</div>`).join('')}
       <div class="rr"><span class="l">Client payment</span>${sel(['Paid','Unpaid'],f.payment,`(function(v){setFil(${c.id},'${key}','payment',v)})`)}${pill(f.payment.toLowerCase())}</div></div>`}).join('')
   }else if(c.service=='TDS'){
@@ -563,7 +563,9 @@ function drawFiling(){const c=clients.find(x=>x.id==fid),sc=dlg2.scrollTop;
       <div class="rr"><span class="l">ITR filing status</span>${sel(['Filed','Pending','N/A'],f.filed,`(function(v){setYr(${c.id},${y},'filed',v)})`)}${pill(f.filed.toLowerCase().replace('n/a','na'))}</div>
       <div class="rr"><span class="l">Client payment</span>${sel(['Paid','Unpaid'],f.payment,`(function(v){setYr(${c.id},${y},'payment',v)})`)}${pill(f.payment.toLowerCase())}</div></div>`}).join('')}
   dlg2.scrollTop=sc}
-function setFil(id,key,f,val){const c=clients.find(x=>x.id==id);c.gstFiling=c.gstFiling||{};c.gstFiling[key]={...monthFil(c,key),...(c.gstFiling[key]||{}),[f]:val};c.lastUpdated=new Date().toISOString();save();render();drawFiling()}
+let gstTogether=true;try{gstTogether=localStorage.getItem('dta-gst-together')!='0'}catch(e){}
+function setTog(on){gstTogether=on;try{localStorage.setItem('dta-gst-together',on?'1':'0')}catch(e){}}
+function setFil(id,key,f,val){const c=clients.find(x=>x.id==id);c.gstFiling=c.gstFiling||{};const both=gstTogether&&(f=='gstr1'||f=='gstr3b');c.gstFiling[key]={...monthFil(c,key),...(c.gstFiling[key]||{}),...(both?{gstr1:val,gstr3b:val}:{[f]:val})};c.lastUpdated=new Date().toISOString();save();render();drawFiling()}
 function setTq(id,key,f,val){const c=clients.find(x=>x.id==id),[fy,q]=key.split('-Q').map(Number);c.tdsQtr=c.tdsQtr||{};c.tdsQtr[key]={...qFil(c,fy,q),...(c.tdsQtr[key]||{}),[f]:val};c.lastUpdated=new Date().toISOString();save();render();drawFiling()}
 function setTm(id,key,val){const c=clients.find(x=>x.id==id);c.tdsFiling=c.tdsFiling||{};c.tdsFiling[key]={pay:val};c.lastUpdated=new Date().toISOString();save();render();drawFiling()}
 function setPan(id,f,val){const c=clients.find(x=>x.id==id);c.panApp={...panInfo(c),...(c.panApp||{}),[f]:val};if(f=='status'&&val=='Delivered'&&!c.panApp.delivered)c.panApp.delivered=today;c.lastUpdated=new Date().toISOString();save();render();drawFiling()}
