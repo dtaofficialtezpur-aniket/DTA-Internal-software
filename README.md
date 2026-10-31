@@ -49,6 +49,9 @@ need to point at a different backend.
   Digital Marketing, Trading) with Tally-style books. It is a separate app
   from the subscription dashboard above and stores everything on the
   user's own device. See `tracker/README.md`.
+- **`erp/`** — ERP & CRM for client Shanti Trading Company (POS, credit
+  control, inventory, warehouse, purchase with landed cost, reports, audit).
+  React + Vite. See `erp/README.md`.
 - **`backend/hostinger-php/`** — the backend: PHP + MySQL, built for
   Hostinger (or any PHP/MySQL) hosting. Handles both the client-software
   status check and the dashboard's accounts/clients/settings. See
