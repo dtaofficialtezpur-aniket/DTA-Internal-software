@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { buildSeed, DEMO_PINS } from './seed.js';
 import { nowIso, uid } from './format.js';
 
-const KEY = 'stc-erp-v1';
+const KEY = 'stc-erp-v2';
 const SESSION_KEY = 'stc-erp-user';
 const Ctx = createContext(null);
 

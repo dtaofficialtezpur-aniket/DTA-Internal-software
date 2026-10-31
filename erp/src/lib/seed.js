@@ -2,6 +2,7 @@
 // Customers, suppliers and transactions are fictional.
 import { computeBill, basePrice, groupDiscount } from './calc.js';
 import { addDays, round2 } from './format.js';
+import { addExtras } from './seedExtras.js';
 
 export const DEMO_PINS = {
   abhimanyu: '1111', salesmgr: '2222', cashier: '3333', godown: '4444', accounts: '5555', salesman: '6666', security: '7777',
@@ -83,6 +84,8 @@ export function buildSeed() {
       cycleEvery: { A: 7, B: 30, C: 90 },
       cycleDailyLimit: 6,
       roundOff: true,
+      loyalty: { enabled: true, pointsPer100: 1, pointValue: 1, minRedeem: 100 },
+      hr: { shiftStart: '09:30', paidLeavePerYear: 12, workDays: [1, 2, 3, 4, 5, 6] },
     },
     users: [
       { id: 'u1', name: 'Abhimanyu Chhawchharia', username: 'abhimanyu', role: 'owner', active: true },
@@ -100,7 +103,9 @@ export function buildSeed() {
     ],
     invoices: [], receipts: [], sessions: [], picklists: [], purchaseOrders: [],
     stockLedger: [], cycleCounts: [], reminders: [], gateLog: [], audit: [],
-    seq: { INV: 0, PO: 0, PL: 0, RC: 0, GRN: 0 },
+    leads: [], loyalty: [], bankLines: [], billScans: [],
+    hr: { profiles: {}, attendance: [], leaves: [], advances: [], payslips: [] },
+    seq: { INV: 0, PO: 0, PL: 0, RC: 0, GRN: 0, LD: 0 },
   };
 
   // Opening stock, roughly 3x the reorder level.
@@ -174,6 +179,7 @@ export function buildSeed() {
     ],
   });
 
+  addExtras(db, rnd);
   return db;
 }
 

@@ -1,4 +1,4 @@
-# Shanti Trading Company — ERP & CRM (v0.1)
+# Shanti Trading Company — ERP & CRM (v0.2, demo by DTA)
 
 Business software for Shanti Trading Company, Parua, Tezpur (steel structurals,
 TMT rebars and allied products), built from the client's requirements
@@ -68,18 +68,24 @@ to the backend at the same time.
 | Reports | Reports & Analytics | Sales, KPIs, inventory movement, ageing, collections, GST HSN summary, GSTR-1 B2B CSV. |
 | Tally | Reports → GST & Tally | Sales vouchers exported as Tally XML for import. |
 | Audit trail | Audit Trail | Every change logged with user and time; filter and CSV export; no edit or delete. |
+| Employee self-service | My Portal | Every user: punch in/out, attendance with app login/logout times, leave and advance requests, salary slips. |
+| HR & payroll | HR & Payroll | Attendance register, owner approves leave and advances, monthly payroll (loss of pay, paid leave, advance recovery), printable salary slips. |
+| Leads | Leads & Loyalty | Pipeline (new → contacted → quoted → won/lost), follow-up dates and due list, activity notes, WhatsApp, convert won lead to customer. |
+| Loyalty programme | Leads & Loyalty, POS | Points per ₹100 billed, Silver/Gold/Platinum tiers with faster earning, redemption at the counter, manual adjustments. |
+| Auto bank reconciliation | Bank Reconciliation | Import bank CSV (common Indian formats); credits auto-matched to receipts and bank/UPI/cheque bill payments by amount, date and reference; manual match, create receipt, or categorise the rest. |
+| Bill scan | Bill Scan | Photo or PDF of a supplier bill (or pasted text) → supplier, bill no., date, total and item lines (per-tonne rates converted to kg) → purchase order for owner approval. The OCR/PDF engine loads from a CDN on first use, so scanning needs internet. |
 | Roles | Users & Roles | Owner, Sales Manager, Cashier, Salesman, Accounts, Godown, Delivery, Security, each seeing only their modules. |
 
-## Next phase (shown as "Soon" in the menu)
+## Still to do
 
 - Cloud backend and shared database (see above), then the mobile view of the management app.
-- HR: employee self-service portal (attendance, login/logout times, leave, salary slips, advances) and payroll.
-- CRM: lead pipeline and follow-ups, loyalty programme (rules still to be decided by the client).
 - WhatsApp Business API for fully automatic messages (now: one-click WhatsApp with logging).
-- Auto bank reconciliation (needs the client's bank and statement format).
-- Bill scan (OCR) for supplier bills.
 - Direct weigh-scale connection (needs scale model and connection type).
 - Second warehouse location when it opens.
+
+## Single-file build
+
+`npm run build:single` writes `dist-single/index.html`: the whole app in one HTML file that opens with a double-click.
 
 ## Code layout
 

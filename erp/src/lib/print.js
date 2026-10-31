@@ -140,3 +140,31 @@ export function printPicklist(db, pl) {
     <div class="sig"><span>Picked by ____________</span><span>Checked by ____________</span><span>Security ____________</span></div>
   </body></html>`);
 }
+
+export function printPayslip(db, s) {
+  const c = db.company;
+  const prof = db.hr.profiles[s.userId] || {};
+  const [y, m] = s.month.split('-');
+  const label = new Date(+y, +m - 1, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  const row = (a, b) => `<tr><td>${a}</td><td class="r">${b}</td></tr>`;
+  printHtml(`<!doctype html><html><head><meta charset="utf-8">${FONT}<style>
+    @page { size: A5; margin: 12mm; } body { font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; color: #111; }
+    h1 { font-family: 'IBM Plex Serif', serif; font-size: 18px; margin: 0; color: #1c3a6b; } .hd { border-bottom: 2px solid #1c3a6b; padding-bottom: 6px; margin-bottom: 10px; }
+    h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: #1c3a6b; margin: 0 0 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: inherit; margin-bottom: 10px; } td { padding: 5px 6px; border-bottom: 1px solid #dde; } .r { text-align: right; }
+    .net td { font-size: 14px; font-weight: 600; border-top: 2px solid #111; } .sig { margin-top: 40px; display: flex; justify-content: space-between; }
+  </style></head><body>
+    <div class="hd"><h1>${esc(c.name)}</h1><div>${esc(c.address)}</div></div>
+    <h2>Salary slip — ${esc(label)}</h2>
+    <table>${row('Employee', `<b>${esc(s.name)}</b>`)}${row('Designation', esc(prof.designation || ''))}${row('Bank account', esc(prof.bank || '—'))}</table>
+    <table>
+      ${row('Monthly salary', money(s.salary))}${row('Working days in month', s.workDays)}${row('Days present', s.presentDays)}
+      ${row('Paid leave', s.leave)}${row('Loss-of-pay days', s.lop)}${row(`Loss of pay (${s.lop} × ${money(s.perDay)})`, '− ' + money(round2(s.salary - s.gross)))}
+      ${row('Gross earnings', money(s.gross))}
+      ${(s.advances || []).map((a) => row(`Advance recovery (${esc(a.reason)})`, '− ' + money(a.amount))).join('')}
+      <tr class="net"><td>Net pay</td><td class="r">${money(s.net)}</td></tr>
+    </table>
+    <div>Amount in words: ${inWords(s.net)}</div>
+    <div class="sig"><span>Employee signature</span><span>For ${esc(c.name)}</span></div>
+  </body></html>`);
+}

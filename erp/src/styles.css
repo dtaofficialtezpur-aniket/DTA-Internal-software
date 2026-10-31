@@ -323,6 +323,30 @@ a.list-row:hover { background: var(--surface-2); }
 .splash { height: 100%; display: grid; place-items: center; }
 .spinner { width: 28px; height: 28px; border: 3px solid var(--primary-100); border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; }
 
+/* ---------- Demo notice ---------- */
+.demo-pill { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid rgba(201, 162, 79, .6); color: #e3c88d; animation: fade 1s var(--ease) .4s both; }
+.dta-credit { margin-top: 8px; color: #c9d4e8; font-size: 13px; letter-spacing: .02em; }
+.dta-credit b { color: #c9a24f; font-family: var(--serif); font-size: 15px; letter-spacing: .06em; }
+.demo-banner { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; margin-bottom: 22px; border-radius: 9px; background: var(--accent-50); color: #7a5716; font-size: 12.5px; border: 1px solid #ecdcb8; animation: rise .5s var(--ease) .15s both; }
+.demo-banner svg { width: 16px; height: 16px; flex: none; margin-top: 1px; }
+
+/* ---------- CRM ---------- */
+.kanban { display: grid; grid-template-columns: repeat(5, minmax(190px, 1fr)); gap: 12px; overflow-x: auto; padding-bottom: 6px; }
+.stage-bar { display: flex; gap: 4px; flex-wrap: wrap; }
+.stage { flex: 1; min-width: 90px; border: 1px solid var(--line); background: var(--surface-2); padding: 8px 6px; font-size: 12.5px; font-weight: 500; cursor: pointer; color: var(--ink-2); transition: all .2s var(--ease); clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%); }
+.stage:first-child { clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%); border-radius: 6px 0 0 6px; }
+.stage.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+.stage.on.won { background: var(--ok); border-color: var(--ok); }
+.stage.on.lost { background: var(--bad); border-color: var(--bad); }
+.timeline { border-left: 2px solid var(--line); padding-left: 14px; display: grid; gap: 10px; max-height: 200px; overflow-y: auto; }
+.tl-item { position: relative; animation: rise .35s var(--ease) both; }
+.tl-item::before { content: ''; position: absolute; left: -20px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--surface); border: 2px solid var(--primary); }
+
+/* ---------- Bill scan ---------- */
+.scan-drop { display: grid; place-items: center; text-align: center; gap: 8px; padding: 50px 20px; border: 2px dashed var(--primary-100); cursor: pointer; color: var(--primary); background: linear-gradient(180deg, var(--surface), var(--primary-50)); transition: border-color .2s, transform .2s var(--ease); }
+.scan-drop:hover { border-color: var(--primary); transform: translateY(-2px); }
+.ocr-text { margin: 0; padding: 14px 16px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11.5px; white-space: pre-wrap; color: var(--ink-2); max-height: 420px; overflow: auto; }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 1180px) {
   .g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }

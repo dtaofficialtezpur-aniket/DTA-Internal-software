@@ -19,10 +19,15 @@ import Security from './pages/Security.jsx';
 import Audit from './pages/Audit.jsx';
 import Users from './pages/Users.jsx';
 import Settings from './pages/Settings.jsx';
+import Portal from './pages/Portal.jsx';
+import Hr from './pages/Hr.jsx';
+import Crm from './pages/Crm.jsx';
+import Bank from './pages/Bank.jsx';
+import BillScan from './pages/BillScan.jsx';
 
 const PAGES = { dashboard: Dashboard, pos: Pos, sales: Sales, customers: Customers, collections: Collections, pricelists: Pricelists,
   products: Products, inventory: Inventory, warehouse: Warehouse, purchase: Purchase, reports: Reports, security: Security,
-  audit: Audit, users: Users, settings: Settings };
+  audit: Audit, users: Users, settings: Settings, me: Portal, hr: Hr, crm: Crm, bank: Bank, scan: BillScan };
 const OWNER_ONLY = ['users', 'settings'];
 const HOME = { owner: 'dashboard', sales_manager: 'dashboard', accounts: 'dashboard', cashier: 'pos', salesman: 'pos', warehouse: 'warehouse', delivery: 'warehouse', security: 'security' };
 

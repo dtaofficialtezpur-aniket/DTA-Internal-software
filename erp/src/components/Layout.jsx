@@ -7,18 +7,17 @@ export const NAV = [
   ['Overview', [['dashboard', 'Management Dashboard', 'dashboard']]],
   ['Sales', [
     ['pos', 'Point of Sale', 'pos'], ['sales', 'Invoices', 'invoice'], ['customers', 'Customers', 'users'],
-    ['collections', 'Credit & Collections', 'wallet'], ['pricelists', 'Pricelists & Offers', 'tag'],
+    ['collections', 'Credit & Collections', 'wallet'], ['pricelists', 'Pricelists & Offers', 'tag'], ['crm', 'Leads & Loyalty', 'gift'],
   ]],
   ['Inventory', [
     ['products', 'Products & Units', 'box'], ['inventory', 'Stock & Cycle Count', 'layers'], ['warehouse', 'Warehouse Orders', 'truck'],
   ]],
-  ['Purchase', [['purchase', 'Purchase & Landed Cost', 'cart']]],
+  ['Purchase', [['purchase', 'Purchase & Landed Cost', 'cart'], ['scan', 'Bill Scan', 'scan']]],
+  ['Accounts', [['bank', 'Bank Reconciliation', 'bank']]],
+  ['People', [['me', 'My Portal', 'clock'], ['hr', 'HR & Payroll', 'briefcase']]],
   ['Control', [['reports', 'Reports & Analytics', 'chart'], ['security', 'Security Dashboard', 'shield'], ['audit', 'Audit Trail', 'history']]],
   ['Administration', [['users', 'Users & Roles', 'user'], ['settings', 'Settings', 'settings']]],
 ];
-
-// Modules scheduled for later phases; shown so the client sees the full roadmap.
-const SOON = [['HR & Self-Service', 'briefcase'], ['Leads & Loyalty', 'gift'], ['Bank Reconciliation', 'bank'], ['Bill Scan (OCR)', 'scan']];
 
 export const TITLES = Object.fromEntries(NAV.flatMap(([, items]) => items.map(([k, t]) => [k, t])));
 
@@ -53,16 +52,8 @@ export function Layout({ page, children }) {
               </div>
             );
           })}
-          {user.role === 'owner' && (
-            <div>
-              <div className="nav-group">Next phase</div>
-              {SOON.map(([label, icon]) => (
-                <div key={label} className="nav-link soon" title="Scheduled for the next release"><Icon name={icon} />{label}<span className="tag">Soon</span></div>
-              ))}
-            </div>
-          )}
         </nav>
-        <div className="sidebar-foot">Developed by DTA · v0.1</div>
+        <div className="sidebar-foot">Demo version · Designed &amp; developed by DTA · v0.2</div>
       </aside>
       {open && <div className="backdrop" style={{ zIndex: 25 }} onClick={() => setOpen(false)} />}
       <main className="main">

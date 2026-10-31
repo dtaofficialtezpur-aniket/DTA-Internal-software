@@ -32,16 +32,23 @@ export default function Login() {
             <path key={i} d={`M-50 ${80 + i * 60} C 200 ${20 + i * 60}, 400 ${160 + i * 60}, 900 ${60 + i * 60}`} stroke="#c9d4e8" strokeWidth="1.2" fill="none" style={{ animationDelay: `${i * 120}ms` }} />
           ))}
         </svg>
-        <div className="kicker">Enterprise Resource Planning</div>
+        <div className="row wrap" style={{ gap: 12 }}>
+          <div className="kicker">Enterprise Resource Planning</div>
+          <span className="demo-pill">Demo version</span>
+        </div>
         <div>
           <h1>{db.company.name}</h1>
           <p style={{ color: '#b9c6de', marginTop: 12, maxWidth: 440, fontSize: 15 }}>{db.company.tagline}</p>
           <p style={{ color: '#8fa0bf', marginTop: 6 }}>{db.company.address}</p>
         </div>
-        <div className="foot">Sales · Inventory · Purchase · Credit Control · Audit</div>
+        <div className="foot">
+          <div>Sales · CRM · Inventory · Purchase · HR &amp; Payroll · Accounts · Audit</div>
+          <div className="dta-credit">Demo designed &amp; developed by <b>DTA</b></div>
+        </div>
       </section>
       <section className="login-form">
         <div className="login-box page">
+          <div className="demo-banner"><Icon name="info" /><div><b>Demo made by DTA</b> for Shanti Trading Company. Sample data only.</div></div>
           <h2 style={{ fontSize: 22 }}>Sign in</h2>
           <p className="muted" style={{ marginTop: 4 }}>{step === 'user' ? 'Enter your username to continue.' : `Enter the 4-digit PIN for ${username}.`}</p>
           {step === 'user' ? (

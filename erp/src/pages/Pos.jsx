@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import QRCode from 'qrcode';
 import { useStore } from '../lib/store.jsx';
-import { approversFor, basePrice, computeBill, creditCheck, creditScore, customerLedger, discountLimit, groupDiscount, offerFor, unitFactor, upiLink, waLink } from '../lib/calc.js';
+import { loyaltyOf, approversFor, basePrice, computeBill, creditCheck, creditScore, customerLedger, discountLimit, groupDiscount, offerFor, unitFactor, upiLink, waLink } from '../lib/calc.js';
 import { money, qty, round2, dateTime, uid, nowIso } from '../lib/format.js';
 import { postInvoice, sessionSummary } from '../lib/ops.js';
 import { printGstInvoice, printThermal } from '../lib/print.js';
@@ -90,6 +90,7 @@ function Counter({ session }) {
   const [override, setOverride] = useState(null);
   const [ask, setAsk] = useState(null);
   const [done, setDone] = useState(null);
+  const [redeem, setRedeem] = useState(0);
 
   const customer = db.customers.find((c) => c.id === customerId);
   const cats = ['All', ...new Set(db.products.map((p) => p.category))];
@@ -105,7 +106,11 @@ function Counter({ session }) {
   }), [lines, customer, db]);
 
   const bill = computeBill({ lines: priced, billDiscPct: Number(billDisc) || 0, groupDiscPct: groupDiscount(db, customer), interState: customer?.stateCode && customer.stateCode !== db.company.stateCode, roundOff: db.settings.roundOff });
-  const paidNow = round2(payments.filter((p) => p.mode !== 'credit').reduce((s, p) => s + (Number(p.amount) || 0), 0));
+  const lp = db.settings.loyalty;
+  const loyalty = lp?.enabled && customer && customer.id !== 'walkin' ? loyaltyOf(db, customer.id) : null;
+  const redeemPts = loyalty ? Math.min(redeem, loyalty.balance, Math.floor(bill.total / lp.pointValue)) : 0;
+  const redeemValue = round2(redeemPts * (lp?.pointValue || 0));
+  const paidNow = round2(redeemValue + payments.filter((p) => p.mode !== 'credit').reduce((s, p) => s + (Number(p.amount) || 0), 0));
   const due = round2(Math.max(0, bill.total - paidNow));
   const limit = discountLimit(db, user.role);
   const needsApproval = bill.manualDiscPct > limit + 0.001 && !(approval && approval.pct >= bill.manualDiscPct);
@@ -117,6 +122,7 @@ function Counter({ session }) {
   // A bill changed after approval must be re-approved.
   useEffect(() => { if (approval && bill.manualDiscPct > approval.pct) setApproval(null); }, [bill.manualDiscPct, approval]);
   useEffect(() => { setOverride(null); }, [customerId, due]);
+  useEffect(() => { setRedeem(0); }, [customerId]);
 
   const add = (p) => {
     const unit = p.units[0]?.unit && p.baseUnit === 'kg' ? p.units[0].unit : p.baseUnit;
@@ -126,13 +132,14 @@ function Counter({ session }) {
     });
   };
   const setLine = (key, patch) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
-  const reset = () => { setLines([]); setBillDisc(0); setPayments([{ mode: 'cash', amount: '' }]); setApproval(null); setOverride(null); setCustomerId('walkin'); };
+  const reset = () => { setLines([]); setBillDisc(0); setPayments([{ mode: 'cash', amount: '' }]); setApproval(null); setOverride(null); setCustomerId('walkin'); setRedeem(0); };
 
   const save = () => {
     if (!lines.length) return;
     if (needsApproval) return setAsk('discount');
     if (blocked) return setAsk('credit');
     const pays = payments.filter((p) => p.mode !== 'credit' && Number(p.amount) > 0).map((p) => ({ mode: p.mode, amount: Number(p.amount), ref: p.ref || '' }));
+    if (redeemPts > 0) pays.push({ mode: 'points', amount: redeemValue, points: redeemPts, ref: 'Loyalty' });
     const inv = update((d) => postInvoice(d, { bill, customer, payments: pays, userId: user.id, sessionId: session.id, approval, override }),
       ['Created invoice', 'Invoice', `${customer.name} · ${money(bill.total)}${approval ? ` · discount ${bill.manualDiscPct}% approved by ${approval.byName}` : ''}${override ? ` · credit override by ${override.byName}: ${override.note}` : ''}`]);
     toast(`Invoice ${inv.no} saved`);
@@ -140,7 +147,7 @@ function Counter({ session }) {
     reset();
   };
 
-  const fillFull = (mode) => setPayments([{ mode, amount: mode === 'credit' ? '' : String(bill.total) }]);
+  const fillFull = (mode) => setPayments([{ mode, amount: mode === 'credit' ? '' : String(round2(bill.total - redeemValue)) }]);
 
   return (
     <div className="pos">
@@ -222,6 +229,15 @@ function Counter({ session }) {
             </div>
 
             <div className="card-body grid" style={{ gap: 10 }}>
+              {loyalty && (
+                <div className="alert ok" style={{ alignItems: 'center' }}>
+                  <Icon name="gift" />
+                  <div className="grow"><b>{loyalty.tier}</b> member · {loyalty.balance} points (₹{(loyalty.balance * lp.pointValue).toLocaleString('en-IN')})</div>
+                  {loyalty.balance >= lp.minRedeem && <input className="input sm num" style={{ width: 90 }} placeholder="Redeem" inputMode="numeric" value={redeem || ''} aria-label="Points to redeem"
+                    onChange={(e) => setRedeem(Number(e.target.value.replace(/\D/g, '')) || 0)} />}
+                </div>
+              )}
+              {redeemValue > 0 && <div className="small" style={{ color: 'var(--ok)' }}>{redeemPts} points redeemed: − {money(redeemValue)}</div>}
               <div className="pay-modes">
                 {MODES.map(([k, l]) => <button key={k} className={`pay-mode ${payments.length === 1 && payments[0].mode === k ? 'on' : ''}`} onClick={() => fillFull(k)}>{l}</button>)}
               </div>

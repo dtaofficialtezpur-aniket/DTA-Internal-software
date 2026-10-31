@@ -1,6 +1,6 @@
 // Write operations that touch several collections. Each takes the draft db passed to `update`.
 import { addDays, nowIso, round2, uid } from './format.js';
-import { invoiceDue } from './calc.js';
+import { invoiceDue, loyaltyOf } from './calc.js';
 import { invoiceNo } from './seed.js';
 
 export function moveStock(db, productId, qtyBase, type, ref, cost) {
@@ -22,6 +22,17 @@ export function postInvoice(db, { bill, customer, payments, userId, sessionId, a
   };
   db.invoices.push(inv);
   for (const l of bill.items) moveStock(db, l.productId, -round2(l.qty * l.factor), 'sale', inv.no);
+
+  // Loyalty: redeemed points come in as a 'points' payment; points are earned on the rest of the bill.
+  const lp = db.settings.loyalty;
+  if (lp?.enabled && customer.id !== 'walkin') {
+    const redeemed = payments.filter((p) => p.mode === 'points').reduce((s, p) => s + (p.points || 0), 0);
+    if (redeemed) db.loyalty.push({ id: uid('ly'), customerId: customer.id, at, points: -redeemed, ref: inv.no, note: 'Redeemed on bill' });
+    const pointsValue = payments.filter((p) => p.mode === 'points').reduce((s, p) => s + p.amount, 0);
+    const earn = Math.floor((bill.total - pointsValue) / 100 * lp.pointsPer100 * loyaltyOf(db, customer.id).mult);
+    if (earn > 0) db.loyalty.push({ id: uid('ly'), customerId: customer.id, at, points: earn, ref: inv.no, note: 'Earned on bill' });
+    inv.pointsEarned = earn;
+  }
 
   const pn = ++db.seq.PL;
   db.picklists.push({

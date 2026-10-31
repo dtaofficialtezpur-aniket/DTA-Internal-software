@@ -15,13 +15,13 @@ export const ROLES = {
 // Which modules each role can open.
 export const ACCESS = {
   owner: '*',
-  sales_manager: ['dashboard', 'pos', 'sales', 'customers', 'collections', 'pricelists', 'products', 'inventory', 'warehouse', 'reports'],
-  cashier: ['pos', 'sales', 'customers', 'collections'],
-  salesman: ['pos', 'sales', 'customers', 'collections'],
-  accounts: ['dashboard', 'sales', 'customers', 'collections', 'purchase', 'reports'],
-  warehouse: ['warehouse', 'inventory', 'products'],
-  delivery: ['warehouse'],
-  security: ['security', 'warehouse'],
+  sales_manager: ['dashboard', 'pos', 'sales', 'customers', 'collections', 'pricelists', 'crm', 'products', 'inventory', 'warehouse', 'reports', 'me'],
+  cashier: ['pos', 'sales', 'customers', 'collections', 'me'],
+  salesman: ['pos', 'sales', 'customers', 'collections', 'crm', 'me'],
+  accounts: ['dashboard', 'sales', 'customers', 'collections', 'purchase', 'scan', 'bank', 'hr', 'reports', 'me'],
+  warehouse: ['warehouse', 'inventory', 'products', 'me'],
+  delivery: ['warehouse', 'me'],
+  security: ['security', 'warehouse', 'me'],
 };
 
 export const canOpen = (role, page) => ACCESS[role] === '*' || (ACCESS[role] || []).includes(page);
@@ -178,3 +178,13 @@ export function waLink(phone, text) {
 }
 
 export const stamp = () => nowIso();
+
+// Loyalty tier by lifetime points earned; higher tiers earn faster.
+export const TIERS = [['Platinum', 20000, 1.5], ['Gold', 5000, 1.25], ['Silver', 0, 1]];
+export function loyaltyOf(db, customerId) {
+  const rows = (db.loyalty || []).filter((l) => l.customerId === customerId);
+  const earned = rows.filter((l) => l.points > 0).reduce((s, l) => s + l.points, 0);
+  const balance = rows.reduce((s, l) => s + l.points, 0);
+  const [tier, , mult] = TIERS.find(([, min]) => earned >= min);
+  return { earned, balance, tier, mult, rows };
+}

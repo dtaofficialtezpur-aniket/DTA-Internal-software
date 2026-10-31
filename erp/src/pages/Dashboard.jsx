@@ -86,6 +86,8 @@ export default function Dashboard() {
           <AttentionRow icon="layers" text={`${cycleCountDue(db).length} item(s) due for cycle count today`} href="#/inventory" />
           <AttentionRow icon="wallet" tone="red" text={`${overdue.length} overdue invoice(s) to follow up`} href="#/collections" />
           <AttentionRow icon="clock" text={`${openSessions.length} cashier session(s) open`} href="#/pos" />
+          <AttentionRow icon="target" tone="gold" text={`${db.leads.filter((l) => !['won', 'lost'].includes(l.stage) && l.followUp && l.followUp <= new Date().toISOString().slice(0, 10)).length} lead follow-up(s) due`} href="#/crm" />
+          <AttentionRow icon="briefcase" text={`${db.hr.leaves.filter((l) => l.status === 'pending').length + db.hr.advances.filter((a) => a.status === 'pending').length} leave / advance request(s) pending`} href="#/hr" />
         </div>
 
         <div className="card">
