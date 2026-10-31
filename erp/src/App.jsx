@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from './lib/store.jsx';
 import { canOpen } from './lib/calc.js';
 import { Layout } from './components/Layout.jsx';
-import { Toasts } from './components/ui.jsx';
+import { DemoLimitModal, Toasts } from './components/ui.jsx';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Pos from './pages/Pos.jsx';
@@ -51,6 +51,7 @@ export default function App() {
   return (
     <>
       <Layout page={page}><Page /></Layout>
+      <DemoLimitModal />
       <Toasts />
     </>
   );

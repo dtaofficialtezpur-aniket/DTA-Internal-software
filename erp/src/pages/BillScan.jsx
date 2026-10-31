@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { money, date, nowIso, uid } from '../lib/format.js';
 import { parseBill, SAMPLE_BILL } from '../lib/billParse.js';
-import { Empty, Field, Icon, PageHead } from '../components/ui.jsx';
+import { DemoLeft, Empty, Field, Icon, PageHead } from '../components/ui.jsx';
 
 // OCR and PDF engines load from a CDN only when a bill is scanned, keeping the app itself light.
 const TESSERACT = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
@@ -56,7 +56,7 @@ function sampleImage() {
 }
 
 export default function BillScan() {
-  const { db, user, update, toast } = useStore();
+  const { db, user, update, toast, guard } = useStore();
   const [busy, setBusy] = useState('');
   const [preview, setPreview] = useState('');
   const [text, setText] = useState('');
@@ -82,6 +82,7 @@ export default function BillScan() {
   const createPo = () => {
     if (!res.supplierId) return toast('Choose the supplier', 'bad');
     if (!res.lines.length) return toast('No items to order', 'bad');
+    if (!guard('po')) return;
     const po = update((d) => {
       const n = ++d.seq.PO;
       const items = res.lines.map((l) => {
@@ -92,7 +93,7 @@ export default function BillScan() {
       d.purchaseOrders.push(rec);
       d.billScans.push({ id: uid('bs'), at: nowIso(), by: user.name, file: fileName, billNo: res.billNo, supplierId: res.supplierId, total: res.total, lines: res.lines.length, poNo: rec.no });
       return rec;
-    }, ['Scanned supplier bill', 'Purchase order', `${fileName} → ${res.lines.length} items, ${money(sum)}`]);
+    }, ['Scanned supplier bill', 'Purchase order', `${fileName} → ${res.lines.length} items, ${money(sum)}`], 'po');
     toast(`${po.no} created from the bill and sent for owner approval`);
     setRes(null); setText(''); setPreview('');
   };
@@ -100,6 +101,7 @@ export default function BillScan() {
   return (
     <div className="page">
       <PageHead title="Bill Scan" sub="Photograph or upload a supplier bill; items, quantities and rates are read automatically">
+        <DemoLeft kind="po" />
         <button className="btn" onClick={() => { const img = sampleImage(); setPreview(img); run((p) => ocrImage(img, p), 'Sample bill'); }} disabled={!!busy}><Icon name="scan" />Scan sample bill</button>
         <button className="btn primary" onClick={() => file.current.click()} disabled={!!busy}><Icon name="scan" />Upload bill (photo / PDF)</button>
         <input ref={file} type="file" accept="image/*,application/pdf" capture="environment" hidden onChange={(e) => { onFile(e.target.files[0]); e.target.value = ''; }} />

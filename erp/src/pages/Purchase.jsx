@@ -3,7 +3,7 @@ import { useStore } from '../lib/store.jsx';
 import { landedCost, unitFactor } from '../lib/calc.js';
 import { money, qty, date, nowIso, round2, uid } from '../lib/format.js';
 import { moveStock } from '../lib/ops.js';
-import { ApprovalModal, Empty, Field, Icon, Modal, PageHead, Tabs } from '../components/ui.jsx';
+import { ApprovalModal, DemoLeft, Empty, Field, Icon, Modal, PageHead, Tabs } from '../components/ui.jsx';
 
 const STATUS = { draft: ['Draft', ''], pending_approval: ['Awaiting approval', 'warn'], approved: ['Approved', 'blue'], received: ['Received', 'ok'], cancelled: ['Cancelled', ''] };
 const CHARGES = [['freight', 'Freight'], ['loading', 'Loading'], ['unloading', 'Unloading'], ['insurance', 'Insurance'], ['other', 'Other']];
@@ -20,6 +20,7 @@ export default function Purchase() {
   return (
     <div className="page">
       <PageHead title="Purchase & Landed Cost" sub="Every purchase order is approved by the owner before it is placed">
+        <DemoLeft kind={tab === 'po' ? 'po' : 'supplier'} />
         {tab === 'po' && <button className="btn primary" onClick={() => setEdit({ supplierId: db.suppliers[0]?.id, items: [] })}><Icon name="plus" />New purchase order</button>}
         {tab === 'suppliers' && <button className="btn primary" onClick={() => setSupplier({ name: '', phone: '', gstin: '', address: '' })}><Icon name="plus" />Add supplier</button>}
       </PageHead>
@@ -52,7 +53,7 @@ export default function Purchase() {
 }
 
 function PoForm({ value, onClose }) {
-  const { db, user, update, toast } = useStore();
+  const { db, user, update, toast, guard } = useStore();
   const [f, setF] = useState(structuredClone(value));
   const addLine = () => { const p = db.products[0]; setF({ ...f, items: [...f.items, { productId: p.id, name: p.name, unit: p.baseUnit, factor: 1, qty: 0, rate: p.cost, gst: p.gst }] }); };
   const setLine = (i, patch) => setF({ ...f, items: f.items.map((l, j) => {
@@ -67,6 +68,7 @@ function PoForm({ value, onClose }) {
   const save = (submit) => {
     const items = f.items.filter((l) => Number(l.qty) > 0).map((l) => ({ ...l, qty: Number(l.qty), rate: Number(l.rate) }));
     if (!items.length) return toast('Add at least one item', 'bad');
+    if (!f.id && !guard('po')) return;
     const po = update((d) => {
       const rec = { ...f, items, status: submit ? 'pending_approval' : 'draft' };
       if (rec.id) { Object.assign(d.purchaseOrders.find((p) => p.id === rec.id), rec); return rec; }
@@ -74,7 +76,7 @@ function PoForm({ value, onClose }) {
       const full = { ...rec, id: uid('po'), no: 'PO-' + String(n).padStart(4, '0'), date: nowIso(), createdBy: user.id };
       d.purchaseOrders.push(full);
       return full;
-    }, [submit ? 'Submitted PO for approval' : 'Saved PO draft', 'Purchase order', `${f.no || 'New PO'} · ${money(total)}`]);
+    }, [submit ? 'Submitted PO for approval' : 'Saved PO draft', 'Purchase order', `${f.no || 'New PO'} · ${money(total)}`], f.id ? null : 'po');
     toast(submit ? `${po.no} sent to the owner for approval` : 'Draft saved');
     onClose();
   };
@@ -200,12 +202,13 @@ function GrnModal({ po, onClose }) {
 }
 
 function SupplierForm({ value, onClose }) {
-  const { update, toast } = useStore();
+  const { update, toast, guard } = useStore();
   const [f, setF] = useState(value);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const save = () => {
     if (!f.name.trim()) return;
-    update((d) => { if (f.id) Object.assign(d.suppliers.find((s) => s.id === f.id), f); else d.suppliers.push({ ...f, id: uid('s') }); }, [f.id ? 'Edited supplier' : 'Added supplier', 'Supplier', f.name]);
+    if (!f.id && !guard('supplier')) return;
+    update((d) => { if (f.id) Object.assign(d.suppliers.find((s) => s.id === f.id), f); else d.suppliers.push({ ...f, id: uid('s') }); }, [f.id ? 'Edited supplier' : 'Added supplier', 'Supplier', f.name], f.id ? null : 'supplier');
     toast('Supplier saved'); onClose();
   };
   return (

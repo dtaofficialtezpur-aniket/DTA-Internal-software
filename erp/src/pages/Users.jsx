@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { hashPin, useStore } from '../lib/store.jsx';
 import { ROLES, ACCESS } from '../lib/calc.js';
 import { uid } from '../lib/format.js';
-import { Field, Icon, Modal, PageHead } from '../components/ui.jsx';
+import { DemoLeft, Field, Icon, Modal, PageHead } from '../components/ui.jsx';
 import { TITLES } from '../components/Layout.jsx';
 
 export default function Users() {
@@ -11,6 +11,7 @@ export default function Users() {
   return (
     <div className="page">
       <PageHead title="Users & Roles" sub="Each person logs in with their own username and 4-digit PIN">
+        <DemoLeft kind="user" />
         <button className="btn primary" onClick={() => setEdit({ name: '', username: '', role: 'cashier', active: true, pin: '' })}><Icon name="plus" />Add user</button>
       </PageHead>
       <div className="card"><div className="table-wrap"><table className="t">
@@ -31,7 +32,7 @@ export default function Users() {
 }
 
 function UserForm({ value, onClose }) {
-  const { db, user, update, toast } = useStore();
+  const { db, user, update, toast, guard } = useStore();
   const [f, setF] = useState(value);
   const [err, setErr] = useState('');
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
@@ -46,10 +47,11 @@ function UserForm({ value, onClose }) {
     // A changed username invalidates the old PIN hash, so require a new PIN then.
     if (f.id && username !== value.username && !pinHash) return setErr('Set a new PIN when changing the username.');
     const { pin, ...rest } = f;
+    if (!f.id && !guard('user')) return;
     update((d) => {
       const rec = { ...rest, name: f.name.trim(), username, ...(pinHash ? { pinHash } : {}) };
       if (f.id) Object.assign(d.users.find((u) => u.id === f.id), rec); else d.users.push({ ...rec, id: uid('u') });
-    }, [f.id ? (pin ? 'Reset PIN' : 'Edited user') : 'Added user', 'User', `${f.name} · ${ROLES[f.role]}${f.active ? '' : ' · disabled'}`]);
+    }, [f.id ? (pin ? 'Reset PIN' : 'Edited user') : 'Added user', 'User', `${f.name} · ${ROLES[f.role]}${f.active ? '' : ' · disabled'}`], f.id ? null : 'user');
     toast('User saved'); onClose();
   };
   return (

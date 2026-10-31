@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { qty, dateTime, nowIso, uid } from '../lib/format.js';
-import { Empty, Field, Icon, Modal, PageHead, Stat } from '../components/ui.jsx';
+import { DemoLeft, Empty, Field, Icon, Modal, PageHead, Stat } from '../components/ui.jsx';
 
 const SENSITIVE = ['Failed login', 'Cancelled invoice', 'Stock adjustment', 'Changed price', 'Bulk price change', 'Deleted pricelist', 'Edited user', 'Reset PIN', 'Changed settings'];
 
 export default function Security() {
-  const { db, user, update, toast } = useStore();
+  const { db, user, update, toast, guard } = useStore();
   const [entry, setEntry] = useState(null);
   const todayKey = new Date().toDateString();
   const today = (ts) => new Date(ts).toDateString() === todayKey;
@@ -24,6 +24,7 @@ export default function Security() {
   return (
     <div className="page">
       <PageHead title="Security Dashboard" sub="Gate passes, weight variances and sensitive activity">
+        <DemoLeft kind="gate" />
         <button className="btn primary" onClick={() => setEntry({ type: 'in', vehicle: '', driver: '', purpose: 'Supplier delivery' })}><Icon name="plus" />Gate entry</button>
       </PageHead>
       <div className="grid g4 stagger">
@@ -66,7 +67,8 @@ export default function Security() {
       </div>
       {entry && <Modal title="Gate entry" onClose={() => setEntry(null)} footer={<><button className="btn" onClick={() => setEntry(null)}>Cancel</button><button className="btn primary" onClick={() => {
         if (!entry.vehicle.trim()) return;
-        update((d) => { d.gateLog.push({ id: uid('g'), at: nowIso(), ...entry, vehicle: entry.vehicle.trim().toUpperCase(), verified: true, verifiedBy: user.name }); }, ['Gate entry', 'Gate', `${entry.type.toUpperCase()} ${entry.vehicle.toUpperCase()} · ${entry.purpose}`]);
+        if (!guard('gate')) return;
+        update((d) => { d.gateLog.push({ id: uid('g'), at: nowIso(), ...entry, vehicle: entry.vehicle.trim().toUpperCase(), verified: true, verifiedBy: user.name }); }, ['Gate entry', 'Gate', `${entry.type.toUpperCase()} ${entry.vehicle.toUpperCase()} · ${entry.purpose}`], 'gate');
         toast('Gate entry recorded'); setEntry(null);
       }}>Record</button></>}>
         <div className="grid g2">

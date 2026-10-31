@@ -8,6 +8,15 @@ const KEY = 'stc-erp-v2';
 const SESSION_KEY = 'stc-erp-user';
 const Ctx = createContext(null);
 
+// Demo build: each kind of new record can be created only DEMO_LIMIT times. Edits are unlimited.
+export const DEMO_LIMIT = 2;
+export const DEMO_KINDS = {
+  invoice: 'new bills', customer: 'new customers', group: 'new customer groups', product: 'new products', pricelist: 'new pricelists',
+  offer: 'new offers', po: 'new purchase orders', supplier: 'new suppliers', receipt: 'new payment receipts', lead: 'new leads',
+  user: 'new users', leave: 'leave requests', advance: 'advance requests', bank: 'bank statement imports', gate: 'gate entries',
+  adjustment: 'stock adjustments',
+};
+
 export async function hashPin(username, pin) {
   const data = new TextEncoder().encode(`stc:${username}:${pin}`);
   if (crypto?.subtle) {
@@ -33,6 +42,7 @@ export function StoreProvider({ children }) {
   const [db, setDb] = useState(load);
   const [userId, setUserId] = useState(() => { try { return sessionStorage.getItem(SESSION_KEY); } catch { return null; } });
   const [toasts, setToasts] = useState([]);
+  const [limitHit, setLimitHit] = useState(null);
   const dbRef = useRef(db);
   dbRef.current = db;
 
@@ -47,10 +57,20 @@ export function StoreProvider({ children }) {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3600);
   }, []);
 
-  // mutate receives a deep copy to change in place; audit = [action, entity, detail].
-  const update = useCallback((mutate, audit) => {
+  const demoLeft = useCallback((kind) => Math.max(0, DEMO_LIMIT - ((dbRef.current?.demoUsage || {})[kind] || 0)), []);
+  // Call before creating a record; shows the demo-limit notice and returns false once the limit is used up.
+  const guard = useCallback((kind) => {
+    if (demoLeft(kind) > 0) return true;
+    setLimitHit(kind);
+    return false;
+  }, [demoLeft]);
+
+  // mutate receives a deep copy to change in place; audit = [action, entity, detail];
+  // demoKind counts the write against that kind's demo allowance.
+  const update = useCallback((mutate, audit, demoKind) => {
     const next = structuredClone(dbRef.current);
     const result = mutate(next);
+    if (demoKind) { next.demoUsage ||= {}; next.demoUsage[demoKind] = (next.demoUsage[demoKind] || 0) + 1; }
     if (audit) {
       const [action, entity, detail] = audit;
       next.audit.unshift({ id: uid('a'), ts: nowIso(), userId: userId, userName: next.users.find((u) => u.id === userId)?.name || 'System', action, entity, detail });
@@ -85,10 +105,11 @@ export function StoreProvider({ children }) {
     try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
   }, [update]);
 
-  const resetDemo = useCallback(async () => { const d = await freshDb(); dbRef.current = d; setDb(d); }, []);
+  // Demo usage survives a reset so the demo limits keep applying.
+  const resetDemo = useCallback(async () => { const d = await freshDb(); d.demoUsage = dbRef.current?.demoUsage || {}; dbRef.current = d; setDb(d); }, []);
 
   return (
-    <Ctx.Provider value={{ db, user, update, login, logout, verifyPin, toast, toasts, resetDemo }}>
+    <Ctx.Provider value={{ db, user, update, login, logout, verifyPin, toast, toasts, resetDemo, guard, demoLeft, limitHit, setLimitHit }}>
       {children}
     </Ctx.Provider>
   );

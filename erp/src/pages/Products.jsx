@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { isLowStock } from '../lib/calc.js';
 import { money, qty, uid } from '../lib/format.js';
-import { Empty, Field, Icon, Modal, PageHead, Search } from '../components/ui.jsx';
+import { DemoLeft, Empty, Field, Icon, Modal, PageHead, Search } from '../components/ui.jsx';
 
 export const UNITS = ['kg', 'pcs', 'mtr', 'carton', 'box'];
 
@@ -15,6 +15,7 @@ export default function Products() {
   return (
     <div className="page">
       <PageHead title="Products & Units" sub="Each item has a base unit for stock and any number of selling units">
+        {canEdit && <DemoLeft kind="product" />}
         {canEdit && <button className="btn primary" onClick={() => setEdit({ sku: '', name: '', category: 'TMT Rebars', hsn: '', gst: 18, baseUnit: 'kg', units: [], cost: 0, stock: 0, reorder: 0, abc: 'B', active: true })}><Icon name="plus" />Add product</button>}
       </PageHead>
       <div className="card">
@@ -39,17 +40,18 @@ export default function Products() {
 }
 
 function ProductForm({ value, onClose }) {
-  const { update, toast } = useStore();
+  const { update, toast, guard } = useStore();
   const [f, setF] = useState(structuredClone(value));
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const save = () => {
     if (!f.name.trim()) return;
     const rec = { ...f, gst: Number(f.gst) || 0, cost: Number(f.cost) || 0, reorder: Number(f.reorder) || 0,
       units: f.units.filter((u) => u.unit && u.unit !== f.baseUnit && Number(u.factor) > 0).map((u) => ({ unit: u.unit, factor: Number(u.factor) })) };
+    if (!rec.id && !guard('product')) return;
     update((d) => {
       if (rec.id) { const p = d.products.find((x) => x.id === rec.id); Object.assign(p, { ...rec, stock: p.stock }); }
       else { const id = uid('p'); d.products.push({ ...rec, id, stock: 0 }); for (const l of d.pricelists) l.prices[id] = 0; }
-    }, [rec.id ? 'Edited product' : 'Added product', 'Product', `${rec.name} (${rec.sku})`]);
+    }, [rec.id ? 'Edited product' : 'Added product', 'Product', `${rec.name} (${rec.sku})`], rec.id ? null : 'product');
     toast('Product saved'); onClose();
   };
   return (

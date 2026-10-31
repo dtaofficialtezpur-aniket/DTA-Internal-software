@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { money, date, daysBetween, downloadCsv, nowIso, toCsv, uid } from '../lib/format.js';
 import { postReceipt } from '../lib/ops.js';
-import { Empty, Field, Icon, Modal, PageHead, Stat, Tabs } from '../components/ui.jsx';
+import { DemoLeft, Empty, Field, Icon, Modal, PageHead, Stat, Tabs } from '../components/ui.jsx';
 
 const CATEGORIES = ['Supplier payment', 'Salary', 'Rent / utilities', 'Bank charges', 'Owner drawing', 'Transfer between accounts', 'Other income', 'Other expense'];
 const WINDOW_DAYS = 5;
@@ -82,7 +82,7 @@ function sampleStatement(db) {
 }
 
 export default function Bank() {
-  const { db, update, toast } = useStore();
+  const { db, update, toast, guard } = useStore();
   const [tab, setTab] = useState('unmatched');
   const [pick, setPick] = useState(null);
   const file = useRef();
@@ -95,6 +95,7 @@ export default function Bank() {
   const importText = (text, name) => {
     let rows;
     try { rows = parseStatement(text); } catch (e) { return toast(e.message, 'bad'); }
+    if (!guard('bank')) return;
     const { added, auto } = update((d) => {
       const seen = new Set(d.bankLines.map((l) => `${l.date}|${l.desc}|${l.debit}|${l.credit}`));
       let added = 0;
@@ -105,13 +106,14 @@ export default function Bank() {
         d.bankLines.push({ id: uid('bl'), ...r, status: 'unmatched', imported: nowIso() });
       }
       return { added, auto: autoMatch(d) };
-    }, ['Imported bank statement', 'Bank', `${name} · ${rows.length} lines`]);
+    }, ['Imported bank statement', 'Bank', `${name} · ${rows.length} lines`], 'bank');
     toast(`${added} new line(s) imported${added < rows.length ? ` (${rows.length - added} already present)` : ''} · ${auto} matched automatically`);
   };
 
   return (
     <div className="page">
       <PageHead title="Bank Reconciliation" sub="Import the bank statement; receipts and bill payments are matched automatically">
+        <DemoLeft kind="bank" />
         <button className="btn" onClick={() => { const blob = new Blob([sampleStatement(db)], { type: 'text/csv' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'sample-bank-statement.csv'; a.click(); }}><Icon name="download" />Sample format</button>
         <button className="btn" onClick={() => importText(sampleStatement(db), 'Sample statement')}><Icon name="refresh" />Load demo statement</button>
         <button className="btn primary" onClick={() => file.current.click()}><Icon name="download" style={{ transform: 'rotate(180deg)' }} />Import CSV</button>
@@ -157,7 +159,7 @@ export default function Bank() {
 }
 
 function ReconcileModal({ line, onClose }) {
-  const { db, user, update, toast } = useStore();
+  const { db, user, update, toast, guard } = useStore();
   const used = new Set(db.bankLines.map((l) => l.matchId).filter(Boolean));
   const amt = line.credit || line.debit;
   const cands = line.credit ? bookEntries(db).filter((b) => !used.has(b.id) && Math.abs(b.amount - amt) < 0.5).sort((a, b) => Math.abs(daysBetween(a.date, line.date + 'T12:00:00')) - Math.abs(daysBetween(b.date, line.date + 'T12:00:00'))) : [];
@@ -169,10 +171,11 @@ function ReconcileModal({ line, onClose }) {
   };
   const receipt = () => {
     if (!cust) return;
+    if (!guard('receipt')) return;
     update((d) => {
       const rc = postReceipt(d, { customerId: cust, amount: line.credit, mode: 'bank', ref: line.ref || line.desc.slice(0, 30), userId: user.id });
       Object.assign(d.bankLines.find((x) => x.id === line.id), { status: 'matched', matchId: 'rc:' + rc.id, how: 'receipt' });
-    }, ['Receipt from bank line', 'Bank', `${db.customers.find((c) => c.id === cust)?.name} · ${money(line.credit)}`]);
+    }, ['Receipt from bank line', 'Bank', `${db.customers.find((c) => c.id === cust)?.name} · ${money(line.credit)}`], 'receipt');
     toast('Receipt created and matched'); onClose();
   };
   return (

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { money, uid } from '../lib/format.js';
-import { Empty, Field, Icon, Modal, PageHead, Tabs } from '../components/ui.jsx';
+import { DemoLeft, Empty, Field, Icon, Modal, PageHead, Tabs } from '../components/ui.jsx';
 
 export default function Pricelists() {
-  const { db, user, update, toast } = useStore();
+  const { db, user, update, toast, guard } = useStore();
   const [tab, setTab] = useState('lists');
   const [sel, setSel] = useState(db.pricelists[0]?.id);
   const [newList, setNewList] = useState(null);
@@ -35,6 +35,7 @@ export default function Pricelists() {
   return (
     <div className="page">
       <PageHead title="Pricelists & Offers" sub="Rates are per base unit and exclusive of GST">
+        {canEdit && <DemoLeft kind={tab === 'lists' ? 'pricelist' : 'offer'} />}
         {canEdit && tab === 'lists' && <button className="btn primary" onClick={() => setNewList({ name: '', copyFrom: sel })}><Icon name="plus" />New pricelist</button>}
         {canEdit && tab === 'offers' && <button className="btn primary" onClick={() => setOffer({ name: '', category: 'TMT Rebars', productId: '', minBase: 0, discPct: 1, from: '', to: '', active: true })}><Icon name="plus" />New offer</button>}
       </PageHead>
@@ -72,8 +73,9 @@ export default function Pricelists() {
       </div>
       {newList && <Modal title="New pricelist" onClose={() => setNewList(null)} footer={<><button className="btn" onClick={() => setNewList(null)}>Cancel</button><button className="btn primary" onClick={() => {
         if (!newList.name.trim()) return;
+        if (!guard('pricelist')) return;
         const id = uid('pl');
-        update((d) => { d.pricelists.push({ id, name: newList.name.trim(), prices: { ...(d.pricelists.find((p) => p.id === newList.copyFrom)?.prices || {}) } }); }, ['Created pricelist', 'Pricelist', newList.name]);
+        update((d) => { d.pricelists.push({ id, name: newList.name.trim(), prices: { ...(d.pricelists.find((p) => p.id === newList.copyFrom)?.prices || {}) } }); }, ['Created pricelist', 'Pricelist', newList.name], 'pricelist');
         setSel(id); setNewList(null); toast('Pricelist created');
       }}>Create</button></>}>
         <div className="grid">
@@ -87,14 +89,15 @@ export default function Pricelists() {
 }
 
 function OfferForm({ value, onClose }) {
-  const { db, update, toast } = useStore();
+  const { db, update, toast, guard } = useStore();
   const [f, setF] = useState(value);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
   const save = () => {
     if (!f.name.trim()) return;
     const rec = { ...f, minBase: Number(f.minBase) || 0, discPct: Number(f.discPct) || 0 };
+    if (!rec.id && !guard('offer')) return;
     update((d) => { d.offers ||= []; if (rec.id) Object.assign(d.offers.find((o) => o.id === rec.id), rec); else d.offers.push({ ...rec, id: uid('o') }); },
-      [rec.id ? 'Edited offer' : 'Created offer', 'Offer', `${rec.name} · ${rec.discPct}%`]);
+      [rec.id ? 'Edited offer' : 'Created offer', 'Offer', `${rec.name} · ${rec.discPct}%`], rec.id ? null : 'offer');
     toast('Offer saved'); onClose();
   };
   const del = () => { update((d) => { d.offers = d.offers.filter((o) => o.id !== f.id); }, ['Deleted offer', 'Offer', f.name]); onClose(); };

@@ -3,7 +3,7 @@ import { useStore } from '../lib/store.jsx';
 import { cycleCountDue, isLowStock } from '../lib/calc.js';
 import { money, qty, date, dateTime, daysBetween, downloadCsv, nowIso, round2, uid } from '../lib/format.js';
 import { moveStock } from '../lib/ops.js';
-import { Empty, Field, HBar, Icon, Modal, PageHead, Stat, Tabs } from '../components/ui.jsx';
+import { DemoLeft, Empty, Field, HBar, Icon, Modal, PageHead, Stat, Tabs } from '../components/ui.jsx';
 
 export default function Inventory() {
   const { db, user } = useStore();
@@ -15,7 +15,7 @@ export default function Inventory() {
 
   return (
     <div className="page">
-      <PageHead title="Stock & Cycle Count" sub="Single location (Parua godown). A second location can be added when it opens." />
+      <PageHead title="Stock & Cycle Count" sub="Single location (Parua godown). A second location can be added when it opens.">{canAdjust && <DemoLeft kind="adjustment" />}</PageHead>
       <div className="grid g4 stagger">
         <Stat label="Stock value at cost" value={db.products.reduce((s, p) => s + p.stock * p.cost, 0)} icon="layers" />
         <Stat label="Steel on hand" value={db.products.filter((p) => p.baseUnit === 'kg').reduce((s, p) => s + p.stock, 0) / 1000} money={false} sub="metric tonnes" icon="scale" tone="gold" />
@@ -108,13 +108,14 @@ function Ledger() {
 }
 
 function AdjustModal({ product, onClose }) {
-  const { update, toast } = useStore();
+  const { update, toast, guard } = useStore();
   const [delta, setDelta] = useState('');
   const [reason, setReason] = useState('Damage');
   const save = () => {
     const n = Number(delta);
     if (!n) return;
-    update((d) => moveStock(d, product.id, n, 'adjust', reason), ['Stock adjustment', 'Stock', `${product.name}: ${n > 0 ? '+' : ''}${n} ${product.baseUnit} (${reason})`]);
+    if (!guard('adjustment')) return;
+    update((d) => moveStock(d, product.id, n, 'adjust', reason), ['Stock adjustment', 'Stock', `${product.name}: ${n > 0 ? '+' : ''}${n} ${product.baseUnit} (${reason})`], 'adjustment');
     toast('Stock adjusted'); onClose();
   };
   return (

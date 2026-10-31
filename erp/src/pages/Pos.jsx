@@ -5,7 +5,7 @@ import { loyaltyOf, approversFor, basePrice, computeBill, creditCheck, creditSco
 import { money, qty, round2, dateTime, uid, nowIso } from '../lib/format.js';
 import { postInvoice, sessionSummary } from '../lib/ops.js';
 import { printGstInvoice, printThermal } from '../lib/print.js';
-import { ApprovalModal, Empty, Field, Icon, Modal, PageHead, Search } from '../components/ui.jsx';
+import { ApprovalModal, DemoLeft, Empty, Field, Icon, Modal, PageHead, Search } from '../components/ui.jsx';
 
 const MODES = [['cash', 'Cash'], ['upi', 'UPI'], ['cheque', 'Cheque'], ['bank', 'Bank'], ['credit', 'Credit']];
 
@@ -18,6 +18,7 @@ export default function Pos() {
   return (
     <div className="page">
       <PageHead title="Point of Sale" sub={`Session opened ${dateTime(session.openedAt)} · Opening cash ${money(session.openingCash)}`}>
+        <DemoLeft kind="invoice" />
         <button className="btn" onClick={() => setClosing(true)}><Icon name="lock" />Close session</button>
       </PageHead>
       <Counter session={session} />
@@ -79,7 +80,7 @@ function CloseSession({ session, onClose }) {
 }
 
 function Counter({ session }) {
-  const { db, user, update, toast } = useStore();
+  const { db, user, update, toast, guard } = useStore();
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('All');
   const [customerId, setCustomerId] = useState('walkin');
@@ -138,10 +139,11 @@ function Counter({ session }) {
     if (!lines.length) return;
     if (needsApproval) return setAsk('discount');
     if (blocked) return setAsk('credit');
+    if (!guard('invoice')) return;
     const pays = payments.filter((p) => p.mode !== 'credit' && Number(p.amount) > 0).map((p) => ({ mode: p.mode, amount: Number(p.amount), ref: p.ref || '' }));
     if (redeemPts > 0) pays.push({ mode: 'points', amount: redeemValue, points: redeemPts, ref: 'Loyalty' });
     const inv = update((d) => postInvoice(d, { bill, customer, payments: pays, userId: user.id, sessionId: session.id, approval, override }),
-      ['Created invoice', 'Invoice', `${customer.name} · ${money(bill.total)}${approval ? ` · discount ${bill.manualDiscPct}% approved by ${approval.byName}` : ''}${override ? ` · credit override by ${override.byName}: ${override.note}` : ''}`]);
+      ['Created invoice', 'Invoice', `${customer.name} · ${money(bill.total)}${approval ? ` · discount ${bill.manualDiscPct}% approved by ${approval.byName}` : ''}${override ? ` · credit override by ${override.byName}: ${override.note}` : ''}`], 'invoice');
     toast(`Invoice ${inv.no} saved`);
     setDone(inv);
     reset();

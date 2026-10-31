@@ -83,6 +83,14 @@ to the backend at the same time.
 - Direct weigh-scale connection (needs scale model and connection type).
 - Second warehouse location when it opens.
 
+## Demo limits
+
+This build is a demo: each kind of new record (bills, customers, products, purchase orders, receipts, leads, users,
+leave and advance requests, bank imports, gate entries, stock adjustments…) can be created only **2 times**.
+Editing and viewing existing data is unlimited. The remaining count shows beside each add button, and a notice
+appears when the limit is reached. Counters are kept in `demoUsage` and survive Settings → Reset demo.
+`DEMO_LIMIT` / `DEMO_KINDS` in `src/lib/store.jsx` control it; remove the `guard(...)` calls for the full version.
+
 ## Single-file build
 
 `npm run build:single` writes `dist-single/index.html`: the whole app in one HTML file that opens with a double-click.

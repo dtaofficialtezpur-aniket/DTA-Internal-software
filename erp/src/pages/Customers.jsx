@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { agingBuckets, creditScore, customerLedger, invoiceDue } from '../lib/calc.js';
 import { money, date, uid } from '../lib/format.js';
-import { Empty, Field, HBar, Icon, Modal, PageHead, Search, Tabs } from '../components/ui.jsx';
+import { DemoLeft, Empty, Field, HBar, Icon, Modal, PageHead, Search, Tabs } from '../components/ui.jsx';
 import { status } from './Sales.jsx';
 
 const blankCustomer = { name: '', phone: '', gstin: '', address: '', groupId: 'g-retail', parentId: '', creditLimit: 0, creditDays: 0, stateCode: '18' };
@@ -20,6 +20,7 @@ export default function Customers() {
   return (
     <div className="page">
       <PageHead title="Customers" sub="Customer accounts, hierarchy, groups and credit standing">
+        {canEdit && tab === 'customers' && <DemoLeft kind="customer" />}
         {canEdit && tab === 'customers' && <button className="btn primary" onClick={() => setEdit({ ...blankCustomer })}><Icon name="plus" />Add customer</button>}
         {canEdit && tab === 'groups' && <button className="btn primary" onClick={() => setGroup({ name: '', pricelistId: db.pricelists[0].id, discount: 0 })}><Icon name="plus" />Add group</button>}
       </PageHead>
@@ -71,16 +72,17 @@ export function ScoreBadge({ s }) {
 }
 
 function CustomerForm({ value, onClose }) {
-  const { db, update, toast } = useStore();
+  const { db, update, toast, guard } = useStore();
   const [f, setF] = useState(value);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const save = () => {
     if (!f.name.trim()) return;
     const rec = { ...f, name: f.name.trim(), creditLimit: Number(f.creditLimit) || 0, creditDays: Number(f.creditDays) || 0 };
+    if (!rec.id && !guard('customer')) return;
     update((d) => {
       if (rec.id) Object.assign(d.customers.find((c) => c.id === rec.id), rec);
       else d.customers.push({ ...rec, id: uid('c') });
-    }, [rec.id ? 'Edited customer' : 'Added customer', 'Customer', `${rec.name} · limit ${money(rec.creditLimit)}, ${rec.creditDays} days`]);
+    }, [rec.id ? 'Edited customer' : 'Added customer', 'Customer', `${rec.name} · limit ${money(rec.creditLimit)}, ${rec.creditDays} days`], rec.id ? null : 'customer');
     toast('Customer saved');
     onClose();
   };
@@ -102,15 +104,16 @@ function CustomerForm({ value, onClose }) {
 }
 
 function GroupForm({ value, onClose }) {
-  const { db, update, toast } = useStore();
+  const { db, update, toast, guard } = useStore();
   const [f, setF] = useState(value);
   const save = () => {
     if (!f.name.trim()) return;
+    if (!f.id && !guard('group')) return;
     update((d) => {
       const rec = { ...f, discount: Number(f.discount) || 0 };
       if (rec.id) Object.assign(d.customerGroups.find((g) => g.id === rec.id), rec);
       else d.customerGroups.push({ ...rec, id: uid('g') });
-    }, [f.id ? 'Edited customer group' : 'Added customer group', 'Customer group', `${f.name} · ${f.discount}%`]);
+    }, [f.id ? 'Edited customer group' : 'Added customer group', 'Customer group', `${f.name} · ${f.discount}%`], f.id ? null : 'group');
     toast('Group saved');
     onClose();
   };

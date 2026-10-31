@@ -3,7 +3,7 @@ import { useStore } from '../lib/store.jsx';
 import { agingBuckets, creditScore, customerLedger, upiLink, waLink } from '../lib/calc.js';
 import { money, date, daysBetween, nowIso, uid } from '../lib/format.js';
 import { postReceipt } from '../lib/ops.js';
-import { Empty, Field, Icon, Modal, PageHead, Stat, Tabs } from '../components/ui.jsx';
+import { DemoLeft, Empty, Field, Icon, Modal, PageHead, Stat, Tabs } from '../components/ui.jsx';
 import { ScoreBadge } from './Customers.jsx';
 
 export default function Collections() {
@@ -36,7 +36,7 @@ export default function Collections() {
 
   return (
     <div className="page">
-      <PageHead title="Credit & Collections" sub={`Reminders are due every ${db.settings.reminderEvery} days while an invoice is overdue`} />
+      <PageHead title="Credit & Collections" sub={`Reminders are due every ${db.settings.reminderEvery} days while an invoice is overdue`}><DemoLeft kind="receipt" /></PageHead>
       <div className="grid g4 stagger">
         <Stat label="Total receivable" value={total} icon="wallet" />
         <Stat label="Overdue" value={overdue} icon="alert" tone="red" sub={`${rows.filter((r) => r.l.overdue.length).length} customers`} />
@@ -69,7 +69,7 @@ export default function Collections() {
 }
 
 function ReceiveModal({ customer, onClose }) {
-  const { db, user, update, toast } = useStore();
+  const { db, user, update, toast, guard } = useStore();
   const l = customerLedger(db, customer.id);
   const [amount, setAmount] = useState(String(l.outstanding));
   const [mode, setMode] = useState('bank');
@@ -77,8 +77,9 @@ function ReceiveModal({ customer, onClose }) {
   const save = () => {
     const amt = Number(amount);
     if (!(amt > 0)) return;
+    if (!guard('receipt')) return;
     const rc = update((d) => postReceipt(d, { customerId: customer.id, amount: amt, mode, ref, userId: user.id }),
-      ['Received payment', 'Receipt', `${customer.name} · ${money(amt)} · ${mode}${ref ? ' ' + ref : ''}`]);
+      ['Received payment', 'Receipt', `${customer.name} · ${money(amt)} · ${mode}${ref ? ' ' + ref : ''}`], 'receipt');
     toast(`Receipt ${rc.no} saved against ${rc.allocations.length} invoice(s)`);
     onClose();
   };

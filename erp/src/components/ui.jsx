@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useStore } from '../lib/store.jsx';
+import { DEMO_KINDS, DEMO_LIMIT, useStore } from '../lib/store.jsx';
 import { money } from '../lib/format.js';
 
 const PATHS = {
@@ -137,6 +137,31 @@ export function Search({ value, onChange, placeholder = 'Search' }) {
       <Icon name="search" />
       <input className="input" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
     </div>
+  );
+}
+
+// "Demo · 1 of 2 left" next to an add button.
+export function DemoLeft({ kind }) {
+  const { demoLeft } = useStore();
+  const left = demoLeft(kind);
+  return <span className={`demo-left ${left ? '' : 'out'}`} title={`Demo version: ${DEMO_LIMIT} ${DEMO_KINDS[kind]} allowed`}><Icon name="lock" />Demo · {left} of {DEMO_LIMIT} {DEMO_KINDS[kind]} left</span>;
+}
+
+export function DemoLimitModal() {
+  const { limitHit, setLimitHit } = useStore();
+  if (!limitHit) return null;
+  return (
+    <Modal title="Demo limit reached" onClose={() => setLimitHit(null)} footer={<button className="btn primary" onClick={() => setLimitHit(null)}>Understood</button>}>
+      <div className="grid" style={{ gap: 14, justifyItems: 'center', textAlign: 'center' }}>
+        <span className="mini-ic gold" style={{ width: 56, height: 56, borderRadius: '50%' }}><Icon name="lock" style={{ width: 26, height: 26 }} /></span>
+        <div>
+          <h2>This is a demo version</h2>
+          <p className="muted" style={{ marginTop: 6 }}>The demo allows only <b>{DEMO_LIMIT} {DEMO_KINDS[limitHit]}</b>, and both have been used.
+            Editing and viewing existing records still works.</p>
+        </div>
+        <div className="alert info" style={{ textAlign: 'left' }}><Icon name="info" /><div>For the full version without limits, please contact <b>DTA</b>.</div></div>
+      </div>
+    </Modal>
   );
 }
 

@@ -3,13 +3,13 @@ import { useStore } from '../lib/store.jsx';
 import { money, date, nowIso, uid } from '../lib/format.js';
 import { hoursOf, isLate, payrollFor } from '../lib/hr.js';
 import { printPayslip } from '../lib/print.js';
-import { Empty, Field, Icon, Modal, PageHead, Stat, Tabs } from '../components/ui.jsx';
+import { DemoLeft, Empty, Field, Icon, Modal, PageHead, Stat, Tabs } from '../components/ui.jsx';
 
 const time = (iso) => (iso ? new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—');
 const STATUS_TONE = { pending: 'warn', approved: 'ok', rejected: 'bad' };
 
 export default function Portal() {
-  const { db, user, update, toast } = useStore();
+  const { db, user, update, toast, guard } = useStore();
   const [tab, setTab] = useState('attendance');
   const [leave, setLeave] = useState(null);
   const [advance, setAdvance] = useState(null);
@@ -55,6 +55,8 @@ export default function Portal() {
       <div className="card mt">
         <div className="card-head wrap">
           <Tabs value={tab} onChange={setTab} items={[['attendance', 'Attendance'], ['logins', 'Login / logout'], ['leave', 'Leave'], ['advance', 'Advances'], ['slips', 'Salary slips']]} />
+          {tab === 'leave' && <DemoLeft kind="leave" />}
+          {tab === 'advance' && <DemoLeft kind="advance" />}
           {tab === 'leave' && <button className="btn primary sm" onClick={() => setLeave({ from: today, to: today, type: 'Casual', reason: '' })}><Icon name="plus" />Apply for leave</button>}
           {tab === 'advance' && <button className="btn primary sm" onClick={() => setAdvance({ amount: '', reason: '' })}><Icon name="plus" />Request advance</button>}
         </div>
@@ -88,8 +90,9 @@ export default function Portal() {
 
       {leave && <Modal title="Apply for leave" onClose={() => setLeave(null)} footer={<><button className="btn" onClick={() => setLeave(null)}>Cancel</button><button className="btn primary" onClick={() => {
         if (leave.to < leave.from || !leave.reason.trim()) return toast('Check the dates and give a reason', 'bad');
+        if (!guard('leave')) return;
         const days = Math.round((new Date(leave.to) - new Date(leave.from)) / 86400000) + 1;
-        update((d) => { d.hr.leaves.push({ id: uid('lv'), userId: user.id, ...leave, days, status: 'pending', at: nowIso() }); }, ['Applied for leave', 'Leave', `${user.name} · ${days} day(s) ${leave.type}`]);
+        update((d) => { d.hr.leaves.push({ id: uid('lv'), userId: user.id, ...leave, days, status: 'pending', at: nowIso() }); }, ['Applied for leave', 'Leave', `${user.name} · ${days} day(s) ${leave.type}`], 'leave');
         toast('Leave request sent for approval'); setLeave(null);
       }}>Submit</button></>}>
         <div className="grid g2">
@@ -101,7 +104,8 @@ export default function Portal() {
       </Modal>}
       {advance && <Modal title="Request salary advance" onClose={() => setAdvance(null)} footer={<><button className="btn" onClick={() => setAdvance(null)}>Cancel</button><button className="btn primary" onClick={() => {
         if (!(Number(advance.amount) > 0) || !advance.reason.trim()) return toast('Enter an amount and reason', 'bad');
-        update((d) => { d.hr.advances.push({ id: uid('ad'), userId: user.id, amount: Number(advance.amount), reason: advance.reason, status: 'pending', at: nowIso() }); }, ['Requested advance', 'Advance', `${user.name} · ${money(advance.amount)}`]);
+        if (!guard('advance')) return;
+        update((d) => { d.hr.advances.push({ id: uid('ad'), userId: user.id, amount: Number(advance.amount), reason: advance.reason, status: 'pending', at: nowIso() }); }, ['Requested advance', 'Advance', `${user.name} · ${money(advance.amount)}`], 'advance');
         toast('Advance request sent'); setAdvance(null);
       }}>Submit</button></>}>
         <div className="grid g2">

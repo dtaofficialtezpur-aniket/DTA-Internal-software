@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { loyaltyOf, TIERS, waLink } from '../lib/calc.js';
 import { money, date, dateTime, nowIso, uid } from '../lib/format.js';
-import { Empty, Field, Icon, Modal, PageHead, Search, Stat, Tabs } from '../components/ui.jsx';
+import { DemoLeft, Empty, Field, Icon, Modal, PageHead, Search, Stat, Tabs } from '../components/ui.jsx';
 
 const STAGES = [['new', 'New', 'blue'], ['contacted', 'Contacted', ''], ['quoted', 'Quotation sent', 'gold'], ['won', 'Won', 'ok'], ['lost', 'Lost', 'bad']];
 const SOURCES = ['Walk-in', 'Phone', 'WhatsApp', 'Referral', 'Field visit', 'Govt. tender', 'Website'];
@@ -20,6 +20,7 @@ export default function Crm() {
   return (
     <div className="page">
       <PageHead title="Leads & Loyalty" sub="Enquiries, follow-ups and customer rewards">
+        {tab !== 'loyalty' && <DemoLeft kind="lead" />}
         {tab !== 'loyalty' && <button className="btn primary" onClick={() => setOpen({ name: '', contact: '', phone: '', source: 'Walk-in', need: '', value: '', stage: 'new', followUp: today, ownerId: user.id, notes: [] })}><Icon name="plus" />New lead</button>}
       </PageHead>
       <div className="grid g4 stagger">
@@ -84,7 +85,7 @@ function FollowUps({ rows, onOpen }) {
 }
 
 function LeadModal({ value, onClose }) {
-  const { db, user, update, toast } = useStore();
+  const { db, user, update, toast, guard } = useStore();
   const [f, setF] = useState(structuredClone(value));
   const [note, setNote] = useState('');
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -93,18 +94,20 @@ function LeadModal({ value, onClose }) {
     if (!rec.name.trim()) return toast('Enter a lead name', 'bad');
     if (note.trim()) rec.notes = [...rec.notes, { at: nowIso(), by: user.name, text: note.trim() }];
     if (rec.stage === 'lost' && !rec.lostReason) return toast('Record why the lead was lost', 'bad');
+    if (!rec.id && !guard('lead')) return;
     update((d) => {
       if (rec.id) Object.assign(d.leads.find((l) => l.id === rec.id), rec);
       else { const n = ++d.seq.LD; d.leads.push({ ...rec, id: uid('ld'), no: 'LD-' + String(n).padStart(3, '0'), created: nowIso() }); }
-    }, [rec.id ? `Lead ${STAGES.find(([k]) => k === rec.stage)[1].toLowerCase()}` : 'New lead', 'Lead', `${rec.name} · ${money(rec.value)}`]);
+    }, [rec.id ? `Lead ${STAGES.find(([k]) => k === rec.stage)[1].toLowerCase()}` : 'New lead', 'Lead', `${rec.name} · ${money(rec.value)}`], rec.id ? null : 'lead');
     toast(msg); onClose();
   };
   const convert = () => {
     if (db.customers.some((c) => c.name === f.name)) return toast('A customer with this name already exists', 'bad');
+    if (!guard('customer')) return;
     update((d) => {
       d.customers.push({ id: uid('c'), name: f.name, phone: f.phone, groupId: 'g-b2b', creditLimit: 0, creditDays: 0, stateCode: '18', address: '' });
       Object.assign(d.leads.find((l) => l.id === f.id), { stage: 'won', converted: true });
-    }, ['Converted lead to customer', 'Lead', f.name]);
+    }, ['Converted lead to customer', 'Lead', f.name], 'customer');
     toast('Customer created — set the credit limit under Customers'); onClose();
   };
   return (

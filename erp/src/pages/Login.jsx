@@ -48,7 +48,7 @@ export default function Login() {
       </section>
       <section className="login-form">
         <div className="login-box page">
-          <div className="demo-banner"><Icon name="info" /><div><b>Demo made by DTA</b> for Shanti Trading Company. Sample data only.</div></div>
+          <div className="demo-banner"><Icon name="info" /><div><b>Demo made by DTA</b> for Shanti Trading Company. Sample data only; new entries are limited to <b>2 per feature</b> (bills, customers, products, orders…).</div></div>
           <h2 style={{ fontSize: 22 }}>Sign in</h2>
           <p className="muted" style={{ marginTop: 4 }}>{step === 'user' ? 'Enter your username to continue.' : `Enter the 4-digit PIN for ${username}.`}</p>
           {step === 'user' ? (

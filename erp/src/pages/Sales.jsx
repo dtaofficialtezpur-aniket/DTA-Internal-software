@@ -4,7 +4,7 @@ import { invoiceDue, waLink } from '../lib/calc.js';
 import { money, qty, date, dateTime, downloadCsv } from '../lib/format.js';
 import { moveStock } from '../lib/ops.js';
 import { printGstInvoice, printThermal } from '../lib/print.js';
-import { ApprovalModal, Empty, Icon, Modal, PageHead, Search, Tabs } from '../components/ui.jsx';
+import { ApprovalModal, DemoLeft, Empty, Icon, Modal, PageHead, Search, Tabs } from '../components/ui.jsx';
 
 export default function Sales() {
   const { db } = useStore();
@@ -27,6 +27,7 @@ export default function Sales() {
   return (
     <div className="page">
       <PageHead title="Invoices" sub={`${db.invoices.length} invoices on record`}>
+        <DemoLeft kind="invoice" />
         <button className="btn" onClick={exportCsv}><Icon name="download" />Export CSV</button>
         <a className="btn primary" href="#/pos"><Icon name="plus" />New bill</a>
       </PageHead>
