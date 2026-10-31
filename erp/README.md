@@ -86,9 +86,9 @@ to the backend at the same time.
 ## Demo limits
 
 This build is a demo: each kind of new record (bills, customers, products, purchase orders, receipts, leads, users,
-leave and advance requests, bank imports, gate entries, stock adjustments…) can be created only **2 times**.
+leave and advance requests, bank imports, gate entries, stock adjustments…) can be created only **2 times per login** (the allowance refreshes at every sign-in).
 Editing and viewing existing data is unlimited. The remaining count shows beside each add button, and a notice
-appears when the limit is reached. Counters are kept in `demoUsage` and survive Settings → Reset demo.
+appears when the limit is reached. Counters are kept in `demoUsage`, reset at login and survive Settings → Reset demo.
 `DEMO_LIMIT` / `DEMO_KINDS` in `src/lib/store.jsx` control it; remove the `guard(...)` calls for the full version.
 
 ## Single-file build

@@ -61,7 +61,7 @@ export function Layout({ page, children }) {
           <button className="btn ghost icon-btn menu-btn" onClick={() => setOpen(true)} aria-label="Menu"><Icon name="menu" /></button>
           <div className="crumb">{db.company.name} / <b>{TITLES[page]}</b></div>
           <div className="spacer" />
-          <span className="demo-top" title="Each kind of new record is limited to 2 in this demo"><Icon name="lock" />Demo version · 2 new entries per feature</span>
+          <span className="demo-top" title="Each kind of new record is limited to 2 per login in this demo"><Icon name="lock" />Demo version · 2 new entries per feature per login</span>
           <div className="user-chip">
             <div className="avatar">{initials}</div>
             <div className="who"><b>{user.name}</b><span>{ROLES[user.role]}</span></div>

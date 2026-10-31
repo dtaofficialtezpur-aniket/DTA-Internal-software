@@ -144,7 +144,7 @@ export function Search({ value, onChange, placeholder = 'Search' }) {
 export function DemoLeft({ kind }) {
   const { demoLeft } = useStore();
   const left = demoLeft(kind);
-  return <span className={`demo-left ${left ? '' : 'out'}`} title={`Demo version: ${DEMO_LIMIT} ${DEMO_KINDS[kind]} allowed`}><Icon name="lock" />Demo · {left} of {DEMO_LIMIT} {DEMO_KINDS[kind]} left</span>;
+  return <span className={`demo-left ${left ? '' : 'out'}`} title={`Demo version: ${DEMO_LIMIT} ${DEMO_KINDS[kind]} per login`}><Icon name="lock" />Demo · {left} of {DEMO_LIMIT} {DEMO_KINDS[kind]} left</span>;
 }
 
 export function DemoLimitModal() {
@@ -156,8 +156,8 @@ export function DemoLimitModal() {
         <span className="mini-ic gold" style={{ width: 56, height: 56, borderRadius: '50%' }}><Icon name="lock" style={{ width: 26, height: 26 }} /></span>
         <div>
           <h2>This is a demo version</h2>
-          <p className="muted" style={{ marginTop: 6 }}>The demo allows only <b>{DEMO_LIMIT} {DEMO_KINDS[limitHit]}</b>, and both have been used.
-            Editing and viewing existing records still works.</p>
+          <p className="muted" style={{ marginTop: 6 }}>The demo allows <b>{DEMO_LIMIT} {DEMO_KINDS[limitHit]}</b> per login, and both have been used.
+            Log out and sign in again for 2 more. Editing and viewing existing records still works.</p>
         </div>
         <div className="alert info" style={{ textAlign: 'left' }}><Icon name="info" /><div>For the full version without limits, please contact <b>DTA</b>.</div></div>
       </div>

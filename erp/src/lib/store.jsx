@@ -8,7 +8,7 @@ const KEY = 'stc-erp-v2';
 const SESSION_KEY = 'stc-erp-user';
 const Ctx = createContext(null);
 
-// Demo build: each kind of new record can be created only DEMO_LIMIT times. Edits are unlimited.
+// Demo build: each kind of new record can be created only DEMO_LIMIT times per login. Edits are unlimited.
 export const DEMO_LIMIT = 2;
 export const DEMO_KINDS = {
   invoice: 'new bills', customer: 'new customers', group: 'new customer groups', product: 'new products', pricelist: 'new pricelists',
@@ -87,6 +87,8 @@ export function StoreProvider({ children }) {
     setUserId(u.id);
     try { sessionStorage.setItem(SESSION_KEY, u.id); } catch { /* ignore */ }
     const next = structuredClone(dbRef.current);
+    // Every login starts with a fresh demo allowance.
+    next.demoUsage = {};
     next.audit.unshift({ id: uid('a'), ts: nowIso(), userId: u.id, userName: u.name, action: 'Logged in', entity: 'Session', detail: ROLE_LABEL(u.role) });
     dbRef.current = next;
     setDb(next);
