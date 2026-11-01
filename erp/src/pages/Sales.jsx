@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../lib/store.jsx';
-import { invoiceDue, waLink } from '../lib/calc.js';
+import { invoiceDue, taxBreakup, waLink } from '../lib/calc.js';
 import { money, qty, date, dateTime, downloadCsv } from '../lib/format.js';
 import { moveStock } from '../lib/ops.js';
 import { printGstInvoice, printThermal } from '../lib/print.js';
@@ -101,13 +101,15 @@ export function InvoiceView({ id, onClose }) {
       </div>
       {inv.cancelled && <div className="alert bad" style={{ marginBottom: 12 }}><Icon name="x" />Cancelled by {inv.cancelled.by}: {inv.cancelled.note}</div>}
       <div className="table-wrap"><table className="t">
-        <thead><tr><th>Item</th><th className="num">Qty</th><th className="num">Rate</th><th className="num">Discount</th><th className="num">Taxable</th><th className="num">GST</th><th className="num">Amount</th></tr></thead>
-        <tbody>{inv.items.map((l, k) => <tr key={k}><td>{l.name}</td><td className="num">{qty(l.qty)} {l.unit}</td><td className="num">{money(l.rate)}</td><td className="num">{money(l.discount)}</td><td className="num">{money(l.taxable)}</td><td className="num">{money(l.tax)}</td><td className="num">{money(l.total)}</td></tr>)}</tbody>
-        <tfoot><tr><td colSpan={4}>Total {inv.roundOff ? `(round off ${money(inv.roundOff)})` : ''}</td><td className="num">{money(inv.taxable)}</td><td className="num">{money(inv.tax)}</td><td className="num">{money(inv.total)}</td></tr></tfoot>
+        <thead><tr><th>Item</th><th className="num">Qty</th><th className="num">Rate</th><th className="num">Discount</th><th className="num">Taxable</th><th className="num">GST %</th><th className="num">GST</th><th className="num">Amount</th></tr></thead>
+        <tbody>{inv.items.map((l, k) => <tr key={k}><td>{l.name}</td><td className="num">{qty(l.qty)} {l.unit}</td><td className="num">{money(l.rate)}</td><td className="num">{money(l.discount)}</td><td className="num">{money(l.taxable)}</td><td className="num">{l.gst}%</td><td className="num">{money(l.tax)}</td><td className="num">{money(l.total)}</td></tr>)}</tbody>
+        <tfoot><tr><td colSpan={4}>Total {inv.roundOff ? `(round off ${money(inv.roundOff)})` : ''}</td><td className="num">{money(inv.taxable)}</td><td /><td className="num">{money(inv.tax)}</td><td className="num">{money(inv.total)}</td></tr></tfoot>
       </table></div>
       <div className="grid g2 mt">
         <div><h3>Payments</h3>{inv.payments.length ? inv.payments.map((p, k) => <div key={k} className="row between small" style={{ padding: '4px 0' }}><span>{p.mode.toUpperCase()} {p.ref && `· ${p.ref}`} {p.at && `· ${date(p.at)}`}</span><b>{money(p.amount)}</b></div>) : <p className="small muted">Fully on credit.</p>}</div>
         <div className="small">
+          <h3 style={{ marginBottom: 6 }}>Tax</h3>
+          {taxBreakup(inv.items, inv.interState).flatMap((r) => r.lines).map(([label, amt]) => <div key={label} className="row between" style={{ padding: '3px 0' }}><span>{label}</span><b>{money(amt)}</b></div>)}
           {inv.approval && <div className="alert info"><Icon name="check" />Discount {inv.manualDiscPct}% approved by {inv.approval.byName}</div>}
           {inv.override && <div className="alert warn mt"><Icon name="lock" />Credit override by {inv.override.byName}: {inv.override.note}</div>}
         </div>

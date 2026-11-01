@@ -188,3 +188,16 @@ export function loyaltyOf(db, customerId) {
   const [tier, , mult] = TIERS.find(([, min]) => earned >= min);
   return { earned, balance, tier, mult, rows };
 }
+
+// Tax split by GST rate: intra-state bills split each rate equally into CGST and SGST, inter-state bills use IGST.
+export function taxBreakup(items, interState) {
+  const by = {};
+  for (const l of items) {
+    const r = (by[l.gst] ||= { rate: Number(l.gst), taxable: 0, tax: 0 });
+    r.taxable += l.taxable; r.tax += l.tax;
+  }
+  return Object.values(by).sort((a, b) => a.rate - b.rate).map((r) => ({
+    ...r, taxable: round2(r.taxable), tax: round2(r.tax), interState,
+    lines: interState ? [[`IGST @ ${r.rate}%`, round2(r.tax)]] : [[`CGST @ ${r.rate / 2}%`, round2(r.tax / 2)], [`SGST @ ${r.rate / 2}%`, round2(r.tax / 2)]],
+  }));
+}

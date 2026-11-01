@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import QRCode from 'qrcode';
 import { useStore } from '../lib/store.jsx';
-import { loyaltyOf, approversFor, basePrice, computeBill, creditCheck, creditScore, customerLedger, discountLimit, groupDiscount, offerFor, unitFactor, upiLink, waLink } from '../lib/calc.js';
+import { taxBreakup, loyaltyOf, approversFor, basePrice, computeBill, creditCheck, creditScore, customerLedger, discountLimit, groupDiscount, offerFor, unitFactor, upiLink, waLink } from '../lib/calc.js';
 import { money, qty, round2, dateTime, uid, nowIso } from '../lib/format.js';
 import { postInvoice, sessionSummary } from '../lib/ops.js';
 import { printGstInvoice, printThermal } from '../lib/print.js';
@@ -162,7 +162,7 @@ function Counter({ session }) {
           {products.map((p, i) => (
             <button key={p.id} className="prod" style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }} onClick={() => add(p)}>
               <div className="nm">{p.name}</div>
-              <div className="pr">{money(basePrice(db, p, customer))}<span className="muted small"> / {p.baseUnit}</span></div>
+              <div className="pr">{money(basePrice(db, p, customer))}<span className="muted small"> / {p.baseUnit} + {p.gst}% GST</span></div>
               <div className="meta"><span>{p.sku}</span><span style={{ color: p.stock <= p.reorder ? 'var(--bad)' : undefined }}>{qty(p.stock)} {p.baseUnit}</span></div>
             </button>
           ))}
@@ -206,6 +206,7 @@ function Counter({ session }) {
                   <span className="muted">{money(l.rate)} / {l.unit} · {qty(l.qty * l.factor)} {p.baseUnit}</span>
                   <b>{money(line?.taxable)}</b>
                 </div>
+                <div className="small muted">GST {l.gst}%{bill.interState ? ` (IGST)` : ` (CGST ${l.gst / 2}% + SGST ${l.gst / 2}%)`} · {money(line?.tax)}</div>
                 {l.offerName && <div className="small" style={{ color: 'var(--ok)' }}>Offer applied: {l.offerName} ({l.offerPct}%)</div>}
                 {l.qty * l.factor > l.stock && <div className="small" style={{ color: 'var(--bad)' }}>Only {qty(l.stock)} {p.baseUnit} in stock</div>}
               </div>
@@ -225,7 +226,8 @@ function Counter({ session }) {
               </div>
               {bill.manualDisc > 0 && <div className="r"><span>Manual discount ({bill.manualDiscPct}%)</span><span>− {money(bill.manualDisc)}</span></div>}
               <div className="r"><span>Taxable value</span><span>{money(bill.taxable)}</span></div>
-              <div className="r"><span>{bill.interState ? 'IGST' : 'CGST + SGST'}</span><span>{money(bill.tax)}</span></div>
+              {taxBreakup(bill.items, bill.interState).flatMap((r) => r.lines).map(([label, amt]) => <div className="r" key={label}><span>{label}</span><span>{money(amt)}</span></div>)}
+              <div className="r strong"><span>Total GST</span><span>{money(bill.tax)}</span></div>
               {bill.roundOff !== 0 && <div className="r"><span>Round off</span><span>{money(bill.roundOff)}</span></div>}
               <div className="r grand"><span>Total</span><span>{money(bill.total)}</span></div>
             </div>

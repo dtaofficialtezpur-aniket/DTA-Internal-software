@@ -2,7 +2,7 @@
 // Each is rendered into a hidden iframe and sent to the browser's print dialog.
 import QRCode from 'qrcode';
 import { money, date, dateTime, qty, inWords, round2 } from './format.js';
-import { upiLink, invoiceDue } from './calc.js';
+import { upiLink, invoiceDue, taxBreakup } from './calc.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -40,7 +40,7 @@ export async function printThermal(db, inv) {
   const qr = await upiQr(db, inv);
   const rows = inv.items.map((l) => `
     <tr><td colspan="3">${esc(l.name)}</td></tr>
-    <tr class="sub"><td>${qty(l.qty)} ${esc(l.unit)} × ${money(l.rate)}</td><td></td><td class="r">${money(l.taxable)}</td></tr>`).join('');
+    <tr class="sub"><td>${qty(l.qty)} ${esc(l.unit)} × ${money(l.rate)} · GST ${l.gst}%</td><td></td><td class="r">${money(l.taxable)}</td></tr>`).join('');
   printHtml(`<!doctype html><html><head><meta charset="utf-8">${FONT}<style>
     @page { size: 80mm auto; margin: 3mm; }
     body { font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; width: 72mm; margin: 0; color: #000; }
@@ -55,7 +55,7 @@ export async function printThermal(db, inv) {
     <table>${rows}</table><hr>
     <table class="tot">
       <tr><td>Taxable value</td><td class="r">${money(inv.taxable)}</td></tr>
-      ${inv.interState ? `<tr><td>IGST</td><td class="r">${money(inv.tax)}</td></tr>` : `<tr><td>CGST</td><td class="r">${money(inv.tax / 2)}</td></tr><tr><td>SGST</td><td class="r">${money(inv.tax / 2)}</td></tr>`}
+      ${taxBreakup(inv.items, inv.interState).flatMap((r) => r.lines).map(([label, amt]) => `<tr><td>${label}</td><td class="r">${money(amt)}</td></tr>`).join('')}
       ${inv.roundOff ? `<tr><td>Round off</td><td class="r">${money(inv.roundOff)}</td></tr>` : ''}
       <tr class="big"><td>TOTAL</td><td class="r">${money(inv.total)}</td></tr>
       ${inv.payments.map((p) => `<tr><td>Paid · ${esc(p.mode.toUpperCase())}</td><td class="r">${money(p.amount)}</td></tr>`).join('')}
@@ -101,8 +101,8 @@ export async function printGstInvoice(db, inv) {
     <table><thead><tr><th>#</th><th>Description</th><th>HSN</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Disc.</th><th class="r">Taxable</th><th class="r">GST</th><th class="r">Amount</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="foot">
       <div>
-        <table><thead><tr><th>HSN</th><th class="r">Taxable</th>${inv.interState ? '<th class="r">IGST</th>' : '<th class="r">CGST</th><th class="r">SGST</th>'}</tr></thead><tbody>
-        ${Object.values(hsn).map((h) => `<tr><td>${h.hsn} @ ${h.rate}%</td><td class="r">${money(h.taxable)}</td>${inv.interState ? `<td class="r">${money(h.tax)}</td>` : `<td class="r">${money(round2(h.tax / 2))}</td><td class="r">${money(round2(h.tax / 2))}</td>`}</tr>`).join('')}
+        <table><thead><tr><th>HSN</th><th class="r">Taxable</th>${inv.interState ? '<th class="r">IGST %</th><th class="r">IGST</th>' : '<th class="r">CGST %</th><th class="r">CGST</th><th class="r">SGST %</th><th class="r">SGST</th>'}</tr></thead><tbody>
+        ${Object.values(hsn).map((h) => `<tr><td>${h.hsn} @ ${h.rate}%</td><td class="r">${money(h.taxable)}</td>${inv.interState ? `<td class="r">${h.rate}%</td><td class="r">${money(h.tax)}</td>` : `<td class="r">${h.rate / 2}%</td><td class="r">${money(round2(h.tax / 2))}</td><td class="r">${h.rate / 2}%</td><td class="r">${money(round2(h.tax / 2))}</td>`}</tr>`).join('')}
         </tbody></table>
         <p><b>Amount in words:</b> ${inWords(inv.total)}</p>
         ${c.bank ? `<p><b>Bank:</b> ${esc(c.bank)}</p>` : ''}
@@ -112,7 +112,7 @@ export async function printGstInvoice(db, inv) {
           <tr><td>Gross</td><td class="r">${money(inv.gross)}</td></tr>
           <tr><td>Discount</td><td class="r">− ${money(inv.groupDisc + inv.manualDisc)}</td></tr>
           <tr><td>Taxable value</td><td class="r">${money(inv.taxable)}</td></tr>
-          <tr><td>GST</td><td class="r">${money(inv.tax)}</td></tr>
+          ${taxBreakup(inv.items, inv.interState).flatMap((r) => r.lines).map(([label, amt]) => `<tr><td>${label}</td><td class="r">${money(amt)}</td></tr>`).join('')}
           <tr><td>Round off</td><td class="r">${money(inv.roundOff)}</td></tr>
           <tr class="grand"><td>Invoice total</td><td class="r">${money(inv.total)}</td></tr>
           <tr><td>Received</td><td class="r">${money(inv.paid)}</td></tr>
