@@ -4,7 +4,8 @@ import { CRM_KEYS, CRM_MODULES, DEAL_STAGES, display, fieldOf, localDate } from 
 import { updateRecord } from '../../lib/crmOps.js';
 import { money, dateTime } from '../../lib/format.js';
 import { Empty, HBar, Icon, Stat } from '../../components/ui.jsx';
-import { defaultsFor, go, RecordForm } from './parts.jsx';
+import { defaultsFor, DueChip, go, RecordForm } from './parts.jsx';
+import { ICON_TINT, MODULE_COLORS, tint } from '../../lib/iconColors.js';
 
 export default function CrmHome() {
   const { db, user, update, toast } = useStore();
@@ -38,14 +39,14 @@ export default function CrmHome() {
           <h1 style={{ marginTop: 6 }}>Good {hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'}, {user.name.split(' ')[0]}</h1>
           <p className="muted" style={{ marginTop: 6 }}>{myTasks.length} open task(s) · {meetings.length} upcoming meeting(s) · {openDeals.length} open deal(s) worth {money(openDeals.reduce((s, d) => s + d.amount, 0))}</p>
           <div className="row wrap" style={{ marginTop: 16 }}>
-            {['leads', 'deals', 'tasks', 'meetings', 'calls'].map((k) => <button key={k} className="btn sm" onClick={() => setForm(k)}><Icon name="plus" />{CRM_MODULES[k].singular}</button>)}
+            {['leads', 'deals', 'tasks', 'meetings', 'calls'].map((k) => <button key={k} className="btn sm" onClick={() => setForm(k)}><Icon name={CRM_MODULES[k].icon} style={{ color: MODULE_COLORS[k] }} />{CRM_MODULES[k].singular}</button>)}
           </div>
         </div>
         <div className="setup">
           <h3>Set up your CRM</h3>
           {setup.map(([icon, title, sub, fn, done]) => (
             <button key={title} className="setup-item" onClick={fn || undefined} disabled={!fn}>
-              <span className={`mini-ic ${done ? 'green' : ''}`}><Icon name={done ? 'check' : icon} /></span>
+              <span className={`mini-ic ${done ? 'green' : ''}`} style={done ? undefined : tint(ICON_TINT[icon] || '#2a78d6')}><Icon name={done ? 'check' : icon} /></span>
               <span className="grow" style={{ textAlign: 'left' }}><b className="small">{title}</b><span className="small muted" style={{ display: 'block' }}>{sub}</span></span>
               {fn && <Icon name="chevronRight" style={{ width: 16, height: 16, color: 'var(--muted)' }} />}
             </button>
@@ -67,7 +68,7 @@ export default function CrmHome() {
             <div className="list-row" key={t.id}>
               <input type="checkbox" aria-label="Mark complete" onChange={() => { update((d) => updateRecord(d, 'tasks', t.id, { status: 'Completed' }, user), ['Completed task', 'Task', t.subject]); toast('Task completed'); }} />
               <a className="grow small" href={`#/tasks/${t.id}`} style={{ color: 'inherit', textDecoration: 'none' }}><b>{t.subject}</b><div className="muted">{display(db, fieldOf('tasks', 'relatedTo'), t.relatedTo)}</div></a>
-              <span className={`badge ${t.dueDate < today ? 'bad' : t.dueDate === today ? 'warn' : ''}`}>{t.dueDate === today ? 'Today' : display(db, fieldOf('tasks', 'dueDate'), t.dueDate)}</span>
+              <DueChip value={t.dueDate} />
             </div>
           ))}
           {!tasks.length && <Empty icon="check" text="No open tasks." />}
@@ -102,7 +103,7 @@ export default function CrmHome() {
           <div className="card-head"><h3>Recently modified</h3></div>
           {recent.map((r) => (
             <a key={r._mod + r.id} className="list-row" href={`#/${r._mod}/${r.id}`} style={{ color: 'inherit', textDecoration: 'none' }}>
-              <span className="mini-ic"><Icon name={CRM_MODULES[r._mod].icon} /></span>
+              <span className="mini-ic" style={tint(MODULE_COLORS[r._mod])}><Icon name={CRM_MODULES[r._mod].icon} /></span>
               <div className="grow small"><b>{r[CRM_MODULES[r._mod].title]}</b><div className="muted">{CRM_MODULES[r._mod].singular} · {dateTime(r.modifiedAt)}</div></div>
             </a>
           ))}

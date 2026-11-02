@@ -24,6 +24,7 @@ import Hr from './pages/Hr.jsx';
 import Crm from './pages/Crm.jsx';
 import Bank from './pages/Bank.jsx';
 import BillScan from './pages/BillScan.jsx';
+import Analytics from './pages/Analytics.jsx';
 import ModuleView from './pages/crm/ModuleView.jsx';
 import CrmHome from './pages/crm/CrmHome.jsx';
 import Forecasts from './pages/crm/Forecasts.jsx';
@@ -31,7 +32,7 @@ import { CRM_KEYS } from './lib/crmMeta.js';
 
 const PAGES = { dashboard: Dashboard, pos: Pos, sales: Sales, customers: Customers, collections: Collections, pricelists: Pricelists,
   products: Products, inventory: Inventory, warehouse: Warehouse, purchase: Purchase, reports: Reports, security: Security,
-  audit: Audit, users: Users, settings: Settings, me: Portal, hr: Hr, crm: Crm, bank: Bank, scan: BillScan, crmhome: CrmHome, forecasts: Forecasts,
+  audit: Audit, users: Users, settings: Settings, me: Portal, hr: Hr, crm: Crm, bank: Bank, scan: BillScan, crmhome: CrmHome, forecasts: Forecasts, analytics: Analytics,
   ...Object.fromEntries(CRM_KEYS.map((k) => [k, () => <ModuleView mod={k} />])) };
 const OWNER_ONLY = ['users', 'settings'];
 const HOME = { owner: 'dashboard', sales_manager: 'dashboard', accounts: 'dashboard', cashier: 'pos', salesman: 'pos', warehouse: 'warehouse', delivery: 'warehouse', security: 'security' };

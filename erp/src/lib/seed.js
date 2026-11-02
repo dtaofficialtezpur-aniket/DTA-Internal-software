@@ -120,7 +120,7 @@ export function buildSeed() {
   let s = 7;
   const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
   const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
-  for (let d = 60; d >= 1; d--) {
+  for (let d = 60; d >= 0; d--) {
     const day = new Date(); day.setDate(day.getDate() - d); day.setHours(10, 0, 0, 0);
     if (day.getDay() === 0) continue;
     const n = 3 + Math.floor(rnd() * 5);

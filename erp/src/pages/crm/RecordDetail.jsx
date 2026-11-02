@@ -6,6 +6,7 @@ import { waLink } from '../../lib/calc.js';
 import { dateTime } from '../../lib/format.js';
 import { Empty, Field, Icon, Modal, Tabs } from '../../components/ui.jsx';
 import { Avatar, Cell, defaultsFor, FieldInput, go, RecordForm, TONE } from './parts.jsx';
+import { ICON_TINT, MODULE_COLORS, tint } from '../../lib/iconColors.js';
 
 // Child records listed on a parent's page: [module, link field, label].
 const CHILDREN = {
@@ -49,8 +50,8 @@ export default function RecordDetail({ mod, id }) {
           <div className="small muted">{[rec[m.subtitle], rec.company, ownerName && `Owner: ${ownerName}`].filter(Boolean).join(' · ')}</div>
         </div>
         <div className="actions">
-          {rec.email && <a className="btn" href={`mailto:${rec.email}`}><Icon name="mail" />Send Email</a>}
-          {rec.phone && <a className="btn" target="_blank" rel="noreferrer" href={waLink(rec.phone, `Namaskar ${rec.name || ''}, this is ${db.company.name}, Tezpur.`)}><Icon name="whatsapp" />WhatsApp</a>}
+          {rec.email && <a className="btn" href={`mailto:${rec.email}`}><Icon name="mail" style={{ color: ICON_TINT.mail }} />Send Email</a>}
+          {rec.phone && <a className="btn" target="_blank" rel="noreferrer" href={waLink(rec.phone, `Namaskar ${rec.name || ''}, this is ${db.company.name}, Tezpur.`)}><Icon name="whatsapp" style={{ color: ICON_TINT.whatsapp }} />WhatsApp</a>}
           {mod === 'leads' && !rec.converted && <button className="btn gold" onClick={() => setDialog({ kind: 'convert' })}><Icon name="convert" />Convert</button>}
           <button className="btn primary" onClick={() => setDialog({ kind: 'edit' })}><Icon name="edit" />Edit</button>
           <button className="btn icon-btn" title="Clone" onClick={() => { const { id: _i, createdAt, modifiedAt, touched, converted, convertedTo, ...rest } = rec; setDialog({ kind: 'clone', record: { ...rest, [m.title]: `${rec[m.title]} (copy)` } }); }} aria-label="Clone"><Icon name="copy" /></button>
@@ -182,7 +183,7 @@ function ActivityList({ id, title, rows, onAdd }) {
           const late = onAdd && when && String(when).slice(0, 10) < localDate();
           return (
             <tr key={a.id} className="click" onClick={() => go(`${a._mod}/${a.id}`)}>
-              <td style={{ width: 34 }}><span className="mini-ic"><Icon name={am.icon} /></span></td>
+              <td style={{ width: 34 }}><span className="mini-ic" style={tint(MODULE_COLORS[a._mod])}><Icon name={am.icon} /></span></td>
               <td><b className="rec-link">{a[am.title]}</b><div className="small muted">{am.singular} · {db.users.find((u) => u.id === a.ownerId)?.name}</div></td>
               <td className="small" style={late ? { color: 'var(--bad)' } : undefined}>{display(db, fieldOf(a._mod, am.dateField), when)}</td>
               <td><span className={`badge ${TONE[a.status] || ''}`}>{a.status}</span></td>

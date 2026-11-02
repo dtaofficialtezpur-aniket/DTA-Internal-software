@@ -83,6 +83,8 @@ export function seedCrm(db) {
     { id: 'nt1', module: 'deals', recordId: 'de1', at: ago(3), by: 'Sales Manager', text: 'Client wants 12 mm and 16 mm split 60/40; asked for 1% extra on volume above 50 MT.' },
     { id: 'nt2', module: 'leads', recordId: 'le1', at: ago(5), by: 'Sales Manager', text: 'Tender opens next week. EMD to be confirmed by accounts.' },
   ];
+  // A few records are brand new, so "this month" figures have something to show on any day of the month.
+  [[crm.leads, 7, 0], [crm.leads, 8, 0], [crm.leads, 9, 1], [crm.accounts, 3, 0], [crm.accounts, 4, 1], [crm.contacts, 4, 0]].forEach(([list, i, d]) => { if (list[i]) list[i].createdAt = ago(d); });
   for (const m of ['leads', 'contacts', 'accounts', 'deals', 'tasks', 'meetings', 'calls', 'campaigns'])
     for (const r of crm[m]) crm.timeline.push({ id: 'tl-' + r.id, module: m, recordId: r.id, at: r.createdAt, by: r.createdBy, text: 'Record created' });
 

@@ -6,6 +6,7 @@ import { downloadCsv, parseCsv, uid } from '../../lib/format.js';
 import { waLink } from '../../lib/calc.js';
 import { DemoLeft, Empty, Field, HBar, Icon, Modal } from '../../components/ui.jsx';
 import { Avatar, Cell, defaultsFor, FieldInput, go, RecordForm, TONE, useRoute } from './parts.jsx';
+import { ICON_TINT, VIEW_COLORS } from '../../lib/iconColors.js';
 import RecordDetail from './RecordDetail.jsx';
 
 const PEOPLE = ['leads', 'contacts'];
@@ -54,6 +55,7 @@ function ListView({ mod }) {
   const records = useMemo(() => sortRecords(db, mod, applyView(db, mod, db.crm[mod], {
     filters: [...(view.filters || []), ...fieldFilters], sys: [...(view.sys || []), ...sys], search, quick,
   }, user.id), sort), [db, mod, view, fieldFilters, sys, search, quick, sort, user.id]);
+  const noted = useMemo(() => new Set(db.crm.notes.filter((n) => n.module === mod).map((n) => n.recordId)), [db, mod]);
   const pages = Math.max(1, Math.ceil(records.length / per));
   const shown = records.slice((page - 1) * per, page * per);
   const selected = records.filter((r) => sel.has(r.id));
@@ -108,12 +110,12 @@ function ListView({ mod }) {
       </div>
 
       <div className="crm-toolbar">
-        <button className={`btn sm ${panel ? 'active-tool' : 'ghost'}`} onClick={() => setPanel(!panel)}><Icon name="filter" />Filter{activeFilters > 0 && <span className="count-pill">{activeFilters}</span>}</button>
-        <button className="btn sm ghost" onClick={() => setDialog({ kind: 'sort' })}><Icon name="sort" />Sort{sort.field && <span className="small muted">· {sort.field === 'createdAt' ? 'Created' : sort.field === 'modifiedAt' ? 'Modified' : fieldOf(mod, sort.field)?.label} {sort.dir === 'asc' ? '↑' : '↓'}</span>}</button>
+        <button className={`btn sm ${panel ? 'active-tool' : 'ghost'}`} onClick={() => setPanel(!panel)}><Icon name="filter" style={{ color: '#2a78d6' }} />Filter{activeFilters > 0 && <span className="count-pill">{activeFilters}</span>}</button>
+        <button className="btn sm ghost" onClick={() => setDialog({ kind: 'sort' })}><Icon name="sort" style={{ color: '#c7791a' }} />Sort{sort.field && <span className="small muted">· {sort.field === 'createdAt' ? 'Created' : sort.field === 'modifiedAt' ? 'Modified' : fieldOf(mod, sort.field)?.label} {sort.dir === 'asc' ? '↑' : '↓'}</span>}</button>
         <span className="tool-sep" />
         <div className="seg">
           {VIEW_TYPES.filter(([k]) => (k !== 'calendar' || m.calendar) && (k !== 'kanban' || m.kanban)).map(([k, icon, label]) => (
-            <button key={k} className={type === k ? 'on' : ''} onClick={() => setType(k)} title={label} aria-label={label}><Icon name={icon} /></button>
+            <button key={k} className={type === k ? 'on' : ''} style={{ '--c': VIEW_COLORS[k], color: VIEW_COLORS[k] }} onClick={() => setType(k)} title={label} aria-label={label}><Icon name={icon} /></button>
           ))}
         </div>
         {type === 'table' && <button className="btn sm ghost" onClick={() => setDialog({ kind: 'columns' })}><Icon name="columns" />Columns</button>}
@@ -159,7 +161,7 @@ function ListView({ mod }) {
                     <td onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={sel.has(r.id)} onChange={() => toggle(r.id)} aria-label="Select" /></td>
                     {columns.map((k, i) => { const f = fieldOf(mod, k); if (!f) return null; return (
                       <td key={k} className={['currency', 'number', 'percent'].includes(f.type) ? 'num' : ''}>
-                        {i === 0 && k === m.title ? <span className="row" style={{ gap: 10 }}>{PEOPLE.includes(mod) && <Avatar name={r[k]} />}<span><b className="rec-link">{r[k]}</b>{m.subtitle && r[m.subtitle] && <span className="small muted" style={{ marginLeft: 8 }}>{r[m.subtitle]}</span>}{r.converted && <span className="badge ok" style={{ marginLeft: 6 }}>Converted</span>}</span></span> : <Cell mod={mod} field={f} rec={r} />}
+                        {i === 0 && k === m.title ? <span className="row" style={{ gap: 10 }}>{noted.has(r.id) && <Icon name="note" className="note-ind" title="Has notes" />}{PEOPLE.includes(mod) && <Avatar name={r[k]} />}<span><b className="rec-link">{r[k]}</b>{m.subtitle && r[m.subtitle] && <span className="small muted" style={{ marginLeft: 8 }}>{r[m.subtitle]}</span>}{r.converted && <span className="badge ok" style={{ marginLeft: 6 }}>Converted</span>}</span></span> : <Cell mod={mod} field={f} rec={r} />}
                       </td>); })}
                     <td onClick={(e) => e.stopPropagation()} style={{ position: 'relative' }}>
                       <button className="btn ghost icon-btn sm row-more" onClick={() => setMenu(menu === r.id ? null : r.id)} aria-label="Record actions"><Icon name="more" /></button>
@@ -212,7 +214,7 @@ function ListView({ mod }) {
     }, [onClose]);
     return (
       <div className={`dropdown ${right ? 'right' : ''}`} ref={ref}>
-        {items.map(([icon, label, fn, tone]) => <button key={label} className={tone || ''} onClick={() => { onClose(); fn(); }}><Icon name={icon} />{label}</button>)}
+        {items.map(([icon, label, fn, tone]) => <button key={label} className={tone || ''} onClick={() => { onClose(); fn(); }}><Icon name={icon} style={{ color: ICON_TINT[icon] }} />{label}</button>)}
       </div>
     );
   }

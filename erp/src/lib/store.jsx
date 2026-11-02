@@ -16,6 +16,7 @@ export const DEMO_KINDS = {
   user: 'new users', leave: 'leave requests', advance: 'advance requests', bank: 'bank statement imports', gate: 'gate entries',
   adjustment: 'stock adjustments',
   crm_leads: 'new leads', crm_contacts: 'new contacts', crm_accounts: 'new accounts', crm_deals: 'new deals', crm_tasks: 'new tasks',
+  dash_dashboard: 'new dashboards', dash_component: 'new dashboard components',
   crm_meetings: 'new meetings', crm_calls: 'new calls', crm_campaigns: 'new campaigns', crm_views: 'new custom views',
 };
 

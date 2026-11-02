@@ -3,9 +3,10 @@ import { useStore } from '../lib/store.jsx';
 import { canOpen, ROLES } from '../lib/calc.js';
 import { Icon } from './ui.jsx';
 import { GlobalSearch, QuickCreate } from './TopTools.jsx';
+import { NAV_COLORS, SECTION_COLORS } from '../lib/iconColors.js';
 
 // Top-level links, then collapsible sections: [section, icon, items].
-const TOP = [['dashboard', 'Management Dashboard', 'dashboard'], ['crmhome', 'CRM Home', 'home'], ['me', 'My Portal', 'clock']];
+const TOP = [['dashboard', 'Management Dashboard', 'dashboard'], ['crmhome', 'CRM Home', 'home'], ['analytics', 'Analytics', 'chart'], ['me', 'My Portal', 'clock']];
 export const NAV = [
   ['CRM Sales', 'target', [['leads', 'Leads', 'target'], ['contacts', 'Contacts', 'user'], ['accounts', 'Accounts', 'bank'],
     ['deals', 'Deals', 'briefcase'], ['forecasts', 'Forecasts', 'trend'], ['campaigns', 'Campaigns', 'gift']]],
@@ -16,7 +17,7 @@ export const NAV = [
   ['Purchase', 'cart', [['purchase', 'Purchase & Landed Cost', 'cart'], ['scan', 'Bill Scan', 'scan']]],
   ['Accounts', 'bank', [['bank', 'Bank Reconciliation', 'bank']]],
   ['HR', 'briefcase', [['hr', 'HR & Payroll', 'briefcase']]],
-  ['Control', 'shield', [['reports', 'Reports & Analytics', 'chart'], ['security', 'Security Dashboard', 'shield'], ['audit', 'Audit Trail', 'history']]],
+  ['Control', 'shield', [['reports', 'Reports', 'history'], ['security', 'Security Dashboard', 'shield'], ['audit', 'Audit Trail', 'history']]],
   ['Administration', 'settings', [['users', 'Users & Roles', 'user'], ['settings', 'Settings', 'settings']]],
 ];
 
@@ -36,7 +37,7 @@ export function Layout({ page, children }) {
   const match = (label) => label.toLowerCase().includes(q.trim().toLowerCase());
   const toggle = (group, isOpen) => setSections((s) => { const n = { ...s, [group]: !isOpen }; try { localStorage.setItem('stc-nav-open', JSON.stringify(n)); } catch { /* ignore */ } return n; });
   const link = (k, label, icon) => (
-    <button key={k} className={`nav-link ${page === k ? 'active' : ''}`} onClick={() => go(k)}><Icon name={icon} />{label}</button>
+    <button key={k} className={`nav-link ${page === k ? 'active' : ''}`} onClick={() => go(k)}><Icon name={icon} style={{ color: NAV_COLORS[k] }} />{label}</button>
   );
 
   return (
@@ -58,14 +59,14 @@ export function Layout({ page, children }) {
             return (
               <div key={group} className="nav-section">
                 <button className={`nav-folder ${visible.some(([k]) => k === page) ? 'has-active' : ''}`} onClick={() => toggle(group, isOpen)} aria-expanded={isOpen}>
-                  <Icon name={gicon} />{group}<Icon name="chevronDown" className={`nav-chev ${isOpen ? 'open' : ''}`} />
+                  <Icon name={gicon} style={{ color: SECTION_COLORS[group] }} />{group}<Icon name="chevronDown" className={`nav-chev ${isOpen ? 'open' : ''}`} />
                 </button>
                 <div className={`nav-children ${isOpen ? 'open' : ''}`}><div>{visible.map(([k, label, icon]) => link(k, label, icon))}</div></div>
               </div>
             );
           })}
         </nav>
-        <div className="sidebar-foot">Demo version · Designed &amp; developed by DTA · v0.4</div>
+        <div className="sidebar-foot">Demo version · Designed &amp; developed by DTA · v0.5</div>
       </aside>
       {open && <div className="backdrop" style={{ zIndex: 25 }} onClick={() => setOpen(false)} />}
       <main className="main">

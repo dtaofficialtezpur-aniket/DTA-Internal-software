@@ -15,10 +15,10 @@ export const ROLES = {
 // Which modules each role can open.
 export const ACCESS = {
   owner: '*',
-  sales_manager: ['crmhome', 'leads', 'contacts', 'accounts', 'deals', 'tasks', 'meetings', 'calls', 'campaigns', 'forecasts', 'dashboard', 'pos', 'sales', 'customers', 'collections', 'pricelists', 'crm', 'products', 'inventory', 'warehouse', 'reports', 'me'],
+  sales_manager: ['analytics', 'crmhome', 'leads', 'contacts', 'accounts', 'deals', 'tasks', 'meetings', 'calls', 'campaigns', 'forecasts', 'dashboard', 'pos', 'sales', 'customers', 'collections', 'pricelists', 'crm', 'products', 'inventory', 'warehouse', 'reports', 'me'],
   cashier: ['pos', 'sales', 'customers', 'collections', 'me'],
   salesman: ['crmhome', 'leads', 'contacts', 'accounts', 'deals', 'tasks', 'meetings', 'calls', 'campaigns', 'pos', 'sales', 'customers', 'collections', 'crm', 'me'],
-  accounts: ['dashboard', 'sales', 'customers', 'collections', 'purchase', 'scan', 'bank', 'hr', 'reports', 'me'],
+  accounts: ['analytics', 'dashboard', 'sales', 'customers', 'collections', 'purchase', 'scan', 'bank', 'hr', 'reports', 'me'],
   warehouse: ['warehouse', 'inventory', 'products', 'me'],
   delivery: ['warehouse', 'me'],
   security: ['security', 'warehouse', 'me'],

@@ -3,6 +3,7 @@ import { useStore } from '../../lib/store.jsx';
 import { CRM_MODULES, display, fieldOf, localDate } from '../../lib/crmMeta.js';
 import { createRecord, updateRecord } from '../../lib/crmOps.js';
 import { Field, Icon, Modal } from '../../components/ui.jsx';
+import { ICON_TINT } from '../../lib/iconColors.js';
 
 // Current hash path split into parts, e.g. ['leads', 'le1'].
 export function useRoute() {
@@ -115,15 +116,22 @@ export function Cell({ mod, field, rec }) {
   const { db } = useStore();
   const v = rec[field.key];
   if (field.type === 'email' && v) return <a href={`mailto:${v}`} onClick={(e) => e.stopPropagation()}>{v}</a>;
-  if (field.type === 'phone' && v) return <a className="row" style={{ gap: 6, display: 'inline-flex' }} href={`tel:${v}`} onClick={(e) => e.stopPropagation()}>{v}<Icon name="phone" style={{ width: 14, height: 14 }} /></a>;
+  if (field.type === 'phone' && v) return <a className="row" style={{ gap: 6, display: 'inline-flex' }} href={`tel:${v}`} onClick={(e) => e.stopPropagation()}>{v}<Icon name="phone" style={{ width: 14, height: 14, color: ICON_TINT.phone }} /></a>;
   if (field.type === 'lookup' && v) return <a href={`#/${field.module}/${v}`} onClick={(e) => e.stopPropagation()}>{display(db, field, v)}</a>;
   if (field.type === 'related' && v?.id) return <a href={`#/${v.module}/${v.id}`} onClick={(e) => e.stopPropagation()}>{display(db, field, v)}</a>;
   if (field.type === 'select' && v) return <span className={`badge ${TONE[v] || ''}`}>{v}</span>;
-  if (field.type === 'date' && v && mod !== 'contacts') {
-    const late = v < localDate() && !(CRM_MODULES[mod].done?.(rec)) && ['followUp', 'dueDate', 'closingDate'].includes(field.key) && !String(rec.stage || '').startsWith('Closed');
-    return <span style={late ? { color: 'var(--bad)', fontWeight: 500 } : undefined}>{display(db, field, v)}</span>;
-  }
+  if (['date', 'datetime'].includes(field.type) && v && DUE_FIELDS.includes(field.key)) return <DueChip value={v} done={isDone(mod, rec)} />;
   return <>{display(db, field, v)}</>;
+}
+
+// Due dates show as Zoho-style chips: red = overdue, orange = today, green = upcoming, grey = finished.
+const DUE_FIELDS = ['followUp', 'dueDate', 'closingDate', 'from', 'callTime'];
+const isDone = (mod, rec) => !!(CRM_MODULES[mod].done?.(rec) || String(rec.stage || '').startsWith('Closed') || rec.converted || ['Junk Lead', 'Lost Lead'].includes(rec.status));
+export function DueChip({ value, done }) {
+  const d = String(value).slice(0, 10), t = localDate();
+  const state = done ? 'done' : d < t ? 'late' : d === t ? 'today' : 'soon';
+  const label = d === t ? 'Today' : new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  return <span className={`due-chip ${state}`} title={state === 'late' ? 'Overdue' : state === 'done' ? 'Completed' : 'Due'}><Icon name={state === 'done' ? 'check' : state === 'late' ? 'alert' : 'calendar'} />{label}</span>;
 }
 
 export const TONE = {

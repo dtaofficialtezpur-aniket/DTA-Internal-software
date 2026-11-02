@@ -1,4 +1,4 @@
-# Shanti Trading Company — ERP & CRM (v0.4, demo by DTA)
+# Shanti Trading Company — ERP & CRM (v0.5, demo by DTA)
 
 Business software for Shanti Trading Company, Parua, Tezpur (steel structurals,
 TMT rebars and allied products), built from the client's requirements
@@ -91,6 +91,19 @@ generated from the field definitions in `src/lib/crmMeta.js`, so every module ge
 - **Record page** – inline edit, deal stage path, notes, open/closed activities with quick add, related lists, timeline of
   every change, previous/next record, clone, delete, and **Convert lead** → account + contact + deal (+ billing customer).
 - **Global search** and **quick create (+)** in the top bar.
+
+## Analytics (Zoho-style dashboards)
+
+**Analytics** holds ready-made dashboards (Org Overview, Sales Performance, Credit & Collections, Inventory & Purchase,
+CRM Pipeline) built from live data. Components: KPI tiles with change versus the previous period (month-to-date is
+compared with the same days last month), gauge and target bar against a target, bar, column, line, donut, funnel and table.
+Owners and sales managers can **Add Component** (with live preview), edit, reorder or remove components, **Create
+Dashboard** (blank or a copy), rename, set the default, delete and export CSV. Every component has a "View data" table.
+Metrics and datasets are defined in `src/lib/analytics.js`; charts are in `src/components/charts.jsx` (validated
+categorical palette, thin rounded bars, hover tooltips).
+
+Icons are colour-coded (`src/lib/iconColors.js`): every menu item and section, each CRM module, view-type buttons, and
+due dates as chips (red overdue, orange today, green upcoming, grey done).
 
 ## Attendance from the biometric punch machine
 

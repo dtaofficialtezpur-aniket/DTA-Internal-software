@@ -31,7 +31,7 @@ export const CRM_MODULES = {
       { key: 'requirement', label: 'Requirement', type: 'textarea' },
     ],
     sections: [['Lead Information', ['name', 'company', 'title', 'email', 'phone', 'status', 'rating', 'source', 'industry', 'value', 'followUp', 'city', 'campaignId', 'ownerId']], ['Description', ['requirement']]],
-    columns: ['name', 'company', 'email', 'phone', 'status', 'rating', 'ownerId'],
+    columns: ['name', 'company', 'email', 'phone', 'status', 'rating', 'followUp', 'ownerId'],
     kanban: ['status', 'rating', 'source'], calendar: 'followUp', chart: ['status', 'source', 'rating', 'industry'],
     views: [
       { id: 'mine', name: 'My Leads', filters: [{ field: 'ownerId', op: 'is', value: ['$me'] }] },
