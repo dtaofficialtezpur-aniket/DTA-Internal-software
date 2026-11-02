@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { buildSeed, DEMO_PINS } from './seed.js';
 import { nowIso, uid } from './format.js';
 
-const KEY = 'stc-erp-v2';
+const KEY = 'stc-erp-v3';
 const SESSION_KEY = 'stc-erp-user';
 const Ctx = createContext(null);
 
@@ -12,9 +12,11 @@ const Ctx = createContext(null);
 export const DEMO_LIMIT = 2;
 export const DEMO_KINDS = {
   invoice: 'new bills', customer: 'new customers', group: 'new customer groups', product: 'new products', pricelist: 'new pricelists',
-  offer: 'new offers', po: 'new purchase orders', supplier: 'new suppliers', receipt: 'new payment receipts', lead: 'new leads',
+  offer: 'new offers', po: 'new purchase orders', supplier: 'new suppliers', receipt: 'new payment receipts', 
   user: 'new users', leave: 'leave requests', advance: 'advance requests', bank: 'bank statement imports', gate: 'gate entries',
   adjustment: 'stock adjustments',
+  crm_leads: 'new leads', crm_contacts: 'new contacts', crm_accounts: 'new accounts', crm_deals: 'new deals', crm_tasks: 'new tasks',
+  crm_meetings: 'new meetings', crm_calls: 'new calls', crm_campaigns: 'new campaigns', crm_views: 'new custom views',
 };
 
 export async function hashPin(username, pin) {

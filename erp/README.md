@@ -1,4 +1,4 @@
-# Shanti Trading Company — ERP & CRM (v0.2, demo by DTA)
+# Shanti Trading Company — ERP & CRM (v0.3, demo by DTA)
 
 Business software for Shanti Trading Company, Parua, Tezpur (steel structurals,
 TMT rebars and allied products), built from the client's requirements
@@ -75,6 +75,22 @@ to the backend at the same time.
 | Auto bank reconciliation | Bank Reconciliation | Import bank CSV (common Indian formats); credits auto-matched to receipts and bank/UPI/cheque bill payments by amount, date and reference; manual match, create receipt, or categorise the rest. |
 | Bill scan | Bill Scan | Photo or PDF of a supplier bill (or pasted text) → supplier, bill no., date, total and item lines (per-tonne rates converted to kg) → purchase order for owner approval. The OCR/PDF engine loads from a CDN on first use, so scanning needs internet. |
 | Roles | Users & Roles | Owner, Sales Manager, Cashier, Salesman, Accounts, Godown, Delivery, Security, each seeing only their modules. |
+
+## CRM (Zoho-style)
+
+Modules: CRM Home, Leads, Contacts, Accounts, Deals, Forecasts, Campaigns, Tasks, Meetings and Calls. All of them are
+generated from the field definitions in `src/lib/crmMeta.js`, so every module gets the same tools:
+
+- **Views** – standard views (e.g. My Leads, Hot Leads, Closing This Month) plus saved custom views with criteria, sort and columns.
+- **Filter panel** – system-defined filters (touched/untouched, created today, with open/overdue activities, with notes,
+  converted) and filter-by-fields with operators per type (contains, is/isn't, ranges, today / this week / overdue …).
+- **Sort**, **column chooser**, **quick filter** (all / mine / touched / untouched), **search**, pagination.
+- **View types** – Table, Kanban (drag cards between columns; group by any picklist), Canvas cards, Calendar and Chart.
+- **Bulk actions** – mass update, change owner, export (CSV), mass delete; row actions (edit, clone, add task, log call, WhatsApp, email).
+- **Import** – CSV with column mapping; **Export** – all, view or selection.
+- **Record page** – inline edit, deal stage path, notes, open/closed activities with quick add, related lists, timeline of
+  every change, previous/next record, clone, delete, and **Convert lead** → account + contact + deal (+ billing customer).
+- **Global search** and **quick create (+)** in the top bar.
 
 ## Still to do
 

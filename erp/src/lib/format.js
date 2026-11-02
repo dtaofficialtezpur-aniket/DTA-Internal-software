@@ -64,3 +64,18 @@ export function downloadCsv(name, rows) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
+
+// Minimal CSV reader: quoted fields, escaped quotes, commas and newlines inside quotes.
+export function parseCsv(text) {
+  const rows = []; let row = [], cur = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"' && text[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === ',') { row.push(cur.trim()); cur = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cur.trim()); if (row.some((c) => c)) rows.push(row); row = []; cur = ''; }
+    else cur += ch;
+  }
+  row.push(cur.trim()); if (row.some((c) => c)) rows.push(row);
+  return rows;
+}

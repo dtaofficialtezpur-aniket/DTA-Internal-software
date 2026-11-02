@@ -3,6 +3,7 @@
 import { computeBill, basePrice, groupDiscount } from './calc.js';
 import { addDays, round2 } from './format.js';
 import { addExtras } from './seedExtras.js';
+import { seedCrm } from './crmSeed.js';
 
 export const DEMO_PINS = {
   abhimanyu: '1111', salesmgr: '2222', cashier: '3333', godown: '4444', accounts: '5555', salesman: '6666', security: '7777',
@@ -103,7 +104,7 @@ export function buildSeed() {
     ],
     invoices: [], receipts: [], sessions: [], picklists: [], purchaseOrders: [],
     stockLedger: [], cycleCounts: [], reminders: [], gateLog: [], audit: [],
-    leads: [], loyalty: [], bankLines: [], billScans: [],
+    loyalty: [], bankLines: [], billScans: [],
     hr: { profiles: {}, attendance: [], leaves: [], advances: [], payslips: [] },
     seq: { INV: 0, PO: 0, PL: 0, RC: 0, GRN: 0, LD: 0 },
   };
@@ -180,6 +181,7 @@ export function buildSeed() {
   });
 
   addExtras(db, rnd);
+  seedCrm(db);
   return db;
 }
 

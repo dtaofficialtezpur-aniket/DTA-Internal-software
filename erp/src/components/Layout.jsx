@@ -2,12 +2,18 @@ import { useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { canOpen, ROLES } from '../lib/calc.js';
 import { Icon } from './ui.jsx';
+import { GlobalSearch, QuickCreate } from './TopTools.jsx';
 
 export const NAV = [
   ['Overview', [['dashboard', 'Management Dashboard', 'dashboard']]],
+  ['CRM', [
+    ['crmhome', 'CRM Home', 'home'], ['leads', 'Leads', 'target'], ['contacts', 'Contacts', 'user'], ['accounts', 'Accounts', 'bank'],
+    ['deals', 'Deals', 'briefcase'], ['forecasts', 'Forecasts', 'trend'], ['campaigns', 'Campaigns', 'gift'],
+    ['tasks', 'Tasks', 'check'], ['meetings', 'Meetings', 'clock'], ['calls', 'Calls', 'phone'],
+  ]],
   ['Sales', [
     ['pos', 'Point of Sale', 'pos'], ['sales', 'Invoices', 'invoice'], ['customers', 'Customers', 'users'],
-    ['collections', 'Credit & Collections', 'wallet'], ['pricelists', 'Pricelists & Offers', 'tag'], ['crm', 'Leads & Loyalty', 'gift'],
+    ['collections', 'Credit & Collections', 'wallet'], ['pricelists', 'Pricelists & Offers', 'tag'], ['crm', 'Loyalty Programme', 'gift'],
   ]],
   ['Inventory', [
     ['products', 'Products & Units', 'box'], ['inventory', 'Stock & Cycle Count', 'layers'], ['warehouse', 'Warehouse Orders', 'truck'],
@@ -53,14 +59,16 @@ export function Layout({ page, children }) {
             );
           })}
         </nav>
-        <div className="sidebar-foot">Demo version · Designed &amp; developed by DTA · v0.2</div>
+        <div className="sidebar-foot">Demo version · Designed &amp; developed by DTA · v0.3</div>
       </aside>
       {open && <div className="backdrop" style={{ zIndex: 25 }} onClick={() => setOpen(false)} />}
       <main className="main">
         <header className="topbar">
           <button className="btn ghost icon-btn menu-btn" onClick={() => setOpen(true)} aria-label="Menu"><Icon name="menu" /></button>
-          <div className="crumb">{db.company.name} / <b>{TITLES[page]}</b></div>
+          <div className="crumb"><b>{TITLES[page]}</b></div>
           <div className="spacer" />
+          <GlobalSearch />
+          {canOpen(user.role, 'leads') && <QuickCreate />}
           <span className="demo-top" title="Each kind of new record is limited to 2 per login in this demo"><Icon name="lock" />Demo version · 2 new entries per feature per login</span>
           <div className="user-chip">
             <div className="avatar">{initials}</div>

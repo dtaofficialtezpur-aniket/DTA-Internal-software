@@ -35,27 +35,6 @@ export function addExtras(db, rnd) {
     { id: 'ad2', userId: 'u7', amount: 2000, reason: 'Festival', status: 'pending', at: addDays(now.toISOString(), -2) },
   );
 
-  // Sales pipeline.
-  const leads = [
-    ['Tezpur Medical College – Hostel Block', 'Mr. Baruah', '9800000201', 'Govt. tender', 'TMT 12/16 mm, ~40 MT', 2600000, 'quoted', 2],
-    ['Sonitpur Rice Mill Shed', 'Mr. Agarwal', '9800000202', 'Walk-in', 'Structurals for shed, ~12 MT', 850000, 'contacted', -1],
-    ['Green Valley Apartments', 'Ms. Hazarika', '9800000203', 'Referral', 'TMT all sizes, phased', 3400000, 'new', 0],
-    ['Biswanath PWD Culvert', 'Er. Saikia', '9800000204', 'Field visit', 'TMT 10/12 mm', 620000, 'quoted', -3],
-    ['Dhekiajuli School Extension', 'Mr. Bora', '9800000205', 'Phone', 'TMT + binding wire', 410000, 'contacted', 4],
-    ['North Bank Warehousing', 'Mr. Jain', '9800000206', 'Referral', 'ISMC channels + angles', 1250000, 'won', null],
-    ['Rangapara Petrol Pump Canopy', 'Mr. Das', '9800000207', 'Walk-in', 'Square pipes', 180000, 'lost', null],
-  ];
-  for (const [name, contact, phone, source, need, value, stage, follow] of leads) {
-    const no = ++db.seq.LD;
-    db.leads.push({
-      id: 'ld' + no, no: 'LD-' + String(no).padStart(3, '0'), name, contact, phone, source, need, value, stage,
-      ownerId: rnd() < 0.5 ? 'u2' : 'u6', created: addDays(now.toISOString(), -10 - no * 3),
-      followUp: follow == null ? '' : d(follow),
-      notes: [{ at: addDays(now.toISOString(), -8), by: 'Sales Manager', text: 'First discussion done; site visit planned.' }],
-      lostReason: stage === 'lost' ? 'Price — went with a Guwahati supplier' : '',
-    });
-  }
-
   // Loyalty points earned on past credit and retail customers' bills.
   const lp = db.settings.loyalty;
   for (const inv of db.invoices) {
