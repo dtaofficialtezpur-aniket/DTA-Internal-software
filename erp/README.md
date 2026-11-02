@@ -1,4 +1,4 @@
-# Shanti Trading Company — ERP & CRM (v0.3, demo by DTA)
+# Shanti Trading Company — ERP & CRM (v0.4, demo by DTA)
 
 Business software for Shanti Trading Company, Parua, Tezpur (steel structurals,
 TMT rebars and allied products), built from the client's requirements
@@ -91,6 +91,15 @@ generated from the field definitions in `src/lib/crmMeta.js`, so every module ge
 - **Record page** – inline edit, deal stage path, notes, open/closed activities with quick add, related lists, timeline of
   every change, previous/next record, clone, delete, and **Convert lead** → account + contact + deal (+ billing customer).
 - **Global search** and **quick create (+)** in the top bar.
+
+## Attendance from the biometric punch machine
+
+Staff punch on the fingerprint machine, so there is no punch button in the software. **My Portal** shows each person's
+attendance (in/out, late marks, source) read-only. **HR & Payroll → Attendance** imports the machine's CSV export
+(employee code + date/time per punch, or separate date and time columns): first punch of the day = in, last = out.
+Each employee's machine code is set under **HR → Employees**. HR/owner can correct missed punches with a recorded
+reason (kept in the audit trail). Payroll counts only days before today, since the machine is synced afterwards.
+A direct connection to the machine (ADMS / push SDK) needs its make and model and arrives with the cloud version.
 
 ## Still to do
 

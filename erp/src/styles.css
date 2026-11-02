@@ -354,6 +354,11 @@ a.list-row:hover { background: var(--surface-2); }
 .demo-top svg { width: 13px; height: 13px; }
 @media (max-width: 860px) { .demo-top { display: none; } }
 
+.bio-card { background: linear-gradient(135deg, #1c3a6b, #112446); color: #fff; border: 0; }
+.bio-time { font-family: var(--serif); font-size: 34px; font-weight: 600; }
+.bio-note { display: flex; gap: 12px; max-width: 360px; padding: 14px; border-radius: 10px; background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .12); color: #dfe6f3; }
+.bio-note svg { width: 22px; height: 22px; color: #c9a24f; flex: none; }
+
 /* ---------- CRM ---------- */
 .kanban { display: grid; grid-template-columns: repeat(5, minmax(190px, 1fr)); gap: 12px; overflow-x: auto; padding-bottom: 6px; }
 .stage-bar { display: flex; gap: 4px; flex-wrap: wrap; }

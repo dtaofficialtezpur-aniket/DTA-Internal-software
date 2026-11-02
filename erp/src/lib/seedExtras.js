@@ -9,9 +9,11 @@ export function addExtras(db, rnd) {
   for (const u of db.users) {
     db.hr.profiles[u.id] = {
       salary: SALARY[u.role] ?? 15000, joinDate: '2024-04-01', designation: u.role === 'owner' ? 'Proprietor' : ROLES[u.role],
-      phone: '', bank: '', onPayroll: u.role !== 'owner',
+      phone: '', bank: '', onPayroll: u.role !== 'owner', biometricId: String(100 + db.users.indexOf(u) + 1),
     };
   }
+
+  db.hr.lastSync = new Date(now.getTime() - 3600e3).toISOString();
 
   // Attendance for the last 30 days (Mon–Sat), with the odd late arrival or absence.
   for (let d = 30; d >= 1; d--) {
@@ -21,7 +23,7 @@ export function addExtras(db, rnd) {
       if (u.role === 'owner' || rnd() < 0.05) continue;
       const inAt = new Date(day); inAt.setHours(9, 10 + Math.floor(rnd() * 40), 0, 0);
       const outAt = new Date(day); outAt.setHours(18, Math.floor(rnd() * 50), 0, 0);
-      db.hr.attendance.push({ id: `at-${u.id}-${d}`, userId: u.id, date: inAt.toISOString().slice(0, 10), in: inAt.toISOString(), out: outAt.toISOString() });
+      db.hr.attendance.push({ id: `at-${u.id}-${d}`, userId: u.id, date: inAt.toISOString().slice(0, 10), in: inAt.toISOString(), out: outAt.toISOString(), source: 'machine' });
     }
   }
 

@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { ROLES } from '../lib/calc.js';
 import { money, date, downloadCsv, nowIso, uid } from '../lib/format.js';
-import { hoursOf, isLate, isWorkDay, payrollFor } from '../lib/hr.js';
+import { hoursOf, isLate, isWorkDay, parsePunches, payrollFor } from '../lib/hr.js';
 import { printPayslip } from '../lib/print.js';
 import { Empty, Field, Icon, Modal, PageHead, Stat, Tabs } from '../components/ui.jsx';
 
@@ -40,23 +40,84 @@ export default function Hr() {
 }
 
 function Register() {
-  const { db } = useStore();
+  const { db, user, update, toast } = useStore();
   const [day, setDay] = useState(new Date().toISOString().slice(0, 10));
+  const [fix, setFix] = useState(null);
+  const [result, setResult] = useState(null);
+  const file = useRef();
   const rows = db.users.filter((u) => u.active && db.hr.profiles[u.id]?.onPayroll).map((u) => ({ u, a: db.hr.attendance.find((x) => x.userId === u.id && x.date === day) }));
   const onLeave = (u) => db.hr.leaves.some((l) => l.userId === u.id && l.status === 'approved' && day >= l.from && day <= l.to);
+  const hhmm = (iso) => (iso ? new Date(iso).toTimeString().slice(0, 5) : '');
+
+  const importFile = async (f) => {
+    let res;
+    try { res = parsePunches(await f.text(), db); } catch (e) { return toast(e.message, 'bad'); }
+    update((d) => {
+      for (const r of res.records) {
+        const ex = d.hr.attendance.find((a) => a.userId === r.userId && a.date === r.date);
+        if (!ex) { d.hr.attendance.push({ id: uid('at'), ...r, source: 'machine' }); continue; }
+        if (ex.source === 'corrected') continue;
+        // Merge with punches already synced for that day.
+        const ins = [ex.in, r.in].filter(Boolean).sort(); const outs = [ex.out, r.out, ex.in, r.in].filter(Boolean).sort();
+        ex.in = ins[0]; ex.out = outs[outs.length - 1] !== ex.in ? outs[outs.length - 1] : '';
+      }
+      d.hr.lastSync = nowIso();
+    }, ['Synced punch machine', 'Attendance', `${f.name} · ${res.punches} punches, ${res.records.length} day records${res.unknown.length ? `, unknown codes ${res.unknown.join(', ')}` : ''}`]);
+    setResult({ name: f.name, ...res });
+  };
+
+  const sample = () => {
+    const lines = [['EmpCode', 'Name', 'Punch DateTime']];
+    for (const [uid2, p] of Object.entries(db.hr.profiles)) {
+      if (!p.onPayroll || !p.biometricId) continue;
+      const nm = db.users.find((u) => u.id === uid2)?.name;
+      const d = day.split('-').reverse().join('/');
+      lines.push([p.biometricId, nm, `${d} 09:${String(15 + Math.floor(Math.random() * 30)).padStart(2, '0')}`], [p.biometricId, nm, `${d} 18:${String(Math.floor(Math.random() * 40)).padStart(2, '0')}`]);
+    }
+    downloadCsv(`punch-machine-${day}.csv`, lines);
+  };
+
   return (
     <>
-      <div className="card-body row wrap" style={{ paddingBottom: 0 }}>
+      <div className="card-body row wrap" style={{ paddingBottom: 0, alignItems: 'flex-end' }}>
         <Field label="Date"><input className="input" type="date" value={day} onChange={(e) => setDay(e.target.value)} /></Field>
-        <button className="btn" style={{ alignSelf: 'flex-end' }} onClick={() => downloadCsv(`attendance-${day.slice(0, 7)}.csv`, [['Date', 'Employee', 'In', 'Out', 'Hours'], ...db.hr.attendance.filter((a) => a.date.startsWith(day.slice(0, 7))).map((a) => [a.date, db.users.find((u) => u.id === a.userId)?.name, time(a.in), time(a.out), hoursOf(a)])])}><Icon name="download" />Month CSV</button>
+        <button className="btn primary" onClick={() => file.current.click()}><Icon name="upload" />Import from punch machine</button>
+        <input ref={file} type="file" accept=".csv,text/csv,.txt" hidden onChange={(e) => { if (e.target.files[0]) importFile(e.target.files[0]); e.target.value = ''; }} />
+        <button className="btn" onClick={sample}><Icon name="download" />Sample machine file</button>
+        <button className="btn" onClick={() => downloadCsv(`attendance-${day.slice(0, 7)}.csv`, [['Date', 'Employee', 'In', 'Out', 'Hours', 'Source'], ...db.hr.attendance.filter((a) => a.date.startsWith(day.slice(0, 7))).map((a) => [a.date, db.users.find((u) => u.id === a.userId)?.name, time(a.in), time(a.out), hoursOf(a), a.source || 'machine'])])}><Icon name="download" />Month CSV</button>
+        <span className="small muted grow" style={{ textAlign: 'right' }}>Last synced {db.hr.lastSync ? new Date(db.hr.lastSync).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'never'}</span>
       </div>
+      {result && <div className="card-body" style={{ paddingBottom: 0 }}><div className={`alert ${result.unknown.length ? 'warn' : 'ok'}`}><Icon name={result.unknown.length ? 'alert' : 'check'} /><div>{result.name}: {result.punches} punches → {result.records.length} attendance day(s) updated.{result.unknown.length > 0 && <> Unknown machine codes: <b>{result.unknown.join(', ')}</b> — set them under Employees.</>}</div></div></div>}
       <div className="table-wrap mt"><table className="t">
-        <thead><tr><th>Employee</th><th>Role</th><th>In</th><th>Out</th><th className="num">Hours</th><th>Status</th></tr></thead>
+        <thead><tr><th>Employee</th><th>Machine code</th><th>In</th><th>Out</th><th className="num">Hours</th><th>Status</th><th /></tr></thead>
         <tbody>{rows.map(({ u, a }) => (
-          <tr key={u.id}><td className="strong">{u.name}</td><td>{ROLES[u.role]}</td><td>{time(a?.in)}</td><td>{time(a?.out)}</td><td className="num">{a ? hoursOf(a) || '—' : '—'}</td>
-            <td>{a ? <span className={`badge ${isLate(db, a) ? 'warn' : 'ok'}`}>{isLate(db, a) ? 'Late' : 'Present'}</span> : onLeave(u) ? <span className="badge blue">On leave</span> : !isWorkDay(db, day) ? <span className="badge">Holiday</span> : <span className="badge bad">Absent</span>}</td></tr>
+          <tr key={u.id}><td className="strong">{u.name}<div className="small muted">{ROLES[u.role]}</div></td><td className="mono">{db.hr.profiles[u.id]?.biometricId || '—'}</td><td>{time(a?.in)}</td><td>{time(a?.out)}</td><td className="num">{a ? hoursOf(a) || '—' : '—'}</td>
+            <td>{a ? <span className={`badge ${isLate(db, a) ? 'warn' : 'ok'}`}>{isLate(db, a) ? 'Late' : 'Present'}</span> : onLeave(u) ? <span className="badge blue">On leave</span> : !isWorkDay(db, day) ? <span className="badge">Holiday</span> : <span className="badge bad">Absent</span>}
+              {a?.source === 'corrected' && <div className="small muted">Corrected{a.reason ? `: ${a.reason}` : ''}</div>}</td>
+            <td className="right">{user.role === 'owner' && <button className="btn sm" onClick={() => setFix({ u, inT: hhmm(a?.in), outT: hhmm(a?.out), reason: '' })}><Icon name="edit" />Correct</button>}</td></tr>
         ))}</tbody>
       </table></div>
+      {fix && <Modal title={`Correct attendance — ${fix.u.name}`} onClose={() => setFix(null)} footer={<>
+        <button className="btn" onClick={() => setFix(null)}>Cancel</button>
+        <button className="btn primary" onClick={() => {
+          if (!fix.reason.trim()) return toast('Record the reason for the correction', 'bad');
+          const at = (t) => (t ? new Date(`${day}T${t}:00`).toISOString() : '');
+          update((d) => {
+            const ex = d.hr.attendance.find((a) => a.userId === fix.u.id && a.date === day);
+            if (!fix.inT) { d.hr.attendance = d.hr.attendance.filter((a) => a !== ex); return; }
+            const rec = { userId: fix.u.id, date: day, in: at(fix.inT), out: at(fix.outT), source: 'corrected', reason: fix.reason.trim(), by: user.name };
+            if (ex) Object.assign(ex, rec); else d.hr.attendance.push({ id: uid('at'), ...rec });
+          }, ['Corrected attendance', 'Attendance', `${fix.u.name} · ${day} · in ${fix.inT || '—'} out ${fix.outT || '—'} · ${fix.reason}`]);
+          toast('Attendance corrected'); setFix(null);
+        }}>Save correction</button>
+      </>}>
+        <div className="alert info"><Icon name="info" />Use only for missed or wrong punches. Every correction is recorded in the audit trail. Leave "In" empty to mark absent.</div>
+        <div className="grid g2 mt">
+          <Field label="In time"><input className="input" type="time" value={fix.inT} onChange={(e) => setFix({ ...fix, inT: e.target.value })} /></Field>
+          <Field label="Out time"><input className="input" type="time" value={fix.outT} onChange={(e) => setFix({ ...fix, outT: e.target.value })} /></Field>
+          <div style={{ gridColumn: '1 / -1' }}><Field label="Reason"><input className="input" value={fix.reason} onChange={(e) => setFix({ ...fix, reason: e.target.value })} placeholder="e.g. Machine did not read fingerprint" /></Field></div>
+        </div>
+      </Modal>}
     </>
   );
 }
@@ -131,9 +192,9 @@ function Staff() {
   return (
     <>
       <div className="table-wrap"><table className="t">
-        <thead><tr><th>Employee</th><th>Designation</th><th>Joined</th><th className="num">Monthly salary</th><th>Payroll</th><th /></tr></thead>
+        <thead><tr><th>Employee</th><th>Designation</th><th>Machine code</th><th>Joined</th><th className="num">Monthly salary</th><th>Payroll</th><th /></tr></thead>
         <tbody>{db.users.map((u) => { const p = db.hr.profiles[u.id] || {}; return (
-          <tr key={u.id}><td className="strong">{u.name}<div className="small muted">{ROLES[u.role]}</div></td><td>{p.designation}</td><td>{p.joinDate ? date(p.joinDate) : '—'}</td>
+          <tr key={u.id}><td className="strong">{u.name}<div className="small muted">{ROLES[u.role]}</div></td><td>{p.designation}</td><td className="mono">{p.biometricId || '—'}</td><td>{p.joinDate ? date(p.joinDate) : '—'}</td>
             <td className="num">{money(p.salary)}</td><td><span className={`badge ${p.onPayroll ? 'ok' : ''}`}>{p.onPayroll ? 'Yes' : 'No'}</span></td>
             <td className="right">{user.role === 'owner' && <button className="btn sm" onClick={() => setEdit({ id: u.id, name: u.name, ...{ salary: 0, joinDate: '', designation: '', bank: '', onPayroll: true }, ...p })}><Icon name="edit" />Edit</button>}</td></tr>
         ); })}</tbody>
@@ -148,6 +209,7 @@ function Staff() {
           <Field label="Designation"><input className="input" value={edit.designation} onChange={(e) => setEdit({ ...edit, designation: e.target.value })} /></Field>
           <Field label="Monthly salary (₹)"><input className="input num" value={edit.salary} onChange={(e) => setEdit({ ...edit, salary: e.target.value.replace(/\D/g, '') })} /></Field>
           <Field label="Joining date"><input className="input" type="date" value={edit.joinDate} onChange={(e) => setEdit({ ...edit, joinDate: e.target.value })} /></Field>
+          <Field label="Punch machine code" hint="Employee code enrolled in the biometric machine"><input className="input" value={edit.biometricId || ''} onChange={(e) => setEdit({ ...edit, biometricId: e.target.value.trim() })} /></Field>
           <Field label="Bank account (for salary)"><input className="input" value={edit.bank} onChange={(e) => setEdit({ ...edit, bank: e.target.value })} /></Field>
         </div>
         <label className="row mt"><input type="checkbox" checked={edit.onPayroll} onChange={(e) => setEdit({ ...edit, onPayroll: e.target.checked })} /> Include in payroll</label>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { money, date, nowIso, uid } from '../lib/format.js';
 import { hoursOf, isLate, payrollFor } from '../lib/hr.js';
@@ -13,8 +13,6 @@ export default function Portal() {
   const [tab, setTab] = useState('attendance');
   const [leave, setLeave] = useState(null);
   const [advance, setAdvance] = useState(null);
-  const [clock, setClock] = useState(new Date());
-  useEffect(() => { const t = setInterval(() => setClock(new Date()), 1000); return () => clearInterval(t); }, []);
 
   const today = new Date().toISOString().slice(0, 10);
   const month = today.slice(0, 7);
@@ -24,32 +22,28 @@ export default function Portal() {
   const profile = db.hr.profiles[user.id] || {};
   const logins = db.audit.filter((a) => a.userId === user.id && (a.action === 'Logged in' || a.action === 'Logged out')).slice(0, 40);
 
-  const punch = () => update((d) => {
-    const rec = d.hr.attendance.find((a) => a.userId === user.id && a.date === today);
-    if (!rec) d.hr.attendance.push({ id: uid('at'), userId: user.id, date: today, in: nowIso(), out: '' });
-    else rec.out = nowIso();
-  }, [todayRec ? 'Punched out' : 'Punched in', 'Attendance', `${user.name} at ${time(nowIso())}`]);
-
   return (
     <div className="page">
       <PageHead title="My Portal" sub={`${user.name} · ${profile.designation || ''}`} />
       <div className="grid g-main stagger">
-        <div className="card" style={{ background: 'linear-gradient(135deg, #1c3a6b, #112446)', color: '#fff', border: 0 }}>
+        <div className="card bio-card">
           <div className="card-body row wrap between" style={{ padding: 26, gap: 20 }}>
             <div>
-              <div className="small" style={{ color: '#9fb1d1', letterSpacing: '.1em', textTransform: 'uppercase' }}>{clock.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-              <div style={{ fontFamily: 'var(--serif)', fontSize: 40, fontWeight: 600, marginTop: 6 }}>{clock.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</div>
-              <div className="small" style={{ color: '#c9d4e8', marginTop: 6 }}>
-                {todayRec ? <>In at <b>{time(todayRec.in)}</b>{todayRec.out && <> · Out at <b>{time(todayRec.out)}</b></>}{isLate(db, todayRec) && <span className="badge warn" style={{ marginLeft: 8 }}>Late</span>}</> : `Shift starts ${db.settings.hr.shiftStart}`}
+              <div className="small" style={{ color: '#9fb1d1', letterSpacing: '.1em', textTransform: 'uppercase' }}>Today · {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+              <div className="row wrap" style={{ gap: 28, marginTop: 10 }}>
+                <div><div className="small" style={{ color: '#9fb1d1' }}>In</div><div className="bio-time">{time(todayRec?.in)}</div></div>
+                <div><div className="small" style={{ color: '#9fb1d1' }}>Out</div><div className="bio-time">{time(todayRec?.out)}</div></div>
+                {todayRec && isLate(db, todayRec) && <span className="badge warn" style={{ alignSelf: 'center' }}>Late</span>}
               </div>
+              <div className="small" style={{ color: '#c9d4e8', marginTop: 10 }}>{todayRec ? '' : `No punch recorded yet today · shift starts ${db.settings.hr.shiftStart}`}</div>
             </div>
-            <button className="btn gold lg" onClick={punch} disabled={todayRec?.out}><Icon name="clock" />{!todayRec ? 'Punch in' : todayRec.out ? 'Day complete' : 'Punch out'}</button>
+            <div className="bio-note"><Icon name="scan" /><div><b>Biometric punch machine</b><div className="small">Attendance is recorded by the fingerprint machine{db.hr.lastSync ? ` · last synced ${new Date(db.hr.lastSync).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}. Missed a punch? Ask HR to correct it.</div></div></div>
           </div>
         </div>
-        <div className="grid g2">
+        {profile.onPayroll ? <div className="grid g2">
           <Stat label="Present this month" value={pay.presentDays} money={false} sub={`of ${pay.elapsed} working days so far`} icon="check" tone="green" />
           <Stat label="Estimated pay" value={pay.net} sub={pay.lop ? `${pay.lop} day(s) loss of pay` : 'No deductions'} icon="wallet" tone="gold" />
-        </div>
+        </div> : <div />}
       </div>
 
       <div className="card mt">
@@ -62,12 +56,12 @@ export default function Portal() {
         </div>
         {tab === 'attendance' && (
           <div className="table-wrap"><table className="t">
-            <thead><tr><th>Date</th><th>In</th><th>Out</th><th className="num">Hours</th><th /></tr></thead>
+            <thead><tr><th>Date</th><th>In</th><th>Out</th><th className="num">Hours</th><th>Source</th><th /></tr></thead>
             <tbody>{mine.slice(-31).reverse().map((a) => (
-              <tr key={a.id}><td>{date(a.date)}</td><td>{time(a.in)}</td><td>{time(a.out)}</td><td className="num">{hoursOf(a) || '—'}</td>
+              <tr key={a.id}><td>{date(a.date)}</td><td>{time(a.in)}</td><td>{time(a.out)}</td><td className="num">{hoursOf(a) || '—'}</td><td className="small muted">{a.source === 'corrected' ? `Corrected by HR${a.reason ? ` (${a.reason})` : ''}` : 'Punch machine'}</td>
                 <td>{isLate(db, a) && <span className="badge warn">Late</span>}</td></tr>
             ))}</tbody>
-          </table>{!mine.length && <Empty icon="clock" text="No attendance yet. Punch in to start." />}</div>
+          </table>{!mine.length && <Empty icon="clock" text="No attendance yet. It appears here once HR syncs the punch machine." />}</div>
         )}
         {tab === 'logins' && (
           <div className="table-wrap"><table className="t">
