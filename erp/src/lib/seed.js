@@ -4,6 +4,7 @@ import { computeBill, basePrice, groupDiscount } from './calc.js';
 import { addDays, round2 } from './format.js';
 import { addExtras } from './seedExtras.js';
 import { seedCrm } from './crmSeed.js';
+import { addHistory } from './seedHistory.js';
 
 export const DEMO_PINS = {
   abhimanyu: '1111', salesmgr: '2222', cashier: '3333', godown: '4444', accounts: '5555', salesman: '6666', security: '7777',
@@ -182,6 +183,7 @@ export function buildSeed() {
 
   addExtras(db, rnd);
   seedCrm(db);
+  addHistory(db, rnd);
   return db;
 }
 

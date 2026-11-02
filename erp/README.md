@@ -1,4 +1,4 @@
-# Shanti Trading Company — ERP & CRM (v0.5, demo by DTA)
+# Shanti Trading Company — ERP & CRM (v0.6, demo by DTA)
 
 Business software for Shanti Trading Company, Parua, Tezpur (steel structurals,
 TMT rebars and allied products), built from the client's requirements
@@ -101,6 +101,13 @@ Owners and sales managers can **Add Component** (with live preview), edit, reord
 Dashboard** (blank or a copy), rename, set the default, delete and export CSV. Every component has a "View data" table.
 Metrics and datasets are defined in `src/lib/analytics.js`; charts are in `src/components/charts.jsx` (validated
 categorical palette, thin rounded bars, hover tooltips).
+
+**Month-wise and year-wise data:** Analytics has a **View** switch (As set / Month wise / Year wise) with month and year
+pickers; every component then shows that month or year, compared with the previous one (yearly targets are scaled to a
+month). The **Month-wise** and **Year-wise performance** tables (revenue with change, bills, steel sold, credit collected,
+leads, deals won, totals, best period) are components you can add to any dashboard, and the Management Dashboard has the
+same two views with a revenue chart. The sample data includes three earlier years of monthly totals (`db.history`, as if
+imported from the old system); the metric functions add them to the live records, which start from `history.liveFrom`.
 
 Icons are colour-coded (`src/lib/iconColors.js`): every menu item and section, each CRM module, view-type buttons, and
 due dates as chips (red overdue, orange today, green upcoming, grey done).

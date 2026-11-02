@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { agingBuckets, cycleCountDue, invoiceDue, isLowStock } from '../lib/calc.js';
 import { money, qty, dateTime, daysBetween } from '../lib/format.js';
-import { Bars, HBar, Icon, PageHead, Stat } from '../components/ui.jsx';
+import { Bars, HBar, Icon, PageHead, Stat, Tabs } from '../components/ui.jsx';
+import { computeSummary } from '../lib/analytics.js';
+import { Columns, SummaryTable } from '../components/charts.jsx';
 
 export default function Dashboard() {
   const { db, user } = useStore();
@@ -64,6 +67,8 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <PeriodCard />
+
       <div className="grid g3 mt stagger">
         <div className="card">
           <div className="card-head"><h3>Top products this month</h3></div>
@@ -102,6 +107,23 @@ export default function Dashboard() {
           {!db.audit.length && <div className="empty">No activity yet.</div>}
         </div>
       </div>
+    </div>
+  );
+}
+
+// Month-wise and year-wise performance, with a revenue chart for the same periods.
+function PeriodCard() {
+  const { db } = useStore();
+  const [mode, setMode] = useState('monthwise');
+  const data = computeSummary(db, mode);
+  return (
+    <div className="card mt">
+      <div className="card-head wrap">
+        <div><h3>{mode === 'monthwise' ? 'Month-wise performance' : 'Year-wise performance'}</h3><p>{mode === 'monthwise' ? 'Last 12 months' : 'Every year on record'} · revenue excludes GST</p></div>
+        <Tabs value={mode} onChange={setMode} items={[['monthwise', 'Month wise'], ['yearwise', 'Year wise']]} />
+      </div>
+      <div className="card-body"><Columns key={mode} rows={data.rows.map((r) => ({ label: r.label, value: r.values[0] }))} fmt="money" /></div>
+      <SummaryTable data={data} />
     </div>
   );
 }

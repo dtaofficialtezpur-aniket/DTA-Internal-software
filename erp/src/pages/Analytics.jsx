@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
-import { CHART_TYPES, computeDataset, computeMetric, DATASETS, DEFAULT_DASHBOARDS, formatFull, isMetricType, METRICS, PERIODS, SIZES } from '../lib/analytics.js';
+import { CHART_TYPES, computeDataset, computeMetric, computeSummary, DATASETS, DEFAULT_DASHBOARDS, formatFull, isMetricType, METRICS, periodLabel, PERIODS, SIZES, SUMMARIES, yearsAvailable } from '../lib/analytics.js';
 import { downloadCsv, uid } from '../lib/format.js';
-import { Bullet, BarList, Columns, DataTable, Donut, Funnel, Gauge, Kpi, LineChart, Nothing } from '../components/charts.jsx';
+import { Bullet, BarList, Columns, DataTable, Donut, Funnel, Gauge, Kpi, LineChart, Nothing, SummaryTable } from '../components/charts.jsx';
 import { DemoLeft, Field, Icon, Modal } from '../components/ui.jsx';
 import { GROUP_COLORS, GROUP_ICON, ICON_TINT, tint } from '../lib/iconColors.js';
 
 const pref = 'stc-analytics-dash';
 
 // One component's body, picked by type. Always live from the current data.
-function Body({ comp, data }) {
+function Body({ comp, data, past }) {
   if (!data) return <Nothing />;
+  // Earlier years hold monthly totals only, so per-customer / per-source breakdowns start with the live data.
+  if (data.rows && !data.summary && !data.rows.some((r) => r.value) && past) return <Nothing text="Detailed breakdown is available from when live records began. Earlier years hold monthly totals only." />;
   switch (comp.type) {
     case 'kpi': return <Kpi data={data} />;
     case 'gauge': return <Gauge data={data} target={comp.target} />;
@@ -20,13 +22,23 @@ function Body({ comp, data }) {
     case 'line': return <LineChart rows={data.rows} fmt={data.fmt} />;
     case 'donut': return <Donut rows={data.rows} fmt={data.fmt} />;
     case 'funnel': return <Funnel rows={data.rows} fmt={data.fmt} />;
+    case 'summary': return <SummaryTable data={data} />;
     default: return <DataTable rows={data.rows} fmt={data.fmt} />;
   }
 }
 
-const compute = (db, comp) => {
-  try { return isMetricType(comp.type) ? computeMetric(db, comp.source, comp.period) : computeDataset(db, comp.source, comp.period); } catch { return null; }
+const compute = (db, comp, period = comp.period) => {
+  try {
+    if (comp.type === 'summary') return computeSummary(db, comp.source);
+    return isMetricType(comp.type) ? computeMetric(db, comp.source, period) : computeDataset(db, comp.source, period);
+  } catch { return null; }
 };
+
+// Yearly targets are scaled when a single month is viewed (and the reverse), so progress stays meaningful.
+const unit = (p) => (p === 'this_year' || p?.startsWith('y:') ? 12 : p === 'this_quarter' ? 3 : 1);
+const stripPeriod = (t) => t.replace(/\s*[-–]?\s*THIS (MONTH|YEAR|QUARTER)/i, '');
+const monthNow = () => new Date().toISOString().slice(0, 7);
+const shiftMonth = (k, n) => { const [y, m] = k.split('-').map(Number); const d = new Date(y, m - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 
 export default function Analytics() {
   const { db, user, update, toast, guard } = useStore();
@@ -39,6 +51,10 @@ export default function Analytics() {
   const [updated, setUpdated] = useState(new Date());
   const [dialog, setDialog] = useState(null);
   const [menu, setMenu] = useState(null);
+  // Month-wise / year-wise view: overrides the period of every component that has one.
+  const [view, setView] = useState({ mode: 'default', month: monthNow(), year: new Date().getFullYear() });
+  const years = yearsAvailable(db);
+  const effP = (c) => (view.mode === 'month' ? `m:${view.month}` : view.mode === 'year' ? `y:${view.year}` : c.period);
   const canEdit = ['owner', 'sales_manager'].includes(user.role);
   useEffect(() => { try { localStorage.setItem(pref, dash.id); } catch { /* ignore */ } }, [dash.id]);
 
@@ -50,12 +66,13 @@ export default function Analytics() {
   const mutateDash = (fn, audit, kind) => mutate((a) => fn(a.dashboards.find((x) => x.id === dash.id), a), audit, kind);
 
   const refresh = () => { setSpin(true); setTick((t) => t + 1); setUpdated(new Date()); setTimeout(() => setSpin(false), 700); };
-  const results = useMemo(() => Object.fromEntries(dash.comps.map((c) => [c.id, compute(db, c)])), [db, dash, tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  const results = useMemo(() => Object.fromEntries(dash.comps.map((c) => [c.id, compute(db, c, effP(c))])), [db, dash, tick, view]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const move = (cid, dir) => mutateDash((d) => { const i = d.comps.findIndex((c) => c.id === cid); const j = i + dir; if (j < 0 || j >= d.comps.length) return; [d.comps[i], d.comps[j]] = [d.comps[j], d.comps[i]]; }, ['Rearranged dashboard', 'Analytics', dash.name]);
   const remove = (c) => { if (confirm(`Remove "${c.title}" from this dashboard?`)) mutateDash((d) => { d.comps = d.comps.filter((x) => x.id !== c.id); }, ['Removed component', 'Analytics', `${dash.name} · ${c.title}`]); };
   const exportAll = () => downloadCsv(`${dash.name}.csv`, [['Component', 'Item', 'Value'], ...dash.comps.flatMap((c) => {
     const r = results[c.id]; if (!r) return [];
+    if (r.summary) return r.rows.flatMap((x) => r.cols.map((id, i) => [c.title, `${x.label} · ${METRICS[id].label}`, x.values[i]]));
     return r.rows ? r.rows.map((x) => [c.title, x.label, x.value]) : [[c.title, 'Value', r.value], ...(c.target ? [[c.title, 'Target', c.target]] : [])];
   })]);
 
@@ -92,13 +109,31 @@ export default function Analytics() {
         </div>
       </div>
 
-      <div className="an-grid" key={dash.id + tick}>
+      <div className="period-bar">
+        <span className="small strong">View</span>
+        <div className="tabs" role="tablist">
+          {[['default', 'As set'], ['month', 'Month wise'], ['year', 'Year wise']].map(([k, l]) => <button key={k} role="tab" aria-selected={view.mode === k} className={`tab ${view.mode === k ? 'active' : ''}`} onClick={() => setView({ ...view, mode: k })}>{l}</button>)}
+        </div>
+        {view.mode === 'month' && <div className="row" style={{ gap: 4 }}>
+          <button className="btn ghost icon-btn sm" onClick={() => setView({ ...view, month: shiftMonth(view.month, -1) })} aria-label="Previous month"><Icon name="chevronLeft" /></button>
+          <input className="input" type="month" value={view.month} max={monthNow()} onChange={(e) => e.target.value && setView({ ...view, month: e.target.value })} aria-label="Month" />
+          <button className="btn ghost icon-btn sm" disabled={view.month >= monthNow()} onClick={() => setView({ ...view, month: shiftMonth(view.month, 1) })} aria-label="Next month"><Icon name="chevronRight" /></button>
+        </div>}
+        {view.mode === 'year' && <div className="row" style={{ gap: 4 }}>
+          <button className="btn ghost icon-btn sm" disabled={view.year <= years[0]} onClick={() => setView({ ...view, year: view.year - 1 })} aria-label="Previous year"><Icon name="chevronLeft" /></button>
+          <select className="input" value={view.year} onChange={(e) => setView({ ...view, year: Number(e.target.value) })} aria-label="Year">{years.map((y) => <option key={y}>{y}</option>)}</select>
+          <button className="btn ghost icon-btn sm" disabled={view.year >= years.at(-1)} onClick={() => setView({ ...view, year: view.year + 1 })} aria-label="Next year"><Icon name="chevronRight" /></button>
+        </div>}
+        <span className="small muted">{view.mode === 'default' ? 'Each component uses the period set on it.' : `Every component shows ${periodLabel(effP({}))} and is compared with ${view.mode === 'month' ? 'the previous month' : 'the previous year'}.`}</span>
+      </div>
+
+      <div className="an-grid" key={dash.id + tick + view.mode + view.month + view.year}>
         {dash.comps.map((c, i) => (
           <section key={c.id} className={`card an-card ${c.w >= 7 ? 'an-big' : ''}`} style={{ '--w': c.w, animationDelay: `${i * 50}ms` }}>
             <header className="an-head">
-              <h3 className="an-title"><GroupBadge comp={c} />{c.title}</h3>
+              <h3 className="an-title"><GroupBadge comp={c} />{view.mode !== 'default' && c.type !== 'summary' ? stripPeriod(c.title) : c.title}</h3>
               <div className="an-tools">
-                <span className="an-period">{PERIODS.find(([k]) => k === c.period)?.[1]}</span>
+                <span className="an-period">{c.type === 'summary' ? 'All periods' : results[c.id]?.snapshot ? 'Today' : periodLabel(effP(c))}</span>
                 <div style={{ position: 'relative' }}>
                   <button className="btn ghost icon-btn sm" onClick={() => setMenu(menu === c.id ? null : c.id)} aria-label={`Options for ${c.title}`}><Icon name="more" /></button>
                   {menu === c.id && <Menu right onClose={() => setMenu(null)} items={[
@@ -113,7 +148,7 @@ export default function Analytics() {
                 </div>
               </div>
             </header>
-            <div className="an-body"><Body comp={c} data={results[c.id]} /></div>
+            <div className="an-body"><Body comp={{ ...c, target: (c.target || 0) * unit(effP(c)) / unit(c.period) }} data={results[c.id]} past={view.mode !== 'default' || c.period === 'last_month'} /></div>
           </section>
         ))}
         {!dash.comps.length && <div className="card an-card" style={{ '--w': 12 }}><div className="an-empty" style={{ padding: 50 }}><Icon name="chart" />This dashboard is empty.{canEdit && <button className="btn primary" style={{ marginTop: 10 }} onClick={() => setDialog({ kind: 'component', comp: null })}>Add Component</button>}</div></div>}
@@ -138,7 +173,7 @@ export default function Analytics() {
 }
 
 function GroupBadge({ comp }) {
-  const g = (isMetricType(comp.type) ? METRICS : DATASETS)[comp.source]?.group;
+  const g = (isMetricType(comp.type) ? METRICS : comp.type === 'summary' ? SUMMARIES : DATASETS)[comp.source]?.group;
   return g ? <span className="an-ic" style={tint(GROUP_COLORS[g])}><Icon name={GROUP_ICON[g]} /></span> : null;
 }
 
@@ -175,13 +210,12 @@ function ComponentDialog({ comp, onSave, onClose }) {
   const [f, setF] = useState(comp || { type: 'kpi', title: '', source: 'sales_revenue', w: 3, period: 'this_month', target: '' });
   const metric = isMetricType(f.type);
   const needsTarget = ['gauge', 'bullet'].includes(f.type);
-  const catalog = metric ? METRICS : DATASETS;
+  const catalog = metric ? METRICS : f.type === 'summary' ? SUMMARIES : DATASETS;
   const groups = [...new Set(Object.values(catalog).map((x) => x.group))];
   const setType = (type) => {
-    const m = isMetricType(type);
-    const ok = m ? METRICS[f.source] : DATASETS[f.source];
-    const src = ok ? f.source : Object.keys(m ? METRICS : DATASETS)[0];
-    const w = { kpi: 3, gauge: 5, bullet: 7, donut: 4, funnel: 6, bar: 6, column: 8, line: 8, table: 6 }[type];
+    const cat = isMetricType(type) ? METRICS : type === 'summary' ? SUMMARIES : DATASETS;
+    const src = cat[f.source] ? f.source : Object.keys(cat)[0];
+    const w = { kpi: 3, gauge: 5, bullet: 7, donut: 4, funnel: 6, bar: 6, column: 8, line: 8, table: 6, summary: 12 }[type];
     setF({ ...f, type, source: src, w: comp ? f.w : w, target: ['gauge', 'bullet'].includes(type) ? f.target || '' : '' });
   };
   const sourceLabel = catalog[f.source]?.label || '';
@@ -195,13 +229,14 @@ function ComponentDialog({ comp, onSave, onClose }) {
           <Field label="Chart type"><select className="input" value={f.type} onChange={(e) => setType(e.target.value)}>
             <optgroup label="Single figure">{CHART_TYPES.filter((t) => t[2] === 'metric').map(([k, l]) => <option key={k} value={k}>{l}</option>)}</optgroup>
             <optgroup label="Breakdown">{CHART_TYPES.filter((t) => t[2] === 'dataset').map(([k, l]) => <option key={k} value={k}>{l}</option>)}</optgroup>
+            <optgroup label="Month / year wise">{CHART_TYPES.filter((t) => t[2] === 'summary').map(([k, l]) => <option key={k} value={k}>{l}</option>)}</optgroup>
           </select></Field>
           <Field label={metric ? 'Measure' : 'Data'}><select className="input" value={f.source} onChange={(e) => setF({ ...f, source: e.target.value })}>
             {groups.map((g) => <optgroup key={g} label={g}>{Object.entries(catalog).filter(([, x]) => x.group === g).map(([k, x]) => <option key={k} value={k}>{x.label}</option>)}</optgroup>)}
           </select></Field>
           <Field label="Title"><input className="input" value={f.title} placeholder={sourceLabel} onChange={(e) => setF({ ...f, title: e.target.value })} /></Field>
           <div className="grid g2">
-            <Field label="Period"><select className="input" value={f.period} onChange={(e) => setF({ ...f, period: e.target.value })}>{PERIODS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
+            {f.type !== 'summary' ? <Field label="Period"><select className="input" value={f.period} onChange={(e) => setF({ ...f, period: e.target.value })}>{PERIODS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field> : <div />}
             <Field label="Width"><select className="input" value={f.w} onChange={(e) => setF({ ...f, w: Number(e.target.value) })}>{SIZES.map(([w, l]) => <option key={w} value={w}>{l}</option>)}</select></Field>
           </div>
           {needsTarget && <Field label={`Target (${METRICS[f.source]?.fmt === 'money' ? '₹' : 'number'})`} hint="The gauge and bar show progress towards this figure"><input className="input num" inputMode="decimal" value={f.target} onChange={(e) => setF({ ...f, target: e.target.value.replace(/[^\d.]/g, '') })} /></Field>}
@@ -210,7 +245,7 @@ function ComponentDialog({ comp, onSave, onClose }) {
         <div>
           <div className="small muted strong" style={{ marginBottom: 6 }}>PREVIEW</div>
           <section className="card an-card" style={{ '--w': 12 }}>
-            <header className="an-head"><h3 className="an-title"><GroupBadge comp={preview} />{(f.title || sourceLabel).toUpperCase()}</h3><span className="an-period">{PERIODS.find(([k]) => k === f.period)?.[1]}</span></header>
+            <header className="an-head"><h3 className="an-title"><GroupBadge comp={preview} />{(f.title || sourceLabel).toUpperCase()}</h3><span className="an-period">{f.type === 'summary' ? 'All periods' : periodLabel(f.period)}</span></header>
             <div className="an-body"><Body comp={preview} data={data} /></div>
           </section>
         </div>
@@ -222,7 +257,7 @@ function ComponentDialog({ comp, onSave, onClose }) {
 function DataDialog({ comp, data, onClose }) {
   return (
     <Modal title={comp.title} onClose={onClose} footer={<button className="btn primary" onClick={onClose}>Close</button>}>
-      {!data ? <Nothing /> : data.rows ? <DataTable rows={data.rows} fmt={data.fmt} /> : (
+      {!data ? <Nothing /> : data.summary ? <SummaryTable data={data} /> : data.rows ? <DataTable rows={data.rows} fmt={data.fmt} /> : (
         <table className="t"><tbody>
           <tr><td>{data.label}</td><td className="num strong">{formatFull(data.value, data.fmt)}</td></tr>
           {data.prev != null && <tr><td>Previous period ({data.compare})</td><td className="num">{formatFull(data.prev, data.fmt)}</td></tr>}

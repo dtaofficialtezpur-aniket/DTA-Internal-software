@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { formatFull, formatValue } from '../lib/analytics.js';
+import { formatFull, formatValue, METRICS, SUMMARY_LABELS } from '../lib/analytics.js';
 import { Icon } from './ui.jsx';
 
 // Validated categorical palette, used in this fixed order. Single-series charts use slot 1.
@@ -235,4 +235,36 @@ export function DataTable({ rows, fmt, compact }) {
   );
 }
 
-export function Nothing() { return <div className="an-empty"><Icon name="chart" />No data for this period</div>; }
+// Month-wise or year-wise performance: one row per period, change versus the previous period on revenue.
+export function SummaryTable({ data }) {
+  const rows = data.rows;
+  const max = Math.max(1, ...rows.map((r) => r.values[0]));
+  const best = rows.reduce((b, r, i) => (r.values[0] > (rows[b]?.values[0] || 0) ? i : b), 0);
+  const totals = data.cols.map((_, ci) => rows.reduce((s, r) => s + r.values[ci], 0));
+  return (
+    <div className="table-wrap">
+      <table className="t an-summary">
+        <thead><tr><th>Period</th>{data.cols.map((id) => <th key={id} className="num">{SUMMARY_LABELS[id]}</th>)}</tr></thead>
+        <tbody>{rows.map((r, i) => {
+          const prev = rows[i - 1];
+          const ch = prev && !r.partial && prev.values[0] ? (r.values[0] - prev.values[0]) / prev.values[0] * 100 : null;
+          return (
+            <tr key={r.label} className={r.partial ? 'partial' : ''}>
+              <td className="strong">{r.label}{r.partial && <span className="badge blue" style={{ marginLeft: 6 }}>so far</span>}{i === best && rows.length > 2 && <span className="badge gold" style={{ marginLeft: 6 }}>Best</span>}</td>
+              {data.cols.map((id, ci) => (
+                <td key={id} className="num">
+                  {ci === 0 ? (
+                    <div className="rev-cell"><span>{formatValue(r.values[0], METRICS[id].fmt)}{ch != null && <em className={ch >= 0 ? 'up' : 'down'}>{ch >= 0 ? '▲' : '▼'}{Math.abs(ch).toFixed(0)}%</em>}</span><i style={{ width: `${r.values[0] / max * 100}%` }} /></div>
+                  ) : formatValue(r.values[ci], METRICS[id].fmt)}
+                </td>
+              ))}
+            </tr>
+          );
+        })}</tbody>
+        <tfoot><tr><td>Total</td>{data.cols.map((id, ci) => <td key={id} className="num">{formatValue(totals[ci], METRICS[id].fmt)}</td>)}</tr></tfoot>
+      </table>
+    </div>
+  );
+}
+
+export function Nothing({ text = 'No data for this period' }) { return <div className="an-empty"><Icon name="chart" />{text}</div>; }

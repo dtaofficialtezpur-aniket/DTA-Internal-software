@@ -13,6 +13,16 @@ const lastDay = (y, m) => new Date(y, m + 1, 0).getDate();
 export function rangeOf(period, now = new Date()) {
   const y = now.getFullYear(), m = now.getMonth();
   const today = localDate(now);
+  // A specific month ("m:2026-03") or year ("y:2025"), used by the month-wise / year-wise views.
+  if (period.startsWith('m:')) {
+    const [yy, mm] = period.slice(2).split('-').map(Number); const mi = mm - 1;
+    const cur = yy === y && mi === m; const pm = mi ? [yy, mi - 1] : [yy - 1, 11];
+    return { from: ymd(yy, mi, 1), to: ymd(yy, mi, lastDay(yy, mi)), prev: { from: ymd(pm[0], pm[1], 1), to: ymd(pm[0], pm[1], cur ? Math.min(now.getDate(), lastDay(...pm)) : lastDay(...pm)) }, label: cur ? 'same days last month' : 'previous month' };
+  }
+  if (period.startsWith('y:')) {
+    const yy = Number(period.slice(2)); const cur = yy === y;
+    return { from: ymd(yy, 0, 1), to: ymd(yy, 11, 31), prev: { from: ymd(yy - 1, 0, 1), to: cur ? ymd(yy - 1, m, Math.min(now.getDate(), lastDay(yy - 1, m))) : ymd(yy - 1, 11, 31) }, label: cur ? 'same period last year' : 'previous year' };
+  }
   switch (period) {
     // Month-to-date is compared with the same number of days last month, so early in the month it is a fair comparison.
     case 'this_month': { const pm = m ? [y, m - 1] : [y - 1, 11]; return { from: ymd(y, m, 1), to: ymd(y, m, lastDay(y, m)), prev: { from: ymd(pm[0], pm[1], 1), to: ymd(pm[0], pm[1], Math.min(now.getDate(), lastDay(...pm))) }, label: 'same days last month' }; }
@@ -28,7 +38,27 @@ export function rangeOf(period, now = new Date()) {
     default: return { from: '0000-01-01', to: '9999-12-31', prev: null, label: '' };
   }
 }
+export function periodLabel(p) {
+  if (p?.startsWith('m:')) return new Date(p.slice(2) + '-01T00:00:00').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+  if (p?.startsWith('y:')) return p.slice(2);
+  return PERIODS.find(([k]) => k === p)?.[1] || '';
+}
 const within = (iso, r) => !!iso && iso.slice(0, 10) >= r.from && iso.slice(0, 10) <= r.to;
+// Monthly totals from earlier years (db.history) that sit before the live data; pro-rated for part-months.
+export function histSum(db, key, r) {
+  const h = db.history;
+  if (!h?.months?.length) return 0;
+  let total = 0;
+  for (const row of h.months) {
+    if (row.month >= h.liveFrom) continue;
+    const [yy, mm] = row.month.split('-').map(Number);
+    const ms = ymd(yy, mm - 1, 1), me = ymd(yy, mm - 1, lastDay(yy, mm - 1));
+    const from = ms > r.from ? ms : r.from, to = me < r.to ? me : r.to;
+    if (from > to) continue;
+    total += (Number(typeof key === 'function' ? key(row) : row[key]) || 0) * (daysBetween(from + 'T00:00:00', to + 'T00:00:00') + 1) / lastDay(yy, mm - 1);
+  }
+  return total;
+}
 const sum = (xs) => xs.reduce((s, x) => s + (Number(x) || 0), 0);
 const live = (db) => db.invoices.filter((i) => !i.cancelled);
 const kgOf = (db, l) => (db.products.find((p) => p.id === l.productId)?.baseUnit === 'kg' ? l.qty * l.factor : 0);
@@ -68,6 +98,11 @@ export const METRICS = {
   pur_pending: { label: 'POs awaiting approval', fmt: 'int', group: 'Purchase', snapshot: true, fn: (db) => db.purchaseOrders.filter((p) => p.status === 'pending_approval').length },
 };
 
+// Add earlier-years history to the additive measures, so year-wise comparisons reach back further than the live data.
+const HIST = { sales_revenue: 'revenue', sales_billed: (h) => h.revenue * 1.18, sales_bills: 'bills', sales_tonnage: 'tonnage', col_collected: 'collected', crm_leads: 'leads', crm_won_count: 'wonCount', crm_won_value: 'won', pur_value: 'purchases' };
+for (const [id, key] of Object.entries(HIST)) { const base = METRICS[id].fn; METRICS[id].fn = (db, r) => base(db, r) + histSum(db, key, r); }
+METRICS.sales_avg.fn = (db, r) => { const n = METRICS.sales_bills.fn(db, r); return n ? METRICS.sales_billed.fn(db, r) / n : 0; };
+
 export function formatValue(v, fmt) {
   const n = Number(v) || 0;
   if (fmt === 'money') {
@@ -103,8 +138,11 @@ const tally = (items, key, val = () => 1) => {
 const desc = (rows) => rows.sort((a, b) => b.value - a.value);
 
 // Time buckets: days for short ranges, months otherwise.
-function series(items, dateOf, valOf, r) {
-  const from = r.from === '0000-01-01' ? (items.map(dateOf).filter(Boolean).sort()[0] || localDate()).slice(0, 10) : r.from;
+function series(db, items, dateOf, valOf, r, histKey) {
+  const first = items.map(dateOf).filter(Boolean).sort()[0];
+  const hFirst = db.history?.months?.[0]?.month;
+  const earliest = [first && first.slice(0, 10), hFirst && hFirst + '-01'].filter(Boolean).sort()[0] || localDate();
+  const from = r.from === '0000-01-01' ? earliest : r.from;
   const to = r.to > localDate() ? localDate() : r.to;
   const byDay = daysBetween(from + 'T00:00:00', to + 'T00:00:00') <= 45;
   const keys = [];
@@ -112,6 +150,7 @@ function series(items, dateOf, valOf, r) {
   else { let [y, m] = from.split('-').map(Number); const [ey, em] = to.split('-').map(Number); while (y < ey || (y === ey && m <= em)) { keys.push(`${y}-${pad(m)}`); m++; if (m > 12) { m = 1; y++; } } }
   const acc = Object.fromEntries(keys.map((k) => [k, 0]));
   for (const it of items) { const d = dateOf(it)?.slice(0, 10); if (!d || d < from || d > to) continue; const k = byDay ? d : d.slice(0, 7); if (k in acc) acc[k] += Number(valOf(it)) || 0; }
+  if (!byDay && histKey) for (const k of keys) { const yy = +k.slice(0, 4), mm = +k.slice(5, 7) - 1; acc[k] += histSum(db, histKey, { from: ymd(yy, mm, 1), to: ymd(yy, mm, lastDay(yy, mm)) }); }
   return keys.map((k) => ({ label: byDay ? new Date(k + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : new Date(k + '-01T00:00:00').toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }), value: round2(acc[k]) }));
 }
 
@@ -120,18 +159,18 @@ export const DATASETS = {
   leads_by_status: { label: 'Leads by status', fmt: 'int', group: 'CRM', fn: (db, r) => desc(tally(db.crm.leads.filter((l) => within(l.createdAt, r)), (l) => l.status)) },
   leads_by_rating: { label: 'Leads by rating', fmt: 'int', group: 'CRM', fn: (db, r) => desc(tally(db.crm.leads.filter((l) => within(l.createdAt, r)), (l) => l.rating)) },
   leads_by_industry: { label: 'Leads by industry', fmt: 'int', group: 'CRM', fn: (db, r) => desc(tally(db.crm.leads.filter((l) => within(l.createdAt, r)), (l) => l.industry)) },
-  leads_trend: { label: 'Leads created over time', fmt: 'int', group: 'CRM', series: true, fn: (db, r) => series(db.crm.leads, (l) => l.createdAt, () => 1, r) },
+  leads_trend: { label: 'Leads created over time', fmt: 'int', group: 'CRM', series: true, fn: (db, r) => series(db, db.crm.leads, (l) => l.createdAt, () => 1, r, 'leads') },
   deals_by_stage: { label: 'Deals by stage (value)', fmt: 'money', group: 'CRM', ordered: true, fn: (db) => ['Qualification', 'Needs Analysis', 'Quotation Sent', 'Negotiation', 'Closed Won'].map((s) => ({ label: s, value: sum(db.crm.deals.filter((d) => d.stage === s).map((d) => d.amount)), count: db.crm.deals.filter((d) => d.stage === s).length })) },
   deals_by_source: { label: 'Deal value by source', fmt: 'money', group: 'CRM', fn: (db) => desc(tally(db.crm.deals, (d) => d.source, (d) => d.amount)) },
   deals_by_owner: { label: 'Deal value by salesperson', fmt: 'money', group: 'CRM', fn: (db) => desc(tally(db.crm.deals, (d) => db.users.find((u) => u.id === d.ownerId)?.name, (d) => d.amount)) },
   tasks_by_status: { label: 'Tasks by status', fmt: 'int', group: 'CRM', fn: (db) => desc(tally(db.crm.tasks, (t) => t.status)) },
-  sales_trend: { label: 'Revenue over time', fmt: 'money', group: 'Sales', series: true, fn: (db, r) => series(live(db), (i) => i.date, (i) => i.taxable, r) },
+  sales_trend: { label: 'Revenue over time', fmt: 'money', group: 'Sales', series: true, fn: (db, r) => series(db, live(db), (i) => i.date, (i) => i.taxable, r, 'revenue') },
   sales_by_category: { label: 'Revenue by product category', fmt: 'money', group: 'Sales', fn: (db, r) => desc(tally(live(db).filter((i) => within(i.date, r)).flatMap((i) => i.items), (l) => db.products.find((p) => p.id === l.productId)?.category, (l) => l.taxable)) },
   sales_by_product: { label: 'Top products by revenue', fmt: 'money', group: 'Sales', fn: (db, r) => desc(tally(live(db).filter((i) => within(i.date, r)).flatMap((i) => i.items), (l) => l.name, (l) => l.taxable)).slice(0, 8) },
   sales_by_customer: { label: 'Top customers by sales', fmt: 'money', group: 'Sales', fn: (db, r) => desc(tally(live(db).filter((i) => within(i.date, r)), (i) => i.customerName, (i) => i.total)).slice(0, 8) },
   sales_by_group: { label: 'Revenue by customer group', fmt: 'money', group: 'Sales', fn: (db, r) => desc(tally(live(db).filter((i) => within(i.date, r)), (i) => db.customerGroups.find((g) => g.id === db.customers.find((c) => c.id === i.customerId)?.groupId)?.name, (i) => i.taxable)) },
   sales_by_payment: { label: 'Receipts by payment mode', fmt: 'money', group: 'Sales', fn: (db, r) => desc(tally(live(db).filter((i) => within(i.date, r)).flatMap((i) => i.payments.filter((p) => !p.at)), (p) => ({ cash: 'Cash', upi: 'UPI', cheque: 'Cheque', bank: 'Bank', points: 'Loyalty points' }[p.mode] || p.mode), (p) => p.amount)) },
-  col_trend: { label: 'Collections over time', fmt: 'money', group: 'Credit', series: true, fn: (db, r) => series(db.receipts, (x) => x.date, (x) => x.amount, r) },
+  col_trend: { label: 'Collections over time', fmt: 'money', group: 'Credit', series: true, fn: (db, r) => series(db, db.receipts, (x) => x.date, (x) => x.amount, r, 'collected') },
   ar_aging: { label: 'Receivables ageing', fmt: 'money', group: 'Credit', ordered: true, fn: (db) => {
     const [a, b, c] = db.settings.agingBuckets;
     const rows = [['Not yet due', 0], [`1–${a} days`, 0], [`${a + 1}–${b} days`, 0], [`${b + 1}–${c} days`, 0], [`${c}+ days`, 0]];
@@ -149,10 +188,28 @@ export const computeDataset = (db, id, period) => {
   return { rows: d.fn(db, rangeOf(period)), fmt: d.fmt, label: d.label, series: !!d.series, ordered: !!d.ordered };
 };
 
+// ---------- month-wise / year-wise summary tables ----------
+export const SUMMARY_COLS = ['sales_revenue', 'sales_bills', 'sales_tonnage', 'col_collected', 'crm_leads', 'crm_won_value'];
+export const SUMMARY_LABELS = { sales_revenue: 'Revenue', sales_bills: 'Bills', sales_tonnage: 'Steel sold', col_collected: 'Credit collected', crm_leads: 'Leads', crm_won_value: 'Deals won' };
+export const SUMMARIES = { monthwise: { label: 'Month-wise performance (last 12 months)', group: 'Sales' }, yearwise: { label: 'Year-wise performance', group: 'Sales' } };
+export function yearsAvailable(db) {
+  const y0 = Number(db.history?.months?.[0]?.month?.slice(0, 4)) || new Date().getFullYear();
+  return Array.from({ length: new Date().getFullYear() - y0 + 1 }, (_, i) => y0 + i);
+}
+export function computeSummary(db, mode) {
+  const now = new Date(); const rows = [];
+  if (mode === 'monthwise') {
+    for (let i = 11; i >= 0; i--) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); rows.push({ label: d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' }), period: `m:${d.getFullYear()}-${pad(d.getMonth() + 1)}`, partial: i === 0 }); }
+  } else for (const y of yearsAvailable(db)) rows.push({ label: String(y), period: `y:${y}`, partial: y === now.getFullYear() });
+  for (const r of rows) { const rg = rangeOf(r.period); r.values = SUMMARY_COLS.map((id) => METRICS[id].fn(db, rg)); }
+  return { summary: true, cols: SUMMARY_COLS, rows, label: SUMMARIES[mode].label };
+}
+
 export const CHART_TYPES = [
   ['kpi', 'KPI tile', 'metric'], ['gauge', 'Gauge (vs target)', 'metric'], ['bullet', 'Target bar', 'metric'],
   ['bar', 'Bar chart', 'dataset'], ['column', 'Column chart', 'dataset'], ['line', 'Line chart', 'dataset'],
   ['donut', 'Donut chart', 'dataset'], ['funnel', 'Funnel', 'dataset'], ['table', 'Table', 'dataset'],
+  ['summary', 'Month-wise / year-wise table', 'summary'],
 ];
 export const SIZES = [[3, 'Small (¼)'], [4, 'Medium (⅓)'], [6, 'Half'], [8, 'Wide (⅔)'], [12, 'Full width']];
 export const isMetricType = (t) => CHART_TYPES.find(([k]) => k === t)?.[2] === 'metric';
@@ -167,11 +224,13 @@ export const DEFAULT_DASHBOARDS = [
     c('kpi', 'DEALS IN PIPELINE', 'crm_pipeline_count', 3),
     c('kpi', 'ACCOUNTS THIS MONTH', 'crm_accounts', 3, { period: 'this_month' }),
     c('gauge', 'LEAD GENERATION TARGET - THIS YEAR', 'crm_leads', 5, { target: 120 }),
-    c('bullet', 'REVENUE TARGET - THIS YEAR', 'sales_revenue', 7, { target: 20000000 }),
+    c('bullet', 'REVENUE TARGET - THIS YEAR', 'sales_revenue', 7, { target: 80000000 }),
     c('column', 'REVENUE TREND', 'sales_trend', 8),
     c('donut', 'LEADS BY SOURCE', 'leads_by_source', 4),
     c('funnel', 'SALES FUNNEL (DEAL VALUE)', 'deals_by_stage', 6, { period: 'all' }),
     c('table', 'TOP CUSTOMERS', 'sales_by_customer', 6),
+    c('summary', 'MONTH-WISE PERFORMANCE', 'monthwise', 12, { period: 'all' }),
+    c('summary', 'YEAR-WISE PERFORMANCE', 'yearwise', 12, { period: 'all' }),
   ] },
   { id: 'sales', name: 'Sales Performance', comps: [
     c('kpi', 'REVENUE', 'sales_revenue', 3, { period: 'this_month' }),

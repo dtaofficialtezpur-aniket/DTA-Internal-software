@@ -459,6 +459,16 @@ a.list-row:hover { background: var(--surface-2); }
 .due-chip.soon { background: #dcf3e5; color: #1d7a4e; }
 .due-chip.done { background: #eceae6; color: #74809a; }
 .note-ind { width: 17px; height: 17px; color: #c7791a; flex: none; }
+.an-summary td, .an-summary th { white-space: nowrap; }
+.an-summary tr.partial td { background: var(--surface-2); }
+.rev-cell { display: inline-flex; flex-direction: column; align-items: flex-end; min-width: 150px; }
+.rev-cell i { display: block; height: 4px; border-radius: 2px; background: #2a78d6; opacity: .4; margin-top: 4px; transition: width .8s var(--ease); }
+.rev-cell em { font-style: normal; font-size: 11px; font-weight: 600; margin-left: 8px; }
+.rev-cell em.up { color: var(--ok); }
+.rev-cell em.down { color: var(--bad); }
+.period-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 14px; }
+.period-bar .tabs { flex: none; }
+.period-bar .input { width: auto; height: 34px; }
 .an-title { display: flex; align-items: center; gap: 9px; }
 .an-ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; flex: none; }
 .an-ic svg { width: 14px; height: 14px; }
