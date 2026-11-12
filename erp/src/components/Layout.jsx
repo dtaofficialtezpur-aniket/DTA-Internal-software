@@ -15,7 +15,8 @@ export const NAV = [
     ['collections', 'Credit & Collections', 'wallet'], ['pricelists', 'Pricelists & Offers', 'tag'], ['crm', 'Loyalty Programme', 'gift']]],
   ['Inventory', 'box', [['products', 'Products & Units', 'box'], ['inventory', 'Stock & Cycle Count', 'layers'], ['warehouse', 'Warehouse Orders', 'truck']]],
   ['Purchase', 'cart', [['purchase', 'Purchase & Landed Cost', 'cart'], ['scan', 'Bill Scan', 'scan']]],
-  ['Accounts', 'bank', [['bank', 'Bank Reconciliation', 'bank']]],
+  ['Accounting', 'book', [['accgate', 'Gateway of Accounts', 'home'], ['accv', 'Voucher Entry', 'edit'], ['accdb', 'Day Book', 'calendar'], ['accl', 'Ledger', 'book'], ['acctb', 'Trial Balance', 'scale'],
+    ['accpl', 'Profit & Loss', 'trend'], ['accbs', 'Balance Sheet', 'layers'], ['accm', 'Masters', 'columns'], ['bank', 'Bank Reconciliation', 'bank']]],
   ['HR', 'briefcase', [['hr', 'HR & Payroll', 'briefcase']]],
   ['Control', 'shield', [['reports', 'Reports', 'history'], ['security', 'Security Dashboard', 'shield'], ['audit', 'Audit Trail', 'history']]],
   ['Administration', 'settings', [['users', 'Users & Roles', 'user'], ['settings', 'Settings', 'settings']]],
@@ -66,7 +67,7 @@ export function Layout({ page, children }) {
             );
           })}
         </nav>
-        <div className="sidebar-foot">Demo version · Designed &amp; developed by DTA · v0.6</div>
+        <div className="sidebar-foot">Demo version · Designed &amp; developed by DTA · v0.7</div>
       </aside>
       {open && <div className="backdrop" style={{ zIndex: 25 }} onClick={() => setOpen(false)} />}
       <main className="main">

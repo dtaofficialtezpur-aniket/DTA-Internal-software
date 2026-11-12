@@ -29,13 +29,18 @@ import ModuleView from './pages/crm/ModuleView.jsx';
 import CrmHome from './pages/crm/CrmHome.jsx';
 import Forecasts from './pages/crm/Forecasts.jsx';
 import { CRM_KEYS } from './lib/crmMeta.js';
+import Gateway from './pages/acc/Gateway.jsx';
+import Vouchers from './pages/acc/Vouchers.jsx';
+import Masters from './pages/acc/Masters.jsx';
+import { BalanceSheet, DayBook, LedgerReport, ProfitLoss, TrialBalance } from './pages/acc/Reports.jsx';
 
 const PAGES = { dashboard: Dashboard, pos: Pos, sales: Sales, customers: Customers, collections: Collections, pricelists: Pricelists,
   products: Products, inventory: Inventory, warehouse: Warehouse, purchase: Purchase, reports: Reports, security: Security,
   audit: Audit, users: Users, settings: Settings, me: Portal, hr: Hr, crm: Crm, bank: Bank, scan: BillScan, crmhome: CrmHome, forecasts: Forecasts, analytics: Analytics,
+  accgate: Gateway, accv: Vouchers, accdb: DayBook, accl: LedgerReport, acctb: TrialBalance, accpl: ProfitLoss, accbs: BalanceSheet, accm: Masters,
   ...Object.fromEntries(CRM_KEYS.map((k) => [k, () => <ModuleView mod={k} />])) };
 const OWNER_ONLY = ['users', 'settings'];
-const HOME = { owner: 'dashboard', sales_manager: 'dashboard', accounts: 'dashboard', cashier: 'pos', salesman: 'pos', warehouse: 'warehouse', delivery: 'warehouse', security: 'security' };
+const HOME = { owner: 'dashboard', sales_manager: 'dashboard', accounts: 'accgate', cashier: 'pos', salesman: 'pos', warehouse: 'warehouse', delivery: 'warehouse', security: 'security' };
 
 const readHash = () => location.hash.replace(/^#\/?/, '').split('?')[0].split('/')[0];
 

@@ -18,7 +18,7 @@ export const ACCESS = {
   sales_manager: ['analytics', 'crmhome', 'leads', 'contacts', 'accounts', 'deals', 'tasks', 'meetings', 'calls', 'campaigns', 'forecasts', 'dashboard', 'pos', 'sales', 'customers', 'collections', 'pricelists', 'crm', 'products', 'inventory', 'warehouse', 'reports', 'me'],
   cashier: ['pos', 'sales', 'customers', 'collections', 'me'],
   salesman: ['crmhome', 'leads', 'contacts', 'accounts', 'deals', 'tasks', 'meetings', 'calls', 'campaigns', 'pos', 'sales', 'customers', 'collections', 'crm', 'me'],
-  accounts: ['analytics', 'dashboard', 'sales', 'customers', 'collections', 'purchase', 'scan', 'bank', 'hr', 'reports', 'me'],
+  accounts: ['accgate', 'accv', 'accdb', 'accl', 'acctb', 'accpl', 'accbs', 'accm', 'analytics', 'dashboard', 'sales', 'customers', 'collections', 'purchase', 'scan', 'bank', 'hr', 'reports', 'me'],
   warehouse: ['warehouse', 'inventory', 'products', 'me'],
   delivery: ['warehouse', 'me'],
   security: ['security', 'warehouse', 'me'],

@@ -6,11 +6,12 @@ export const NAV_COLORS = {
   tasks: '#7be495', meetings: '#b39dff', calls: '#5cc8ff',
   pos: '#ffd166', sales: '#8ecbff', customers: '#ff9fb2', collections: '#ffa86b', pricelists: '#7fe0c9', crm: '#ffc857',
   products: '#ffb870', inventory: '#6fd0ff', warehouse: '#c3a6ff', purchase: '#ff9d6c', scan: '#7fdcff', bank: '#79e0a6', hr: '#ff8fb8',
+  accgate: '#ffd166', accv: '#ff8a80', accdb: '#8ecbff', accl: '#b39dff', acctb: '#7fe0c9', accpl: '#6fe08f', accbs: '#ffb870', accm: '#aab8d6',
   reports: '#9ab6ff', security: '#ff9a8a', audit: '#d0b0ff', users: '#6fd6ff', settings: '#aab8d6',
 };
 export const SECTION_COLORS = {
   'CRM Sales': '#ff7aa8', Activities: '#7be495', 'Billing & Sales': '#ffd166', Inventory: '#6fd0ff', Purchase: '#ff9d6c',
-  Accounts: '#79e0a6', HR: '#ff8fb8', Control: '#9ab6ff', Administration: '#aab8d6',
+  Accounting: '#79e0a6', HR: '#ff8fb8', Control: '#9ab6ff', Administration: '#aab8d6',
 };
 // For light surfaces.
 export const MODULE_COLORS = {

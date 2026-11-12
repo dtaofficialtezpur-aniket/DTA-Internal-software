@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { buildSeed, DEMO_PINS } from './seed.js';
 import { nowIso, uid } from './format.js';
 
-const KEY = 'stc-erp-v4';
+const KEY = 'stc-erp-v5';
 const SESSION_KEY = 'stc-erp-user';
 const Ctx = createContext(null);
 
@@ -17,6 +17,9 @@ export const DEMO_KINDS = {
   adjustment: 'stock adjustments',
   crm_leads: 'new leads', crm_contacts: 'new contacts', crm_accounts: 'new accounts', crm_deals: 'new deals', crm_tasks: 'new tasks',
   dash_dashboard: 'new dashboards', dash_component: 'new dashboard components',
+  acc_contra: 'new contra vouchers', acc_payment: 'new payment vouchers', acc_receipt: 'new receipt vouchers', acc_journal: 'new journal vouchers',
+  acc_sales: 'new sales vouchers', acc_purchase: 'new purchase vouchers', acc_creditnote: 'new credit notes', acc_debitnote: 'new debit notes',
+  acc_ledger: 'new ledgers', acc_group: 'new account groups',
   crm_meetings: 'new meetings', crm_calls: 'new calls', crm_campaigns: 'new campaigns', crm_views: 'new custom views',
 };
 

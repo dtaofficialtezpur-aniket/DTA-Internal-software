@@ -1,4 +1,4 @@
-# Shanti Trading Company — ERP & CRM (v0.6, demo by DTA)
+# Shanti Trading Company — ERP & CRM (v0.7, demo by DTA)
 
 Business software for Shanti Trading Company, Parua, Tezpur (steel structurals,
 TMT rebars and allied products), built from the client's requirements
@@ -91,6 +91,25 @@ generated from the field definitions in `src/lib/crmMeta.js`, so every module ge
 - **Record page** – inline edit, deal stage path, notes, open/closed activities with quick add, related lists, timeline of
   every change, previous/next record, clone, delete, and **Convert lead** → account + contact + deal (+ billing customer).
 - **Global search** and **quick create (+)** in the top bar.
+
+## Accounting (Tally-style daily entry)
+
+**Accounting** holds a double-entry set of books. `src/lib/accounts.js` is the engine, `src/pages/acc/` the screens.
+
+- **Voucher Entry** – Contra (F4), Payment (F5), Receipt (F6), Journal (F7), Sales (F8), Purchase (F9), Credit Note (Ctrl+F8),
+  Debit Note (Ctrl+F9). Enter moves to the next field, Ctrl+A accepts, Esc clears; ledger fields type-ahead with the current
+  balance shown; Sales / Purchase vouchers add CGST + SGST or IGST by the party's state; the resulting Dr/Cr entry is shown before
+  saving. A **day summary** beside the form shows the date's cash and bank opening, received, paid and closing, and the vouchers
+  entered (edit or delete them there). Warns when cash or bank would go below zero.
+- **Automatic postings** – POS bills (sales by category, output GST, round off, cash / bank / customer), customer receipts and
+  goods receipts (purchase, input GST, freight) post to the books by themselves, so accounts always agree with billing.
+  Customers and suppliers are ledgers under Sundry Debtors / Creditors.
+- **Reports** – Day Book (filters, CSV, Tally XML), Ledger (running balance), Trial Balance (group tree: opening, debit, credit,
+  closing), Profit & Loss (trading account + P&L, stock valued from the inventory), Balance Sheet (with tally check).
+- **Masters** – chart of accounts: Tally's primary groups, ledgers with opening balances, user groups.
+- **Gateway of Accounts** – Tally-like home with letter shortcuts, cash / bank / debtors / creditors and quick voucher buttons.
+- Roles: owner and Accounts post and edit; every voucher change is in the Audit Trail. Demo limit: 2 new vouchers per type per login.
+- Stock is not moved by accounting vouchers; use purchase orders and billing for inventory.
 
 ## Analytics (Zoho-style dashboards)
 
