@@ -166,3 +166,7 @@ appears when the limit is reached. Counters are kept in `demoUsage`, reset at lo
 - `src/lib/store.jsx` — state, persistence, audit logging, login.
 - `src/lib/seed.js` — demo data. `src/lib/print.js` — printable documents.
 - `src/pages/` — one file per screen. `src/components/` — layout and shared UI.
+
+
+### Voucher entry (Tally style, v0.8)
+The Voucher Entry screen follows Tally's keyboard-first sheet: voucher-type band with F4–F9 / Ctrl+F8 / Ctrl+F9 keys, `Account :` line with current balance, Particulars/Amount rows with a *List of Ledger Accounts* pop-up (arrows + Enter), Enter to move on, Ctrl+A to accept, Esc to clear, F2 date, Alt+C create ledger, Ctrl+D delete.

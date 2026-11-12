@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../../lib/store.jsx';
 import { allVouchers, balances, drcr, GST_RATES, groupIds, L, ledgerList, ledgerMap, num2, taxLedgerId, VKEYS, VTYPES, voucherNo, voucherTotal } from '../../lib/accounts.js';
 import { localDate } from '../../lib/crmMeta.js';
 import { money, nowIso, round2, uid } from '../../lib/format.js';
-import { DemoLeft, Empty, Field, Icon, PageHead } from '../../components/ui.jsx';
-import { go, LedgerForm, LedgerInput, particulars, TypeBadge, unstash, VoucherView } from './shared.jsx';
+import { DemoLeft, Empty, Icon } from '../../components/ui.jsx';
+import { go, LedgerForm, particulars, TypeBadge, unstash, VoucherView } from './shared.jsx';
 
 const MODE = { payment: 'single', receipt: 'single', contra: 'single', journal: 'journal', sales: 'invoice', purchase: 'invoice', creditnote: 'invoice', debitnote: 'invoice' };
 const SIDE = { payment: { account: 'cr', rows: 'dr' }, receipt: { account: 'dr', rows: 'cr' }, contra: { account: 'cr', rows: 'dr' } };
@@ -23,6 +24,8 @@ const blank = (type, date) => ({
 export default function Vouchers() {
   const { db, user, update, toast, guard } = useStore();
   const root = useRef();
+  const wrapRef = useRef();
+  const [showEntry, setShowEntry] = useState(false);
   const [type, setType] = useState('payment');
   const [form, setForm] = useState(() => blank('payment', localDate()));
   const [nonce, setNonce] = useState(0);
@@ -45,7 +48,7 @@ export default function Vouchers() {
   const bal = useMemo(() => balances(db, '0000-01-01', form.date), [db, form.date]);
   const cur = (id) => (id ? drcr(bal.get(id)?.close || 0) : '');
 
-  const reset = (t = type, date = form.date) => { setForm(blank(t, date)); setNonce((n) => n + 1); setTimeout(() => root.current?.querySelector('[data-f]')?.focus(), 30); };
+  const reset = (t = type, date = form.date) => { setForm(blank(t, date)); setNonce((n) => n + 1); setTimeout(() => root.current?.querySelector('.tally-body [data-f]')?.focus(), 40); };
   const switchType = (t) => { setType(t); reset(t); };
   const edit = (v) => { setView(null); setType(v.type); setForm({ ...v.form, id: v.id }); setNonce((n) => n + 1); };
 
@@ -62,6 +65,8 @@ export default function Vouchers() {
       if (document.querySelector('.modal')) return;
       const t = e.ctrlKey ? { F8: 'creditnote', F9: 'debitnote' }[e.key] : { F4: 'contra', F5: 'payment', F6: 'receipt', F7: 'journal', F8: 'sales', F9: 'purchase' }[e.key];
       if (t) { e.preventDefault(); switchType(t); }
+      if (e.key === 'F2') { e.preventDefault(); root.current?.querySelector('[data-date]')?.focus(); }
+      if (e.ctrlKey && e.key.toLowerCase() === 'd' && form.id) { e.preventDefault(); const v = db.acc.vouchers.find((x) => x.id === form.id); if (v) remove(v); }
       if (e.altKey && e.key.toLowerCase() === 'c') { e.preventDefault(); setNewLedger(true); }
     };
     window.addEventListener('keydown', h);
@@ -145,7 +150,7 @@ export default function Vouchers() {
       e.preventDefault();
       const els = [...root.current.querySelectorAll('[data-f]')];
       const i = els.indexOf(e.target);
-      if (e.target.dataset.last === '1' && mode !== 'invoice') { addRow(); setTimeout(() => { const n = [...root.current.querySelectorAll('[data-f]')]; n[Math.max(0, n.length - (mode === 'journal' ? 3 : 2))]?.focus(); }, 30); }
+      if (e.target.dataset.last === '1' && mode !== 'invoice') { const idx = form.rows.length; addRow(); setTimeout(() => root.current?.querySelector(`[data-row="${idx}"][data-f]`)?.focus(), 40); }
       else els[i + 1]?.focus();
     }
   };
@@ -161,111 +166,134 @@ export default function Vouchers() {
   }, [db, form.date, leds]);
   const shiftDay = (n) => { const d = new Date(form.date + 'T00:00:00'); d.setDate(d.getDate() + n); setForm({ ...form, date: localDate(d) }); };
 
+  const total = round2(mode === 'single' ? form.rows.reduce((a, r) => a + (Number(r.amount) || 0), 0) : mode === 'journal' ? totalDr : totalDr);
+  const weekday = new Date(form.date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long' });
+  const voucherNoText = form.id ? db.acc.vouchers.find((v) => v.id === form.id)?.no : voucherNo(type, (db.acc.seq[type] || 0) + 1);
+  const taxRows = built.lines.filter((l) => /^l-[oi]-/.test(l.ledger));
+  const jTot = { dr: round2(form.rows.filter((r) => r.side === 'dr').reduce((a, r) => a + (Number(r.amount) || 0), 0)), cr: round2(form.rows.filter((r) => r.side === 'cr').reduce((a, r) => a + (Number(r.amount) || 0), 0)) };
+  const field = (id, onChange, options, extra = {}) => <LedgerField value={id} onChange={onChange} options={options} {...extra} />;
+
   return (
-    <div className="page acc-page" onKeyDown={onKey} ref={root}>
-      <PageHead title="Voucher Entry" sub="Accounting vouchers · enter daily transactions like Tally">
-        <DemoLeft kind={'acc_' + type} />
-        <button className="btn" onClick={() => setNewLedger(true)} title="Alt + C"><Icon name="plus" />Create ledger</button>
-      </PageHead>
-
-      <div className="vtabs" role="tablist">
-        {VKEYS.map((k) => (
-          <button key={k} role="tab" aria-selected={type === k} className={type === k ? 'on' : ''} style={{ '--c': VTYPES[k].color }} onClick={() => switchType(k)}>
-            <kbd>{VTYPES[k].key}</kbd>{VTYPES[k].label}
-          </button>
-        ))}
-      </div>
-
-      <div className="acc-grid">
-        <div className="card acc-form" key={nonce}>
-          <div className="acc-form-head" style={{ borderTopColor: vt.color }}>
-            <div><span className="vtype big" style={{ color: vt.color, background: vt.color + '1a' }}>{vt.label}</span> <span className="small muted">{vt.hint}</span></div>
-            {form.id && <span className="badge gold">Editing {db.acc.vouchers.find((v) => v.id === form.id)?.no}</span>}
-          </div>
-          <div className="card-body grid" style={{ gap: 14 }}>
-            <div className="grid g3">
-              <Field label="Voucher no."><input className="input" disabled value={form.id ? db.acc.vouchers.find((v) => v.id === form.id)?.no : voucherNo(type, (db.acc.seq[type] || 0) + 1)} /></Field>
-              <Field label="Date"><input className="input" type="date" data-f="1" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></Field>
-              {mode === 'invoice' && <Field label={['sales', 'creditnote'].includes(type) ? 'Invoice / reference no.' : "Supplier's bill no."}><input className="input" data-f="1" value={form.ref} onChange={(e) => setForm({ ...form, ref: e.target.value })} /></Field>}
+    <div className="page acc-page tally" onKeyDown={onKey} ref={root}>
+      <div className="tally-wrap" ref={wrapRef}>
+        <LedgerCtx.Provider value={{ wrap: wrapRef, cur, create: () => setNewLedger(true) }}>
+          <div className="tally-main">
+            <div className="vstrip">
+              {VKEYS.map((k) => (
+                <button key={k} className={`key-btn ${type === k ? 'on' : ''}`} style={{ '--c': VTYPES[k].color }} onClick={() => switchType(k)} tabIndex={-1}><kbd>{VTYPES[k].key}</kbd><span>{VTYPES[k].label}</span></button>
+              ))}
+              <span className="grow" />
+              <button className="key-btn" onClick={() => root.current?.querySelector('[data-date]')?.focus()} tabIndex={-1}><kbd>F2</kbd><span>Date</span></button>
+              <button className="key-btn" onClick={() => setNewLedger(true)} tabIndex={-1}><kbd>Alt+C</kbd><span>Create ledger</span></button>
+              {form.id && <button className="key-btn" onClick={() => { const v = db.acc.vouchers.find((x) => x.id === form.id); if (v) remove(v); }} tabIndex={-1}><kbd>Ctrl+D</kbd><span>Delete</span></button>}
+            </div>
+          <section className="tally-sheet">
+            <div className="tally-title"><span>Accounting Voucher {form.id ? 'Alteration' : 'Creation'}</span><span>{db.company.name}</span></div>
+            <div className="tally-head">
+              <span className="tally-vtype" style={{ background: vt.color }}>{vt.label}</span>
+              <span className="tally-no">No. <b>{voucherNoText}</b></span>
+              {mode === 'invoice' && <label className="tally-ref">{['sales', 'creditnote'].includes(type) ? 'Ref' : 'Supplier bill no.'}<input className="tf" data-f="1" value={form.ref} onChange={(e) => setForm({ ...form, ref: e.target.value })} /></label>}
+              <span className="grow" />
+              <label className="tally-date"><input className="tf" type="date" data-f="1" data-date="1" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} aria-label="Voucher date" /><b>{weekday}</b></label>
             </div>
 
-            {mode === 'single' && (
-              <>
-                <Field label={LABELS[type][0]}>
-                  <div className="row"><div className="grow"><LedgerInput value={form.account} onChange={(v) => setForm({ ...form, account: v })} options={set.cb} listId="dl-cb" dataF="1" autoFocus /></div><span className="curbal">{cur(form.account) && `Cur Bal: ${cur(form.account)}`}</span></div>
-                </Field>
-                <div className="acc-lines">
-                  <div className="acc-lines-head"><span>{LABELS[type][1]}</span><span className="num">Amount (₹)</span><span /></div>
-                  {form.rows.map((r, i) => (
-                    <div className="acc-line" key={i}>
-                      <div><LedgerInput value={r.ledger} onChange={(v) => setRow(i, { ledger: v })} options={type === 'contra' ? set.cb : set.all} listId={type === 'contra' ? 'dl-cb' : 'dl-all'} dataF="1" /><span className="curbal">{cur(r.ledger) && `Cur Bal: ${cur(r.ledger)}`}</span></div>
-                      <input className="input num" inputMode="decimal" data-f="1" data-last={i === form.rows.length - 1 ? '1' : undefined} value={r.amount} placeholder="0.00" onChange={(e) => setRow(i, { amount: e.target.value.replace(/[^\d.]/g, '') })} aria-label="Amount" />
-                      <button className="btn ghost icon-btn sm" disabled={form.rows.length === 1} onClick={() => setForm({ ...form, rows: form.rows.filter((_, j) => j !== i) })} aria-label="Remove line"><Icon name="x" /></button>
-                    </div>
-                  ))}
-                  <button className="btn sm" onClick={addRow}><Icon name="plus" />Add line</button>
-                </div>
-              </>
-            )}
+            <div className="tally-body" key={nonce}>
+              {mode === 'single' && (
+                <>
+                  <div className="t-acc"><span className="t-lbl">{LABELS[type][0]}</span><span>:</span>{field(form.account, (v) => setForm((f) => ({ ...f, account: v })), set.cb, { autoFocus: true, dataRow: 'a' })}<span className="t-cur">{cur(form.account) && `Cur Bal: ${cur(form.account)}`}</span></div>
+                  <table className="t-table">
+                    <thead><tr><th>Particulars</th><th className="num">Amount</th><th style={{ width: 28 }} /></tr></thead>
+                    <tbody>{form.rows.map((r, i) => (
+                      <tr key={i}>
+                        <td>{field(r.ledger, (v) => setRow(i, { ledger: v }), type === 'contra' ? set.cb : set.all, { dataRow: i })}{r.ledger && <div className="t-cur">Cur Bal: {cur(r.ledger)}</div>}</td>
+                        <td className="num"><input className="tf num" inputMode="decimal" data-f="1" data-row={i} data-last={i === form.rows.length - 1 ? '1' : undefined} value={r.amount} placeholder="" onChange={(e) => setRow(i, { amount: e.target.value.replace(/[^\d.]/g, '') })} aria-label="Amount" /></td>
+                        <td>{form.rows.length > 1 && <button className="t-x" onClick={() => setForm({ ...form, rows: form.rows.filter((_, j) => j !== i) })} aria-label="Remove line" tabIndex={-1}>×</button>}</td>
+                      </tr>
+                    ))}</tbody>
+                    <tfoot><tr><td><button className="t-add" onClick={addRow} tabIndex={-1}>+ Add line</button></td><td className="num t-total">{num2(total)}</td><td /></tr></tfoot>
+                  </table>
+                </>
+              )}
 
-            {mode === 'journal' && (
-              <div className="acc-lines">
-                <div className="acc-lines-head j"><span>Dr / Cr</span><span>Particulars</span><span className="num">Amount (₹)</span><span /></div>
-                {form.rows.map((r, i) => (
-                  <div className="acc-line j" key={i}>
-                    <select className="input" data-f="1" value={r.side} onChange={(e) => setRow(i, { side: e.target.value })} aria-label="Dr or Cr"><option value="dr">Dr</option><option value="cr">Cr</option></select>
-                    <div><LedgerInput value={r.ledger} onChange={(v) => setRow(i, { ledger: v })} options={set.all} listId="dl-all" dataF="1" /><span className="curbal">{cur(r.ledger) && `Cur Bal: ${cur(r.ledger)}`}</span></div>
-                    <input className="input num" inputMode="decimal" data-f="1" data-last={i === form.rows.length - 1 ? '1' : undefined} value={r.amount} placeholder="0.00" onChange={(e) => setRow(i, { amount: e.target.value.replace(/[^\d.]/g, '') })} aria-label="Amount" />
-                    <button className="btn ghost icon-btn sm" disabled={form.rows.length <= 2} onClick={() => setForm({ ...form, rows: form.rows.filter((_, j) => j !== i) })} aria-label="Remove line"><Icon name="x" /></button>
+              {mode === 'journal' && (
+                <table className="t-table">
+                  <thead><tr><th style={{ width: 54 }}>Dr / Cr</th><th>Particulars</th><th className="num" style={{ width: 150 }}>Debit</th><th className="num" style={{ width: 150 }}>Credit</th><th style={{ width: 28 }} /></tr></thead>
+                  <tbody>{form.rows.map((r, i) => {
+                    const amt = (side) => (r.side === side
+                      ? <input className="tf num" inputMode="decimal" data-f="1" data-row={i} data-last={i === form.rows.length - 1 ? '1' : undefined} value={r.amount} onChange={(e) => setRow(i, { amount: e.target.value.replace(/[^\d.]/g, '') })} aria-label={side === 'dr' ? 'Debit' : 'Credit'} /> : null);
+                    return (
+                      <tr key={i}>
+                        <td><select className="tf" data-f="1" data-row={i} value={r.side} onChange={(e) => setRow(i, { side: e.target.value })} aria-label="Dr or Cr"><option value="dr">Dr</option><option value="cr">Cr</option></select></td>
+                        <td>{field(r.ledger, (v) => setRow(i, { ledger: v }), set.all, { dataRow: i, autoFocus: i === 0 })}{r.ledger && <div className="t-cur">Cur Bal: {cur(r.ledger)}</div>}</td>
+                        <td className="num">{amt('dr')}</td><td className="num">{amt('cr')}</td>
+                        <td>{form.rows.length > 2 && <button className="t-x" onClick={() => setForm({ ...form, rows: form.rows.filter((_, j) => j !== i) })} aria-label="Remove line" tabIndex={-1}>×</button>}</td>
+                      </tr>
+                    );
+                  })}</tbody>
+                  <tfoot><tr><td /><td><button className="t-add" onClick={addRow} tabIndex={-1}>+ Add line</button></td><td className="num t-total">{num2(jTot.dr)}</td><td className="num t-total">{num2(jTot.cr)}</td><td /></tr></tfoot>
+                </table>
+              )}
+
+              {mode === 'invoice' && (
+                <>
+                  <div className="t-acc"><span className="t-lbl">{LABELS[type][0]}</span><span>:</span>{field(form.party, (v) => setForm((f) => ({ ...f, party: v })), set.party(type), { autoFocus: true })}<span className="t-cur">{cur(form.party) && `Cur Bal: ${cur(form.party)}`}</span></div>
+                  <div className="t-inline">
+                    <label>GST rate <select className="tf" data-f="1" value={form.rate} onChange={(e) => setForm({ ...form, rate: Number(e.target.value) })}><option value={0}>No GST</option>{GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}</select></label>
+                    <label>GST type <select className="tf" data-f="1" value={form.gstType} onChange={(e) => setForm({ ...form, gstType: e.target.value })}><option value="auto">Auto (by party state)</option><option value="intra">CGST + SGST</option><option value="inter">IGST</option></select></label>
                   </div>
-                ))}
-                <button className="btn sm" onClick={addRow}><Icon name="plus" />Add line</button>
-              </div>
-            )}
+                  <table className="t-table">
+                    <thead><tr><th>Particulars</th><th className="num" style={{ width: 70 }}>Rate</th><th className="num" style={{ width: 180 }}>Amount</th></tr></thead>
+                    <tbody>
+                      <tr>
+                        <td><span className="t-lbl small">{LABELS[type][1]}</span>{field(form.main, (v) => setForm((f) => ({ ...f, main: v })), set.main(type), { dataRow: 0 })}{form.main && <div className="t-cur">Cur Bal: {cur(form.main)}</div>}</td>
+                        <td />
+                        <td className="num"><input className="tf num" inputMode="decimal" data-f="1" data-row={0} data-last="1" value={form.taxable} onChange={(e) => setForm({ ...form, taxable: e.target.value.replace(/[^\d.]/g, '') })} aria-label="Amount before GST" /></td>
+                      </tr>
+                      {taxRows.map((l) => (
+                        <tr key={l.ledger} className="t-auto"><td><i>{names.get(l.ledger)?.name}</i></td><td className="num">{String(names.get(l.ledger)?.name || '').match(/@ ([\d.]+)%/)?.[1]}%</td><td className="num">{num2(l.dr || l.cr)}</td></tr>
+                      ))}
+                    </tbody>
+                    <tfoot><tr><td /><td /><td className="num t-total">{num2(round2((built.lines.find((l) => l.ledger === form.party)?.dr || 0) + (built.lines.find((l) => l.ledger === form.party)?.cr || 0)))}</td></tr></tfoot>
+                  </table>
+                </>
+              )}
+            </div>
 
-            {mode === 'invoice' && (
-              <div className="grid g2">
-                <div style={{ gridColumn: '1 / -1' }}><Field label={LABELS[type][0]}><div className="row"><div className="grow"><LedgerInput value={form.party} onChange={(v) => setForm({ ...form, party: v })} options={set.party(type)} listId={`dl-party-${type}`} dataF="1" autoFocus /></div><span className="curbal">{cur(form.party) && `Cur Bal: ${cur(form.party)}`}</span></div></Field></div>
-                <div style={{ gridColumn: '1 / -1' }}><Field label={LABELS[type][1]}><LedgerInput value={form.main} onChange={(v) => setForm({ ...form, main: v })} options={set.main(type)} listId={`dl-main-${type}`} dataF="1" /></Field></div>
-                <Field label="Amount before GST (₹)"><input className="input num" inputMode="decimal" data-f="1" value={form.taxable} placeholder="0.00" onChange={(e) => setForm({ ...form, taxable: e.target.value.replace(/[^\d.]/g, '') })} /></Field>
-                <Field label="GST rate"><select className="input" data-f="1" value={form.rate} onChange={(e) => setForm({ ...form, rate: Number(e.target.value) })}><option value={0}>No GST</option>{GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}</select></Field>
-                <div style={{ gridColumn: '1 / -1' }}><Field label="GST type" hint="Auto: inter-state when the party's state differs from yours"><select className="input" data-f="1" data-last="1" value={form.gstType} onChange={(e) => setForm({ ...form, gstType: e.target.value })}><option value="auto">Auto from the party's state</option><option value="intra">Intra-state (CGST + SGST)</option><option value="inter">Inter-state (IGST)</option></select></Field></div>
-              </div>
-            )}
+            <div className="tally-narr"><span>Narration:</span><textarea className="tf" rows={2} data-f="1" value={form.narration} onChange={(e) => setForm({ ...form, narration: e.target.value })} placeholder="" /></div>
 
-            <Field label="Narration"><textarea className="input" rows={2} value={form.narration} placeholder="e.g. Paid electricity bill for October" onChange={(e) => setForm({ ...form, narration: e.target.value })} /></Field>
-
-            {built.lines.length > 0 && (
-              <div className="acc-preview">
+            {built.warn.map((w) => <div key={w} className="alert warn" style={{ margin: '0 16px 10px' }}><Icon name="alert" />{w}</div>)}
+            {built.lines.length > 0 && Math.abs(totalDr - totalCr) > 0.005 && <div className="alert bad" style={{ margin: '0 16px 10px' }}><Icon name="alert" />Debit and credit differ by {num2(Math.abs(totalDr - totalCr))}.</div>}
+            {showEntry && built.lines.length > 0 && (
+              <div className="acc-preview" style={{ margin: '0 16px 12px' }}>
                 <div className="small muted strong" style={{ marginBottom: 6 }}>ACCOUNTING ENTRY</div>
                 <table className="t"><tbody>
                   {built.lines.map((l, i) => <tr key={i}><td style={{ width: 36 }}><span className={`drcr ${l.dr ? 'dr' : 'cr'}`}>{l.dr ? 'Dr' : 'Cr'}</span></td><td>{names.get(l.ledger)?.name}</td><td className="num">{l.dr ? num2(l.dr) : ''}</td><td className="num">{l.cr ? num2(l.cr) : ''}</td></tr>)}
                 </tbody><tfoot><tr><td /><td>Total</td><td className="num">{num2(totalDr)}</td><td className="num">{num2(totalCr)}</td></tr></tfoot></table>
               </div>
             )}
-            {built.warn.map((w) => <div key={w} className="alert warn"><Icon name="alert" />{w}</div>)}
-            {built.lines.length > 0 && Math.abs(totalDr - totalCr) > 0.005 && <div className="alert bad"><Icon name="alert" />Debit and credit differ by {num2(Math.abs(totalDr - totalCr))}.</div>}
+            <div className="tally-foot">
+              <button className="t-link" onClick={() => setShowEntry(!showEntry)} tabIndex={-1}>{showEntry ? 'Hide' : 'Show'} Dr / Cr entry</button>
+              <DemoLeft kind={'acc_' + type} />
+              <span className="grow" />
+              <button className="btn" onClick={() => reset()} tabIndex={-1}>Quit <kbd>Esc</kbd></button>
+              <button className="btn primary" onClick={save} disabled={!canPost} title={canPost ? '' : 'Only Accounts and the owner can post vouchers'}><Icon name="check" />{form.id ? 'Update' : 'Accept'} <kbd>Ctrl+A</kbd></button>
+            </div>
+          </section>
           </div>
-          <div className="acc-foot">
-            <span className="small muted"><kbd>Enter</kbd> next field · <kbd>Ctrl</kbd>+<kbd>A</kbd> accept · <kbd>Esc</kbd> clear · <kbd>F4</kbd>–<kbd>F9</kbd> voucher type</span>
-            <div className="grow" />
-            <button className="btn" onClick={() => reset()}>Clear</button>
-            <button className="btn primary lg" onClick={save} disabled={!canPost} title={canPost ? '' : 'Only Accounts and the owner can post vouchers'}><Icon name="check" />{form.id ? 'Update voucher' : 'Accept'}</button>
-          </div>
-        </div>
+        </LedgerCtx.Provider>
 
-        <div className="grid" style={{ gap: 14, alignContent: 'start' }}>
+        <aside className="tally-side">
           <div className="card">
             <div className="card-head">
-              <div><h3>Day summary</h3><p>{new Date(form.date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p></div>
+              <div><h3>Day summary</h3><p>{new Date(form.date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</p></div>
               <div className="row" style={{ gap: 2 }}>
-                <button className="btn ghost icon-btn sm" onClick={() => shiftDay(-1)} aria-label="Previous day"><Icon name="chevronLeft" /></button>
-                <button className="btn ghost sm" onClick={() => setForm({ ...form, date: localDate() })}>Today</button>
-                <button className="btn ghost icon-btn sm" onClick={() => shiftDay(1)} aria-label="Next day"><Icon name="chevronRight" /></button>
+                <button className="btn ghost icon-btn sm" onClick={() => shiftDay(-1)} aria-label="Previous day" tabIndex={-1}><Icon name="chevronLeft" /></button>
+                <button className="btn ghost sm" onClick={() => setForm({ ...form, date: localDate() })} tabIndex={-1}>Today</button>
+                <button className="btn ghost icon-btn sm" onClick={() => shiftDay(1)} aria-label="Next day" tabIndex={-1}><Icon name="chevronRight" /></button>
               </div>
             </div>
             <div className="table-wrap"><table className="t"><thead><tr><th /><th className="num">Opening</th><th className="num">Received</th><th className="num">Paid</th><th className="num">Closing</th></tr></thead><tbody>
-              {[['Cash', day.cash], ['Bank', day.bank]].map(([n, b]) => <tr key={n}><td className="strong">{n}</td><td className="num">{num2(b.open)}</td><td className="num" style={{ color: 'var(--ok)' }}>{num2(b.dr)}</td><td className="num" style={{ color: 'var(--bad)' }}>{num2(b.cr)}</td><td className="num strong">{num2(b.close)}</td></tr>)}
+              {[['Cash', day.cash], ['Bank', day.bank]].map(([n, bb]) => <tr key={n}><td className="strong">{n}</td><td className="num">{num2(bb.open)}</td><td className="num" style={{ color: 'var(--ok)' }}>{num2(bb.dr)}</td><td className="num" style={{ color: 'var(--bad)' }}>{num2(bb.cr)}</td><td className="num strong">{num2(bb.close)}</td></tr>)}
             </tbody></table></div>
           </div>
           <div className="card">
@@ -273,24 +301,60 @@ export default function Vouchers() {
             {day.manual.map((v) => (
               <div className="list-row" key={v.id}>
                 <TypeBadge type={v.type} />
-                <button className="grow small day-link" onClick={() => setView(v)}><b>{v.no}</b> · {particulars(v, names)}<div className="muted">{v.narration}</div></button>
+                <button className="grow small day-link" onClick={() => setView(v)} tabIndex={-1}><b>{v.no}</b> · {particulars(v, names)}<div className="muted">{v.narration}</div></button>
                 <b className="small">{num2(voucherTotal(v))}</b>
-                {canPost && <><button className="btn ghost icon-btn sm" onClick={() => edit(v)} aria-label="Edit voucher"><Icon name="edit" /></button><button className="btn ghost icon-btn sm" onClick={() => remove(v)} aria-label="Delete voucher"><Icon name="trash" style={{ color: 'var(--bad)' }} /></button></>}
+                {canPost && <><button className="btn ghost icon-btn sm" onClick={() => edit(v)} aria-label="Edit voucher" tabIndex={-1}><Icon name="edit" /></button><button className="btn ghost icon-btn sm" onClick={() => remove(v)} aria-label="Delete voucher" tabIndex={-1}><Icon name="trash" style={{ color: 'var(--bad)' }} /></button></>}
               </div>
             ))}
             {!day.manual.length && <Empty icon="book" text="No vouchers entered for this date yet." />}
             {day.auto.length > 0 && <div className="small muted card-body" style={{ borderTop: '1px solid var(--line-2)' }}>{day.auto.length} bill(s) and receipt(s) were posted automatically from billing. <a href="#/accdb" onClick={() => { sessionStorage.setItem('stc-acc-day', JSON.stringify(form.date)); }}>View in Day Book</a></div>}
           </div>
-        </div>
+        </aside>
       </div>
 
-      <datalist id="dl-all">{set.all.map((l) => <option key={l.id} value={l.name} />)}</datalist>
-      <datalist id="dl-cb">{set.cb.map((l) => <option key={l.id} value={l.name} />)}</datalist>
-      <datalist id={`dl-party-${type}`}>{set.party(type).map((l) => <option key={l.id} value={l.name} />)}</datalist>
-      <datalist id={`dl-main-${type}`}>{set.main(type).map((l) => <option key={l.id} value={l.name} />)}</datalist>
       {view && <VoucherView v={view} onClose={() => setView(null)} onEdit={edit} />}
-      {newLedger && <LedgerForm onClose={() => setNewLedger(false)} onSaved={() => toast('Ledger created — it is now available in the lists')} />}
+      {newLedger && <LedgerForm onClose={() => setNewLedger(false)} onSaved={() => toast('Ledger created — it is now available in the list')} />}
     </div>
+  );
+}
+
+// ---------- Tally-style ledger field: type to search, a "List of Ledger Accounts" opens on the right ----------
+const LedgerCtx = createContext(null);
+function LedgerField({ value, onChange, options, dataRow, dataLast, autoFocus }) {
+  const ctx = useContext(LedgerCtx);
+  const [text, setText] = useState(options.find((l) => l.id === value)?.name || '');
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const [top, setTop] = useState(0);
+  const el = useRef();
+  const exact = options.find((l) => l.name.toLowerCase() === text.trim().toLowerCase());
+  const q = exact && exact.id === value ? '' : text.trim().toLowerCase();
+  const matches = options.filter((l) => !q || l.name.toLowerCase().includes(q)).slice(0, 40);
+  useLayoutEffect(() => {
+    if (open && ctx.wrap.current && el.current) setTop(Math.max(0, el.current.getBoundingClientRect().top - ctx.wrap.current.getBoundingClientRect().top - 6));
+  }, [open, text, ctx.wrap]);
+  const pick = (l) => { setText(l.name); onChange(l.id); setOpen(false); };
+  return (
+    <>
+      <input ref={el} className="tf" data-f="1" data-row={dataRow} data-last={dataLast} value={text} autoFocus={autoFocus} aria-label="Ledger" autoComplete="off"
+        style={value || !text ? undefined : { color: 'var(--bad)' }}
+        onFocus={(e) => { setOpen(true); e.target.select(); }} onBlur={() => setTimeout(() => setOpen(false), 130)}
+        onChange={(e) => { setText(e.target.value); setActive(0); setOpen(true); const m = options.find((l) => l.name.toLowerCase() === e.target.value.trim().toLowerCase()); onChange(m ? m.id : ''); }}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') { e.preventDefault(); setOpen(true); setActive((a) => Math.min(a + 1, matches.length - 1)); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
+          else if (e.key === 'Enter' && open && matches.length && !(exact && exact.id === value)) pick(matches[Math.min(active, matches.length - 1)]);
+        }} />
+      {open && ctx.wrap.current && createPortal(
+        <div className="lf-list" style={{ top }} onMouseDown={(e) => e.preventDefault()}>
+          <div className="lf-head">List of Ledger Accounts</div>
+          <button className="lf-item create" onMouseDown={() => { setOpen(false); ctx.create(); }}>+ Create <kbd>Alt+C</kbd></button>
+          <div className="lf-scroll">
+            {matches.map((l, i) => <button key={l.id} className={`lf-item ${i === active ? 'on' : ''}`} onMouseDown={() => pick(l)}><span className="grow">{l.name}</span><span className="lf-bal">{ctx.cur(l.id)}</span></button>)}
+            {!matches.length && <div className="lf-empty">No ledger matches "{text}"</div>}
+          </div>
+        </div>, ctx.wrap.current)}
+    </>
   );
 }
 export { go };

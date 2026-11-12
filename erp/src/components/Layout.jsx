@@ -67,7 +67,7 @@ export function Layout({ page, children }) {
             );
           })}
         </nav>
-        <div className="sidebar-foot">Demo version · Designed &amp; developed by DTA · v0.7</div>
+        <div className="sidebar-foot">Demo version · Designed &amp; developed by DTA · v0.8</div>
       </aside>
       {open && <div className="backdrop" style={{ zIndex: 25 }} onClick={() => setOpen(false)} />}
       <main className="main">
